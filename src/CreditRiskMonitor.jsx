@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback, Component } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef, Component } from "react";
 
 // ─── ERROR BOUNDARY ────────────────────────────────────────────────────────
 class ErrorBoundary extends Component {
@@ -1392,6 +1392,78 @@ export default function CreditRiskMonitor() {
   const [showOverrideModal, setShowOverrideModal] = useState(null);
   const [overrideReason, setOverrideReason] = useState("");
 
+  // ─── NAVIGATION HISTORY ───────────────────────────────────────────────
+  const [navHistory, setNavHistory] = useState([{ selected: null, tab: "overview", detailTab: "financials" }]);
+  const [navPos, setNavPos] = useState(0);
+  const isNavigating = useRef(false); // prevent popstate feedback loops
+
+  const navigate = useCallback((newSelected, newTab, newDetailTab) => {
+    const entry = { selected: newSelected, tab: newTab || (newSelected ? tab : "overview"), detailTab: newDetailTab || "financials" };
+    setSelected(entry.selected);
+    setTab(entry.tab);
+    setDetailTab(entry.detailTab);
+    setNavHistory(prev => {
+      const trimmed = prev.slice(0, navPos + 1);
+      return [...trimmed, entry];
+    });
+    setNavPos(prev => prev + 1);
+    // Push to browser history so phone back button works
+    try {
+      if (!isNavigating.current) {
+        window.history.pushState(entry, "", newSelected ? `#${newSelected}` : "#");
+      }
+    } catch(e) {}
+  }, [tab, navPos]);
+
+  const canGoBack = navPos > 0;
+  const canGoForward = navPos < navHistory.length - 1;
+
+  const goBack = useCallback(() => {
+    if (!canGoBack) return;
+    const newPos = navPos - 1;
+    const entry = navHistory[newPos];
+    isNavigating.current = true;
+    setNavPos(newPos);
+    setSelected(entry.selected);
+    setTab(entry.tab);
+    setDetailTab(entry.detailTab);
+    try { window.history.back(); } catch(e) {}
+    setTimeout(() => { isNavigating.current = false; }, 100);
+  }, [navPos, navHistory, canGoBack]);
+
+  const goForward = useCallback(() => {
+    if (!canGoForward) return;
+    const newPos = navPos + 1;
+    const entry = navHistory[newPos];
+    isNavigating.current = true;
+    setNavPos(newPos);
+    setSelected(entry.selected);
+    setTab(entry.tab);
+    setDetailTab(entry.detailTab);
+    try { window.history.forward(); } catch(e) {}
+    setTimeout(() => { isNavigating.current = false; }, 100);
+  }, [navPos, navHistory, canGoForward]);
+
+  // Listen for browser back/forward buttons
+  useEffect(() => {
+    const onPopState = (e) => {
+      if (isNavigating.current) return;
+      if (e.state) {
+        setSelected(e.state.selected);
+        setTab(e.state.tab || "overview");
+        setDetailTab(e.state.detailTab || "financials");
+        // Find matching position in our history
+        setNavPos(prev => Math.max(0, prev - 1));
+      } else {
+        setSelected(null);
+        setTab("overview");
+        setNavPos(prev => Math.max(0, prev - 1));
+      }
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+
   // ─── LIVE DATA STATE ──────────────────────────────────────────────────
   const [secFilings, setSecFilings] = useState([]);
   const [liveNews, setLiveNews] = useState([]);
@@ -1559,8 +1631,12 @@ export default function CreditRiskMonitor() {
     return (
       <div style={root}>
         <div style={headerBar}>
-          <div style={{ display: "flex", alignItems: "center", gap: mob ? 8 : 16, flexWrap: "wrap" }}>
-            <button onClick={() => setSelected(null)} style={{ ...pill(false), border: "1px solid #334155" }}>{"\u2190"} Portfolio</button>
+          <div style={{ display: "flex", alignItems: "center", gap: mob ? 6 : 10, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", gap: 2 }}>
+              <button onClick={goBack} disabled={!canGoBack} style={{ ...pill(false), border: "1px solid #334155", opacity: canGoBack ? 1 : 0.3, cursor: canGoBack ? "pointer" : "default", padding: mob ? "6px 8px" : "6px 12px" }}>{"\u2190"}</button>
+              <button onClick={goForward} disabled={!canGoForward} style={{ ...pill(false), border: "1px solid #334155", opacity: canGoForward ? 1 : 0.3, cursor: canGoForward ? "pointer" : "default", padding: mob ? "6px 8px" : "6px 12px" }}>{"\u2192"}</button>
+            </div>
+            <button onClick={() => navigate(null, "overview", "financials")} style={{ ...pill(false), border: "1px solid #334155" }}>Portfolio</button>
             <div>
               <span style={{ fontSize: mob ? 16 : 18, fontWeight: 700, color: "#f1f5f9" }}>{detail.id}</span>
               <span style={{ fontSize: mob ? 11 : 13, color: "#94a3b8", marginLeft: 8 }}>{mob ? "" : detail.name}</span>
@@ -2812,15 +2888,19 @@ export default function CreditRiskMonitor() {
   return (
     <div style={root}>
       <div style={headerBar}>
-        <div style={{ display: "flex", alignItems: "center", gap: mob ? 8 : 16, flex: 1, minWidth: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: mob ? 6 : 16, flex: 1, minWidth: 0 }}>
+          <div style={{ display: "flex", gap: 2, flexShrink: 0 }}>
+            <button onClick={goBack} disabled={!canGoBack} style={{ ...pill(false), border: "1px solid #334155", opacity: canGoBack ? 1 : 0.3, cursor: canGoBack ? "pointer" : "default", padding: mob ? "6px 8px" : "6px 12px" }}>{"\u2190"}</button>
+            <button onClick={goForward} disabled={!canGoForward} style={{ ...pill(false), border: "1px solid #334155", opacity: canGoForward ? 1 : 0.3, cursor: canGoForward ? "pointer" : "default", padding: mob ? "6px 8px" : "6px 12px" }}>{"\u2192"}</button>
+          </div>
           <div style={{ fontSize: mob ? 13 : 16, fontWeight: 800, letterSpacing: "-0.5px", color: "#f1f5f9", whiteSpace: "nowrap" }}>
-            <span style={{ color: "#ef4444" }}>{"\u25C6"}</span> EV CREDIT RISK MONITOR
+            <span style={{ color: "#ef4444" }}>{"\u25C6"}</span> CREDIT RISK MONITOR
           </div>
           {!mob && <div style={{ fontSize: 10, color: "#475569", borderLeft: "1px solid #334155", paddingLeft: 12 }}>
             {now.toLocaleDateString("en-US", { weekday: "short", year: "numeric", month: "short", day: "numeric" })} {"\u00B7"} {now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
           </div>}
         </div>
-        <div style={{ display: "flex", gap: mob ? 4 : 6 }}>
+        <div style={{ display: "flex", gap: mob ? 4 : 6, overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
           {["overview", "filings", "news", "analytics", "calendar"].map((t) => (
             <button key={t} onClick={() => setTab(t)} style={pill(tab === t)}>{t === "filings" ? "SEC Filings" : t}</button>
           ))}
@@ -2857,7 +2937,7 @@ export default function CreditRiskMonitor() {
             /* ─── MOBILE: Card layout ─── */
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {PORTFOLIO.map((c) => (
-                <div key={c.id} onClick={() => { setSelected(c.id); setDetailTab("financials"); }} style={{ ...card, cursor: "pointer", padding: 14 }}>
+                <div key={c.id} onClick={() => { navigate(c.id, tab, "financials"); }} style={{ ...card, cursor: "pointer", padding: 14 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
                     <div>
                       <span style={{ fontWeight: 700, fontSize: 16 }}>{c.id}</span>
@@ -2912,7 +2992,7 @@ export default function CreditRiskMonitor() {
               </thead>
               <tbody>
                 {PORTFOLIO.map((c) => (
-                  <tr key={c.id} onClick={() => { setSelected(c.id); setDetailTab("financials"); }} style={{ cursor: "pointer", borderBottom: "1px solid #1e293b", transition: "background .1s" }}
+                  <tr key={c.id} onClick={() => { navigate(c.id, tab, "financials"); }} style={{ cursor: "pointer", borderBottom: "1px solid #1e293b", transition: "background .1s" }}
                     onMouseEnter={(e) => (e.currentTarget.style.background = "#1e293b")}
                     onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
                   >
@@ -2992,7 +3072,7 @@ export default function CreditRiskMonitor() {
                 <div style={{ width: mob ? "auto" : 28, fontSize: 14, textAlign: "center", flexShrink: 0 }}>{sevIcon[f.severity]}</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                    <span style={{ color: "#3b82f6", fontWeight: 700, fontSize: 12, cursor: "pointer" }} onClick={() => { setSelected(f.ticker); setDetailTab("financials"); }}>{f.ticker}</span>
+                    <span style={{ color: "#3b82f6", fontWeight: 700, fontSize: 12, cursor: "pointer" }} onClick={() => { navigate(f.ticker, tab, "financials"); }}>{f.ticker}</span>
                     <span style={{ padding: "1px 6px", borderRadius: 3, fontSize: 9, fontWeight: 700, background: `${sevColor[f.severity]}22`, color: sevColor[f.severity], border: `1px solid ${sevColor[f.severity]}44` }}>{f.form}</span>
                     <span style={{ fontSize: 12, fontWeight: 600, color: "#e2e8f0" }}>{f.label}</span>
                   </div>
@@ -3062,7 +3142,7 @@ export default function CreditRiskMonitor() {
                     const cf = ltmAdjCashFlow(c);
                     const ws = getWatchlistStatus(c);
                     return (
-                      <tr key={c.id} style={{ borderBottom: "1px solid #1e293b", cursor: "pointer" }} onClick={() => { setSelected(c.id); setDetailTab("financials"); }}>
+                      <tr key={c.id} style={{ borderBottom: "1px solid #1e293b", cursor: "pointer" }} onClick={() => { navigate(c.id, tab, "financials"); }}>
                         <td style={{ padding: "8px 6px", fontSize: 12, fontWeight: 700 }}>{c.id}</td>
                         <td style={{ padding: "8px 6px", fontSize: 11, textAlign: "right", color: lev === null ? "#64748b" : lev > peerBenchmarks.medianLeverage * 1.5 ? "#ef4444" : "#e2e8f0" }}>{lev !== null ? `${lev.toFixed(1)}x` : "N/M"}</td>
                         <td style={{ padding: "8px 6px", fontSize: 11, textAlign: "right", color: c.intCov < 2 ? "#ef4444" : "#e2e8f0" }}>{fmtNum(c.intCov)}x</td>
@@ -3098,7 +3178,7 @@ export default function CreditRiskMonitor() {
               </div>
               <div style={{ display: "grid", gridTemplateColumns: mob ? "1fr 1fr" : "repeat(4, 1fr)", gap: 8, minWidth: 0 }}>
                 {Object.entries(marketData).map(([ticker, q]) => (
-                  <div key={ticker} style={{ padding: "10px 12px", background: "#0a0e1a", borderRadius: 6, cursor: "pointer" }} onClick={() => { setSelected(ticker); setDetailTab("financials"); }}>
+                  <div key={ticker} style={{ padding: "10px 12px", background: "#0a0e1a", borderRadius: 6, cursor: "pointer" }} onClick={() => { navigate(ticker, tab, "financials"); }}>
                     <div style={{ fontSize: 13, fontWeight: 700 }}>{ticker}</div>
                     <div style={{ fontSize: 18, fontWeight: 800, color: "#f1f5f9", marginTop: 2 }}>${q.price}</div>
                     <div style={{ fontSize: 11, fontWeight: 700, color: q.changePct >= 0 ? "#22c55e" : "#ef4444", marginTop: 2 }}>
@@ -3123,7 +3203,7 @@ export default function CreditRiskMonitor() {
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.5 }}>{n.headline}</div>
                   <div style={{ fontSize: 11, color: "#64748b", marginTop: 3 }}>
-                    <span style={{ color: "#3b82f6", fontWeight: 600, cursor: "pointer" }} onClick={() => { setSelected(n.ticker); setDetailTab("news"); }}>{n.ticker}</span>
+                    <span style={{ color: "#3b82f6", fontWeight: 600, cursor: "pointer" }} onClick={() => { navigate(n.ticker, tab, "news"); }}>{n.ticker}</span>
                     {" \u00B7 "}{n.src} {"\u00B7"} {n.date}
                   </div>
                 </div>
@@ -3142,7 +3222,7 @@ export default function CreditRiskMonitor() {
               const days = Math.ceil((new Date(c.earningsDate) - now) / (1000 * 60 * 60 * 24));
               return (
                 <div key={i} style={{ display: "flex", alignItems: "center", gap: 16, padding: "14px 0", borderBottom: i < PORTFOLIO.length - 1 ? "1px solid #1e293b" : "none", cursor: "pointer" }}
-                  onClick={() => { setSelected(c.id); setDetailTab("earnings"); }}>
+                  onClick={() => { navigate(c.id, tab, "earnings"); }}>
                   <div style={{ width: 52, textAlign: "center" }}>
                     <div style={{ fontSize: 18, fontWeight: 800, color: days <= 14 ? "#f97316" : "#3b82f6" }}>{days}</div>
                     <div style={{ fontSize: 9, color: "#64748b", textTransform: "uppercase" }}>days</div>
