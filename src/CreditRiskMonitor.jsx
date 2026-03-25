@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback, useRef, Component } from “react”;
+import { useState, useEffect, useMemo, useCallback, useRef, Component } from "react";
 
 // ─── ERROR BOUNDARY ────────────────────────────────────────────────────────
 class ErrorBoundary extends Component {
@@ -7,10 +7,10 @@ static getDerivedStateFromError(error) { return { hasError: true, error }; }
 render() {
 if (this.state.hasError) {
 return (
-<div style={{ padding: 24, background: “#1c1917”, borderRadius: 8, margin: 16, border: “1px solid #dc2626” }}>
-<div style={{ fontSize: 14, fontWeight: 700, color: “#fca5a5”, marginBottom: 8 }}>{”\u26A0”} Rendering Error</div>
-<div style={{ fontSize: 12, color: “#94a3b8”, marginBottom: 12 }}>{this.state.error?.message || “An unexpected error occurred”}</div>
-<button onClick={() => this.setState({ hasError: false, error: null })} style={{ padding: “6px 16px”, borderRadius: 4, fontSize: 11, fontWeight: 600, border: “1px solid #334155”, background: “#1e293b”, color: “#94a3b8”, cursor: “pointer” }}>Try Again</button>
+<div style={{ padding: 24, background: "#1c1917", borderRadius: 8, margin: 16, border: "1px solid #dc2626" }}>
+<div style={{ fontSize: 14, fontWeight: 700, color: "#fca5a5", marginBottom: 8 }}>{"\u26A0"} Rendering Error</div>
+<div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 12 }}>{this.state.error?.message || "An unexpected error occurred"}</div>
+<button onClick={() => this.setState({ hasError: false, error: null })} style={{ padding: "6px 16px", borderRadius: 4, fontSize: 11, fontWeight: 600, border: "1px solid #334155", background: "#1e293b", color: "#94a3b8", cursor: "pointer" }}>Try Again</button>
 </div>
 );
 }
@@ -24,15 +24,15 @@ const safeDiv = (a, b, fallback = 0) => { const r = a / b; return (isFinite(r) &
 // ─── PORTFOLIO DATA: LCID & RIVN ────────────────────────────────────────────
 const PORTFOLIO = [
 {
-id: “LCID”,
-name: “Lucid Group Inc.”,
-sector: “EV / Automotive”,
+id: "LCID",
+name: "Lucid Group Inc.",
+sector: "EV / Automotive",
 exposure: 25000000,
-sp: “NR”,
-moodys: “NR”,
-fitch: “NR”,
-impliedRating: “CCC+”,
-outlook: “Negative”,
+sp: "NR",
+moodys: "NR",
+fitch: "NR",
+impliedRating: "CCC+",
+outlook: "Negative",
 watchlist: true,
 cds5y: 1850,
 cds5yChg: 95,
@@ -60,140 +60,140 @@ debtToEquity: 0.91,
 currentRatio: 1.27,
 roic: -52.4,
 deliveries2025: 15841,
-deliveriesGuidance2026: “25,000 - 27,000”,
-productionGuidance2026: “25,000 - 27,000”,
+deliveriesGuidance2026: "25,000 - 27,000",
+productionGuidance2026: "25,000 - 27,000",
 cashBurnQtr: -814,
-liquidityRunway: “~5-6 qtrs at current burn”,
+liquidityRunway: "~5-6 qtrs at current burn",
 // Adjusted Cash Burn Components (FY2025, $M)
 // Source: Q4 FY2025 Earnings Release, 10-K, Earnings Presentation
 adjBurn: {
 adjEBITDA: -2130,         // Company-reported Non-GAAP Adj. EBITDA FY2025
-adjEBITDA_src: “Q4 2025 Earnings Release — GAAP-to-Non-GAAP reconciliation”,
+adjEBITDA_src: "Q4 2025 Earnings Release — GAAP-to-Non-GAAP reconciliation",
 incomeTaxes: 5,            // Recurring income taxes (minimal — pre-profit, NOL carryforwards)
-incomeTaxes_src: “10-K FY2025; near-zero cash taxes due to NOLs”,
+incomeTaxes_src: "10-K FY2025; near-zero cash taxes due to NOLs",
 prefDividends: 0,          // No cash preferred dividends (PIF converts accrue, non-cash)
-prefDividends_src: “No cash preferred dividends; PIF redeemable converts are non-cash accretion”,
+prefDividends_src: "No cash preferred dividends; PIF redeemable converts are non-cash accretion",
 maintCapex: null,          // Maintenance capex not separately disclosed
 totalCapex: 868,           // Total CapEx FY2025
-totalCapex_src: “Stocktitan / 10-K: $868.2M; 2026 guidance: $1.2B-$1.4B”,
+totalCapex_src: "Stocktitan / 10-K: $868.2M; 2026 guidance: $1.2B-$1.4B",
 currentLTD: 0,             // Current portion of LT debt (2026 converts retired in Nov 2025)
-currentLTD_src: “2026 converts retired via $975M 2031 note proceeds; no near-term maturities”,
+currentLTD_src: "2026 converts retired via $975M 2031 note proceeds; no near-term maturities",
 intExpCash: 95,            // Cash interest expense FY2025
-intExpCash_src: “10-K FY2025; converts + SIDF + GIB draws”,
+intExpCash_src: "10-K FY2025; converts + SIDF + GIB draws",
 },
 liquidityBreakdown: {
 totalLiquidity: 4600,
 components: [
-{ category: “Cash & Cash Equivalents”, amount: 998, type: “cash”, sub: [
-{ label: “Bank Deposits & Money Market Funds”, amount: 612 },
-{ label: “U.S. Treasury Bills (< 3 mo.)”, amount: 268 },
-{ label: “Restricted Cash”, amount: 118 },
+{ category: "Cash & Cash Equivalents", amount: 998, type: "cash", sub: [
+{ label: "Bank Deposits & Money Market Funds", amount: 612 },
+{ label: "U.S. Treasury Bills (< 3 mo.)", amount: 268 },
+{ label: "Restricted Cash", amount: 118 },
 ]},
-{ category: “Short-Term Investments (< 1 yr)”, amount: 820, type: “st_invest”, sub: [
-{ label: “U.S. Treasury Securities”, amount: 385 },
-{ label: “U.S. Agency Securities”, amount: 195 },
-{ label: “Corporate Debt Securities (IG)”, amount: 155 },
-{ label: “Related Party Investments (PIF)”, amount: 85 },
+{ category: "Short-Term Investments (< 1 yr)", amount: 820, type: "st_invest", sub: [
+{ label: "U.S. Treasury Securities", amount: 385 },
+{ label: "U.S. Agency Securities", amount: 195 },
+{ label: "Corporate Debt Securities (IG)", amount: 155 },
+{ label: "Related Party Investments (PIF)", amount: 85 },
 ]},
-{ category: “Long-Term Investments (> 1 yr)”, amount: 282, type: “lt_invest”, sub: [
-{ label: “U.S. Treasury Securities”, amount: 142 },
-{ label: “Corporate Bonds (IG-rated)”, amount: 90 },
-{ label: “Related Party Investments (PIF)”, amount: 50 },
+{ category: "Long-Term Investments (> 1 yr)", amount: 282, type: "lt_invest", sub: [
+{ label: "U.S. Treasury Securities", amount: 142 },
+{ label: "Corporate Bonds (IG-rated)", amount: 90 },
+{ label: "Related Party Investments (PIF)", amount: 50 },
 ]},
-{ category: “Undrawn Credit Facilities”, amount: 2415, type: “facility”, sub: [] },
+{ category: "Undrawn Credit Facilities", amount: 2415, type: "facility", sub: [] },
 ],
-// Source: Lucid Q4 FY2025 Earnings Presentation, Slide 9 — “Liquidity Supports Execution and Growth”
+// Source: Lucid Q4 FY2025 Earnings Presentation, Slide 9 — "Liquidity Supports Execution and Growth"
 // Total Liquidity $4.6B = Cash/Inv $2.1B + DDTL $2.0B + ABL $397M + GIB $38M
 facilities: [
-{ name: “PIF Delayed Draw Term Loan (DDTL)”, committed: 1980, drawn: 0, available: 1980, maturity: “Aug 2029”, rate: “Negotiated”, secured: “Unsecured”, notes: “Increased from $750M to ~$2.0B (Nov 2025); 5-yr term from Aug 2024; fully undrawn; PIF (majority shareholder) is counterparty” },
-{ name: “ABL Revolving Credit Facility”, committed: 1000, drawn: 0, available: 397, maturity: “Jun 2027”, rate: “SOFR + spread”, secured: “Senior Secured”, notes: “BofA-led syndicate (10 banks); availability = lesser of (committed amount, borrowing base); borrowing base driven by eligible inventory + receivables minus reserves; $350M LC sublimit, $100M swingline sublimit; springing maturity 91 days prior to any >$500M debt maturity; Q4 2025 availability: $397M per earnings presentation” },
-{ name: “GIB Revolving Credit Facility”, committed: 507, drawn: 469, available: 38, maturity: “Feb 2028”, rate: “SAIBOR + 1.40%”, secured: “Unsecured”, notes: “SAR 1.9B (~$507M) with Gulf International Bank S.A. (PIF-related party); renewed Feb 2025; 0.25%/yr commitment fee on unused; loans up to 12-mo tenor; general corporate purposes; Q4 2025 availability: $38M per earnings presentation — majority drawn for KSA operations” },
-{ name: “SIDF Term Loan”, committed: 1400, drawn: 735, available: 665, maturity: “2029-2032 (amortizing)”, rate: “Subsidized (KSA)”, secured: “Senior Secured”, notes: “Saudi Industrial Development Fund; for AMP-2 factory construction in KSA; partially drawn; disbursements tied to project milestones; SAR-denominated; not included in reported $4.6B total liquidity figure” },
+{ name: "PIF Delayed Draw Term Loan (DDTL)", committed: 1980, drawn: 0, available: 1980, maturity: "Aug 2029", rate: "Negotiated", secured: "Unsecured", notes: "Increased from $750M to ~$2.0B (Nov 2025); 5-yr term from Aug 2024; fully undrawn; PIF (majority shareholder) is counterparty" },
+{ name: "ABL Revolving Credit Facility", committed: 1000, drawn: 0, available: 397, maturity: "Jun 2027", rate: "SOFR + spread", secured: "Senior Secured", notes: "BofA-led syndicate (10 banks); availability = lesser of (committed amount, borrowing base); borrowing base driven by eligible inventory + receivables minus reserves; $350M LC sublimit, $100M swingline sublimit; springing maturity 91 days prior to any >$500M debt maturity; Q4 2025 availability: $397M per earnings presentation" },
+{ name: "GIB Revolving Credit Facility", committed: 507, drawn: 469, available: 38, maturity: "Feb 2028", rate: "SAIBOR + 1.40%", secured: "Unsecured", notes: "SAR 1.9B (~$507M) with Gulf International Bank S.A. (PIF-related party); renewed Feb 2025; 0.25%/yr commitment fee on unused; loans up to 12-mo tenor; general corporate purposes; Q4 2025 availability: $38M per earnings presentation — majority drawn for KSA operations" },
+{ name: "SIDF Term Loan", committed: 1400, drawn: 735, available: 665, maturity: "2029-2032 (amortizing)", rate: "Subsidized (KSA)", secured: "Senior Secured", notes: "Saudi Industrial Development Fund; for AMP-2 factory construction in KSA; partially drawn; disbursements tied to project milestones; SAR-denominated; not included in reported $4.6B total liquidity figure" },
 ],
 debtMaturities: [
-{ year: “2026”, amount: 0, desc: “2026 converts retired via 2031 note proceeds” },
-{ year: “2027”, amount: 0, desc: “No maturities; SIDF amortization ongoing” },
-{ year: “2028”, amount: 469, desc: “GIB Revolving Facility ($469M drawn; matures Feb 2028)” },
-{ year: “2029”, amount: 0, desc: “DDTL maturity window (5-yr from Aug 2024)” },
-{ year: “2030”, amount: 1100, desc: “5.00% Convertible Senior Notes (Apr 2030)” },
-{ year: “2031”, amount: 975, desc: “1.75% Convertible Senior Notes (Nov 2031)” },
-{ year: “Other”, amount: 665, desc: “SIDF draws + other KSA obligations” },
+{ year: "2026", amount: 0, desc: "2026 converts retired via 2031 note proceeds" },
+{ year: "2027", amount: 0, desc: "No maturities; SIDF amortization ongoing" },
+{ year: "2028", amount: 469, desc: "GIB Revolving Facility ($469M drawn; matures Feb 2028)" },
+{ year: "2029", amount: 0, desc: "DDTL maturity window (5-yr from Aug 2024)" },
+{ year: "2030", amount: 1100, desc: "5.00% Convertible Senior Notes (Apr 2030)" },
+{ year: "2031", amount: 975, desc: "1.75% Convertible Senior Notes (Nov 2031)" },
+{ year: "Other", amount: 665, desc: "SIDF draws + other KSA obligations" },
 ],
 },
-earningsDate: “2026-05-04”,
-earningsTime: “After Close”,
-lastEarnings: “Miss — EPS -$3.62 vs -$2.89 est.”,
+earningsDate: "2026-05-04",
+earningsTime: "After Close",
+lastEarnings: "Miss — EPS -$3.62 vs -$2.89 est.",
 earningsCallSummary: {
-date: “February 24, 2026”,
-quarter: “Q4 FY2025”,
-source: “SEC Filing: Exhibit 99.1 (Q4 FY2025 Earnings Release) + Earnings Call Transcript”,
+date: "February 24, 2026",
+quarter: "Q4 FY2025",
+source: "SEC Filing: Exhibit 99.1 (Q4 FY2025 Earnings Release) + Earnings Call Transcript",
 keyFinancials: [
-“Q4 revenue of $522.7M, up 123% YoY; FY2025 revenue $1,353.8M, up 68% YoY”,
-“GAAP diluted net loss per share of $(3.62) in Q4; $(12.09) for FY2025”,
-“Total liquidity of ~$4.6B at quarter-end (cash/investments $2.1B + undrawn facilities $2.5B)”,
+"Q4 revenue of $522.7M, up 123% YoY; FY2025 revenue $1,353.8M, up 68% YoY",
+"GAAP diluted net loss per share of $(3.62) in Q4; $(12.09) for FY2025",
+"Total liquidity of ~$4.6B at quarter-end (cash/investments $2.1B + undrawn facilities $2.5B)",
 ],
 production: [
-“Q4 production of 7,874 vehicles (up 133% YoY); FY2025 production 17,840 vehicles (nearly doubled YoY)”,
-“538 vehicles reclassified — did not complete final validation at AMP-2 Saudi Arabia facility; shifted to 2026”,
-“Q4 deliveries of 5,345 (up 72% YoY) — eighth consecutive quarter of record deliveries”,
-“2026 production guidance: 25,000–27,000 vehicles (40-50% increase)”,
+"Q4 production of 7,874 vehicles (up 133% YoY); FY2025 production 17,840 vehicles (nearly doubled YoY)",
+"538 vehicles reclassified — did not complete final validation at AMP-2 Saudi Arabia facility; shifted to 2026",
+"Q4 deliveries of 5,345 (up 72% YoY) — eighth consecutive quarter of record deliveries",
+"2026 production guidance: 25,000–27,000 vehicles (40-50% increase)",
 ],
 creditRelevant: [
-“CEO Winterhoff cited ‘extraordinary macro turbulences’ — tariffs, incentive roll-offs, shifting EV demand, supply chain disruptions”,
-“Focus on improving gross margin through lower material costs, fixed cost absorption via scale, and operational efficiencies”,
-“Cost actions intended to extend liquidity runway into first half of 2027”,
-“Layoffs of 12% of U.S. workforce announced post-earnings to improve cost structure”,
-“Robotaxi partnership with Uber/Nuro announced; Lucid Lunar concept revealed at March Investor Day”,
+"CEO Winterhoff cited 'extraordinary macro turbulences' — tariffs, incentive roll-offs, shifting EV demand, supply chain disruptions",
+"Focus on improving gross margin through lower material costs, fixed cost absorption via scale, and operational efficiencies",
+"Cost actions intended to extend liquidity runway into first half of 2027",
+"Layoffs of 12% of U.S. workforce announced post-earnings to improve cost structure",
+"Robotaxi partnership with Uber/Nuro announced; Lucid Lunar concept revealed at March Investor Day",
 ],
 strategicItems: [
-“Gravity SUV ramp continues — primary 2026 revenue growth driver”,
-“Midsize vehicle platform in development; first production expected in 2026-2027 timeframe”,
-“PIF remains majority shareholder and primary liquidity backstop via undrawn $1.98B DDTL”,
-“Path to profitability details deferred to March 12 Investor Day”,
+"Gravity SUV ramp continues — primary 2026 revenue growth driver",
+"Midsize vehicle platform in development; first production expected in 2026-2027 timeframe",
+"PIF remains majority shareholder and primary liquidity backstop via undrawn $1.98B DDTL",
+"Path to profitability details deferred to March 12 Investor Day",
 ],
 analystQA: [
-“Clearest path to positive gross margin? — CFO: Better material costs, scale absorption, efficiencies; more detail at Investor Day”,
-“Tesla competitive threat? — CEO: Lucid is natural successor to Model S/X; seeing uptick in Tesla owner inquiries”,
+"Clearest path to positive gross margin? — CFO: Better material costs, scale absorption, efficiencies; more detail at Investor Day",
+"Tesla competitive threat? — CEO: Lucid is natural successor to Model S/X; seeing uptick in Tesla owner inquiries",
 ],
 },
-analystRating: “Hold”,
+analystRating: "Hold",
 targetPrice: 12.86,
 news: [
-{ date: “2026-03-19”, src: “CNBC”, headline: “Lucid receives first Buy rating in months as Citi initiates coverage”, sentiment: “positive” },
-{ date: “2026-03-17”, src: “Reuters”, headline: “Uber expands robotaxi deal with Nvidia; Lucid partnership in focus”, sentiment: “positive” },
-{ date: “2026-03-12”, src: “Bloomberg”, headline: “Lucid reveals Lunar robotaxi concept and Uber partnership at Investor Day”, sentiment: “positive” },
-{ date: “2026-03-09”, src: “CNBC”, headline: “Lucid lays off 12% of U.S. workforce to cut costs and improve gross margin”, sentiment: “negative” },
-{ date: “2026-02-25”, src: “CNBC”, headline: “Lucid widely misses earnings expectations, forecasts slowing EV growth in 2026”, sentiment: “negative” },
-{ date: “2026-02-24”, src: “Bloomberg”, headline: “Lucid files prospectus to register 69M shares for resale by PIF and Uber affiliates”, sentiment: “negative” },
+{ date: "2026-03-19", src: "CNBC", headline: "Lucid receives first Buy rating in months as Citi initiates coverage", sentiment: "positive" },
+{ date: "2026-03-17", src: "Reuters", headline: "Uber expands robotaxi deal with Nvidia; Lucid partnership in focus", sentiment: "positive" },
+{ date: "2026-03-12", src: "Bloomberg", headline: "Lucid reveals Lunar robotaxi concept and Uber partnership at Investor Day", sentiment: "positive" },
+{ date: "2026-03-09", src: "CNBC", headline: "Lucid lays off 12% of U.S. workforce to cut costs and improve gross margin", sentiment: "negative" },
+{ date: "2026-02-25", src: "CNBC", headline: "Lucid widely misses earnings expectations, forecasts slowing EV growth in 2026", sentiment: "negative" },
+{ date: "2026-02-24", src: "Bloomberg", headline: "Lucid files prospectus to register 69M shares for resale by PIF and Uber affiliates", sentiment: "negative" },
 ],
 ratingHistory: [
-{ date: “2025-11”, sp: “NR”, moodys: “NR”, fitch: “NR”, event: “$975M convertible notes issued (2031 maturity)” },
-{ date: “2025-06”, sp: “NR”, moodys: “NR”, fitch: “NR”, event: “Gravity SUV production begins” },
-{ date: “2024-06”, sp: “NR”, moodys: “NR”, fitch: “NR”, event: “1.25% convertible notes issued (2026 maturity)” },
+{ date: "2025-11", sp: "NR", moodys: "NR", fitch: "NR", event: "$975M convertible notes issued (2031 maturity)" },
+{ date: "2025-06", sp: "NR", moodys: "NR", fitch: "NR", event: "Gravity SUV production begins" },
+{ date: "2024-06", sp: "NR", moodys: "NR", fitch: "NR", event: "1.25% convertible notes issued (2026 maturity)" },
 ],
 financials: [
-{ period: “FY2025”, rev: 1354, ebitda: -2890, ni: -3682, debt: 2740, cash: 4600 },
-{ period: “FY2024”, rev: 875, ebitda: -3050, ni: -3420, debt: 2000, cash: 4500 },
-{ period: “FY2023”, rev: 595, ebitda: -3290, ni: -2828, debt: 2050, cash: 4850 },
-{ period: “FY2022”, rev: 608, ebitda: -3050, ni: -1304, debt: 2000, cash: 6260 },
+{ period: "FY2025", rev: 1354, ebitda: -2890, ni: -3682, debt: 2740, cash: 4600 },
+{ period: "FY2024", rev: 875, ebitda: -3050, ni: -3420, debt: 2000, cash: 4500 },
+{ period: "FY2023", rev: 595, ebitda: -3290, ni: -2828, debt: 2050, cash: 4850 },
+{ period: "FY2022", rev: 608, ebitda: -3050, ni: -1304, debt: 2000, cash: 6260 },
 ],
 research: [
-{ date: “2026-03-18”, firm: “Citi”, action: “Initiate Buy”, pt: 16, summary: “Gravity SUV ramp + robotaxi partnership with Uber creates optionality; PIF backing provides liquidity floor.” },
-{ date: “2026-03-12”, firm: “RBC Capital”, action: “Hold”, pt: 11, summary: “Investor Day laid out path to FCF positive but execution remains high-risk; 2026 deliveries of 25-27K still uncertain.” },
-{ date: “2026-02-25”, firm: “Wolfe Research”, action: “Underperform”, pt: 6, summary: “Q4 miss underscores cash burn challenge; $975M convert offering extends runway but dilution concerns persist.” },
-{ date: “2026-02-15”, firm: “Morgan Stanley”, action: “Hold”, pt: 10, summary: “Gravity driving demand visibility but negative gross margins remain a structural concern.” },
+{ date: "2026-03-18", firm: "Citi", action: "Initiate Buy", pt: 16, summary: "Gravity SUV ramp + robotaxi partnership with Uber creates optionality; PIF backing provides liquidity floor." },
+{ date: "2026-03-12", firm: "RBC Capital", action: "Hold", pt: 11, summary: "Investor Day laid out path to FCF positive but execution remains high-risk; 2026 deliveries of 25-27K still uncertain." },
+{ date: "2026-02-25", firm: "Wolfe Research", action: "Underperform", pt: 6, summary: "Q4 miss underscores cash burn challenge; $975M convert offering extends runway but dilution concerns persist." },
+{ date: "2026-02-15", firm: "Morgan Stanley", action: "Hold", pt: 10, summary: "Gravity driving demand visibility but negative gross margins remain a structural concern." },
 ],
 },
 {
-id: “RIVN”,
-name: “Rivian Automotive Inc.”,
-sector: “EV / Automotive”,
+id: "RIVN",
+name: "Rivian Automotive Inc.",
+sector: "EV / Automotive",
 exposure: 35000000,
-sp: “NR”,
-moodys: “NR”,
-fitch: “NR”,
-impliedRating: “B-”,
-outlook: “Developing”,
+sp: "NR",
+moodys: "NR",
+fitch: "NR",
+impliedRating: "B-",
+outlook: "Developing",
 watchlist: true,
 cds5y: 1280,
 cds5yChg: -65,
@@ -221,137 +221,137 @@ debtToEquity: 0.97,
 currentRatio: 2.32,
 roic: -18.6,
 deliveries2025: 42284,
-deliveriesGuidance2026: “62,000 - 67,000 (incl. R2)”,
-productionGuidance2026: “48,000 - 52,000”,
+deliveriesGuidance2026: "62,000 - 67,000 (incl. R2)",
+productionGuidance2026: "48,000 - 52,000",
 cashBurnQtr: -530,
-liquidityRunway: “~8-10 qtrs (incl. DOE loan)”,
+liquidityRunway: "~8-10 qtrs (incl. DOE loan)",
 // Adjusted Cash Burn Components (FY2025, $M)
 adjBurn: {
 adjEBITDA: -2063,         // Sum of quarterly Adj. EBITDA: Q1 -$329M + Q2 -$667M + Q3 -$602M + Q4 -$465M
-adjEBITDA_src: “Q4 FY2025 Press Release (Exhibit 99.1); sum of quarterly Non-GAAP Adj. EBITDA”,
+adjEBITDA_src: "Q4 FY2025 Press Release (Exhibit 99.1); sum of quarterly Non-GAAP Adj. EBITDA",
 incomeTaxes: 8,            // Recurring income taxes (minimal — pre-profit)
-incomeTaxes_src: “10-K FY2025; nominal cash taxes; substantial NOL carryforwards”,
+incomeTaxes_src: "10-K FY2025; nominal cash taxes; substantial NOL carryforwards",
 prefDividends: 0,          // No preferred dividends
-prefDividends_src: “No preferred stock outstanding”,
+prefDividends_src: "No preferred stock outstanding",
 maintCapex: null,          // Not disclosed separately
 totalCapex: 1710,          // Sum of quarterly CapEx: Q1 $338M + Q2 $462M + Q3 $447M + Q4 $463M
-totalCapex_src: “Q4 FY2025 Press Release; heavy growth CapEx for R2 tooling + Georgia plant”,
+totalCapex_src: "Q4 FY2025 Press Release; heavy growth CapEx for R2 tooling + Georgia plant",
 currentLTD: 0,             // 2026 floating rate notes retired via green note proceeds
-currentLTD_src: “2026 notes retired Jun 2025; next maturity 2028 converts”,
+currentLTD_src: "2026 notes retired Jun 2025; next maturity 2028 converts",
 intExpCash: 285,           // Cash interest expense FY2025
-intExpCash_src: “10-K FY2025; green notes + convertible notes”,
+intExpCash_src: "10-K FY2025; green notes + convertible notes",
 },
 liquidityBreakdown: {
 totalLiquidity: 6590,
 components: [
-{ category: “Cash & Cash Equivalents”, amount: 3574, type: “cash”, sub: [
-{ label: “Bank Deposits & Money Market Funds”, amount: 2100 },
-{ label: “U.S. Treasury Bills (< 3 mo.)”, amount: 1430 },
-{ label: “Restricted Cash”, amount: 44 },
+{ category: "Cash & Cash Equivalents", amount: 3574, type: "cash", sub: [
+{ label: "Bank Deposits & Money Market Funds", amount: 2100 },
+{ label: "U.S. Treasury Bills (< 3 mo.)", amount: 1430 },
+{ label: "Restricted Cash", amount: 44 },
 ]},
-{ category: “Short-Term Investments”, amount: 2508, type: “st_invest”, sub: [
-{ label: “U.S. Treasury Securities”, amount: 1200 },
-{ label: “U.S. Agency Securities”, amount: 520 },
-{ label: “Corporate Debt Securities (IG)”, amount: 420 },
-{ label: “Asset-Backed Securities (AAA)”, amount: 230 },
-{ label: “Commercial Paper”, amount: 138 },
+{ category: "Short-Term Investments", amount: 2508, type: "st_invest", sub: [
+{ label: "U.S. Treasury Securities", amount: 1200 },
+{ label: "U.S. Agency Securities", amount: 520 },
+{ label: "Corporate Debt Securities (IG)", amount: 420 },
+{ label: "Asset-Backed Securities (AAA)", amount: 230 },
+{ label: "Commercial Paper", amount: 138 },
 ]},
-{ category: “Undrawn Credit Facilities”, amount: 508, type: “facility”, sub: [] },
+{ category: "Undrawn Credit Facilities", amount: 508, type: "facility", sub: [] },
 ],
 facilities: [
-{ name: “ABL Revolving Credit Facility”, committed: 1500, drawn: 0, available: 508, maturity: “Apr 2028”, rate: “SOFR + spread”, secured: “First Lien (ABL Priority Collateral)”, notes: “Upsized to $1.5B in Apr 2023 (from $750M); undrawn; availability of $508M after borrowing base and outstanding LCs; LC sub-limit $1.0B; minimum liquidity covenant of $1.0B (falls away upon FCCR > 1.0x for 2 consecutive quarters); in compliance with all covenants as of Dec 31, 2025” },
-{ name: “DOE ATVM Loan (Conditional)”, committed: 6600, drawn: 0, available: 0, maturity: “TBD”, rate: “Subsidized (DOE)”, secured: “Secured by New Horizon assets”, notes: “Up to $6.6B conditionally approved for Georgia plant (R2 production); NOT a confirmed liquidity source — final terms, closing conditions, and disbursement schedule still pending; availability begins only after final loan closing and project milestone draws” },
+{ name: "ABL Revolving Credit Facility", committed: 1500, drawn: 0, available: 508, maturity: "Apr 2028", rate: "SOFR + spread", secured: "First Lien (ABL Priority Collateral)", notes: "Upsized to $1.5B in Apr 2023 (from $750M); undrawn; availability of $508M after borrowing base and outstanding LCs; LC sub-limit $1.0B; minimum liquidity covenant of $1.0B (falls away upon FCCR > 1.0x for 2 consecutive quarters); in compliance with all covenants as of Dec 31, 2025" },
+{ name: "DOE ATVM Loan (Conditional)", committed: 6600, drawn: 0, available: 0, maturity: "TBD", rate: "Subsidized (DOE)", secured: "Secured by New Horizon assets", notes: "Up to $6.6B conditionally approved for Georgia plant (R2 production); NOT a confirmed liquidity source — final terms, closing conditions, and disbursement schedule still pending; availability begins only after final loan closing and project milestone draws" },
 ],
 debtMaturities: [
-{ year: “2026”, amount: 0, desc: “Retired via green note proceeds” },
-{ year: “2027”, amount: 0, desc: “No maturities” },
-{ year: “2028”, amount: 1500, desc: “Convertible Notes (4.625%)” },
-{ year: “2029”, amount: 0, desc: “No maturities” },
-{ year: “2030”, amount: 1500, desc: “Convertible Notes (3.625%)” },
-{ year: “2031”, amount: 1250, desc: “Green Secured Notes (issued Jun 2025)” },
-{ year: “Other”, amount: 150, desc: “Other obligations & leases” },
+{ year: "2026", amount: 0, desc: "Retired via green note proceeds" },
+{ year: "2027", amount: 0, desc: "No maturities" },
+{ year: "2028", amount: 1500, desc: "Convertible Notes (4.625%)" },
+{ year: "2029", amount: 0, desc: "No maturities" },
+{ year: "2030", amount: 1500, desc: "Convertible Notes (3.625%)" },
+{ year: "2031", amount: 1250, desc: "Green Secured Notes (issued Jun 2025)" },
+{ year: "Other", amount: 150, desc: "Other obligations & leases" },
 ],
 },
-earningsDate: “2026-05-12”,
-earningsTime: “After Close”,
-lastEarnings: “Beat — EPS -$0.53 vs -$0.71 est.”,
+earningsDate: "2026-05-12",
+earningsTime: "After Close",
+lastEarnings: "Beat — EPS -$0.53 vs -$0.71 est.",
 earningsCallSummary: {
-date: “February 12, 2026”,
-quarter: “Q4 FY2025”,
-source: “SEC Filing: Exhibit 99.1 (Q4 FY2025 Earnings Release) + Earnings Call Transcript”,
+date: "February 12, 2026",
+quarter: "Q4 FY2025",
+source: "SEC Filing: Exhibit 99.1 (Q4 FY2025 Earnings Release) + Earnings Call Transcript",
 keyFinancials: [
-“Q4 consolidated revenue of $1,286M; automotive revenue $839M (down 45% YoY due to loss of $270M regulatory credits + expired tax incentives)”,
-“Software & services revenue surged to $447M in Q4 (up 109% YoY), driven by Volkswagen JV”,
-“Q4 consolidated gross profit of $120M; FY2025 gross profit $144M — first full year of positive gross profit (>$1.3B improvement vs FY2024)”,
-“Q4 adjusted EBITDA loss of -$465M; FY2025 adjusted EBITDA guided at -$1.8B to -$2.1B”,
-“Liquidity of ~$6.1B at year-end (cash, equivalents, and short-term investments)”,
+"Q4 consolidated revenue of $1,286M; automotive revenue $839M (down 45% YoY due to loss of $270M regulatory credits + expired tax incentives)",
+"Software & services revenue surged to $447M in Q4 (up 109% YoY), driven by Volkswagen JV",
+"Q4 consolidated gross profit of $120M; FY2025 gross profit $144M — first full year of positive gross profit (>$1.3B improvement vs FY2024)",
+"Q4 adjusted EBITDA loss of -$465M; FY2025 adjusted EBITDA guided at -$1.8B to -$2.1B",
+"Liquidity of ~$6.1B at year-end (cash, equivalents, and short-term investments)",
 ],
 production: [
-“Q4 production of 10,974 vehicles; Q4 deliveries of 9,745 vehicles”,
-“FY2025 deliveries of 42,247 vehicles (down 18% YoY due to tax credit expiration impact)”,
-“2026 delivery guidance: 62,000–67,000 vehicles”,
-“R2 pre-production builds receiving outstanding reviews; customer deliveries expected Q2 2026”,
+"Q4 production of 10,974 vehicles; Q4 deliveries of 9,745 vehicles",
+"FY2025 deliveries of 42,247 vehicles (down 18% YoY due to tax credit expiration impact)",
+"2026 delivery guidance: 62,000–67,000 vehicles",
+"R2 pre-production builds receiving outstanding reviews; customer deliveries expected Q2 2026",
 ],
 creditRelevant: [
-“First full year of positive consolidated gross profit — a major credit inflection point”,
-“Automotive gross profit still negative at -$59M in Q4 and -$432M for FY2025; software/services ($576M GP) offsets losses”,
-“2026 capex guidance: $1.95B–$2.05B (Georgia plant + R2 launch)”,
-“Adjusted EBITDA positive no longer expected in 2027 — pushed further out”,
-“Cash burn remains elevated; FY2025 cash position declined from $7.7B to $6.1B (-$1.6B); total liquidity $6.6B including $508M ABL availability”,
+"First full year of positive consolidated gross profit — a major credit inflection point",
+"Automotive gross profit still negative at -$59M in Q4 and -$432M for FY2025; software/services ($576M GP) offsets losses",
+"2026 capex guidance: $1.95B–$2.05B (Georgia plant + R2 launch)",
+"Adjusted EBITDA positive no longer expected in 2027 — pushed further out",
+"Cash burn remains elevated; FY2025 cash position declined from $7.7B to $6.1B (-$1.6B); total liquidity $6.6B including $508M ABL availability",
 ],
 strategicItems: [
-“R2 SUV launch at $45,000–$57,990 pricing opens mass-market addressable opportunity”,
-“Volkswagen JV progressing — vehicles delivered for winter testing 13 months after formation; ~60% of Q4 software revenue”,
-“Unveiled RAP1 in-house autonomy processor at December AI Day; Universal Hands-Free expanded to 3.5M+ miles of roads”,
-“Uber $1.25B equity-linked investment for 10,000 autonomous R2 robotaxis (milestone-based, announced March 2026)”,
-“DOE ATVM $6.6B conditional loan — disbursement still pending final closing”,
+"R2 SUV launch at $45,000–$57,990 pricing opens mass-market addressable opportunity",
+"Volkswagen JV progressing — vehicles delivered for winter testing 13 months after formation; ~60% of Q4 software revenue",
+"Unveiled RAP1 in-house autonomy processor at December AI Day; Universal Hands-Free expanded to 3.5M+ miles of roads",
+"Uber $1.25B equity-linked investment for 10,000 autonomous R2 robotaxis (milestone-based, announced March 2026)",
+"DOE ATVM $6.6B conditional loan — disbursement still pending final closing",
 ],
 analystQA: [
-“R2 demand signals? — CEO Scaringe: Pre-production reviews very strong; fills gap for quality EVs under $50K”,
-“Path to auto gross profit positive? — CFO: Targeting automotive gross profit positive by end of 2026 through R2 economics + continued R1 cost reductions”,
-“VW JV revenue sustainability? — Management: Expect continued growth; VW product launches using Rivian architecture in 2027”,
+"R2 demand signals? — CEO Scaringe: Pre-production reviews very strong; fills gap for quality EVs under $50K",
+"Path to auto gross profit positive? — CFO: Targeting automotive gross profit positive by end of 2026 through R2 economics + continued R1 cost reductions",
+"VW JV revenue sustainability? — Management: Expect continued growth; VW product launches using Rivian architecture in 2027",
 ],
 },
-analystRating: “Buy”,
+analystRating: "Buy",
 targetPrice: 17.74,
 news: [
-{ date: “2026-03-20”, src: “Bloomberg”, headline: “Rivian shares fall 6.8% as Middle East tensions weigh on cyclical stocks”, sentiment: “negative” },
-{ date: “2026-03-19”, src: “Reuters”, headline: “Uber invests $1.25B in Rivian for 10,000 autonomous R2 robotaxis”, sentiment: “positive” },
-{ date: “2026-03-19”, src: “CNBC”, headline: “Rivian no longer expects to be adjusted EBITDA positive in 2027”, sentiment: “negative” },
-{ date: “2026-03-12”, src: “CNBC”, headline: “Rivian launches R2 SUV at $57,990; deliveries begin spring 2026”, sentiment: “positive” },
-{ date: “2026-03-10”, src: “Bloomberg”, headline: “TD Cowen upgrades Rivian to Buy on R2 demand potential”, sentiment: “positive” },
-{ date: “2026-02-13”, src: “Reuters”, headline: “Deutsche Bank and UBS both upgrade Rivian on improving fundamentals”, sentiment: “positive” },
+{ date: "2026-03-20", src: "Bloomberg", headline: "Rivian shares fall 6.8% as Middle East tensions weigh on cyclical stocks", sentiment: "negative" },
+{ date: "2026-03-19", src: "Reuters", headline: "Uber invests $1.25B in Rivian for 10,000 autonomous R2 robotaxis", sentiment: "positive" },
+{ date: "2026-03-19", src: "CNBC", headline: "Rivian no longer expects to be adjusted EBITDA positive in 2027", sentiment: "negative" },
+{ date: "2026-03-12", src: "CNBC", headline: "Rivian launches R2 SUV at $57,990; deliveries begin spring 2026", sentiment: "positive" },
+{ date: "2026-03-10", src: "Bloomberg", headline: "TD Cowen upgrades Rivian to Buy on R2 demand potential", sentiment: "positive" },
+{ date: "2026-02-13", src: "Reuters", headline: "Deutsche Bank and UBS both upgrade Rivian on improving fundamentals", sentiment: "positive" },
 ],
 ratingHistory: [
-{ date: “2025-06”, sp: “NR”, moodys: “NR”, fitch: “NR”, event: “$1.25B green notes issued (2031), redeemed 2026 floating-rate notes” },
-{ date: “2024-10”, sp: “NR”, moodys: “NR”, fitch: “NR”, event: “DOE ATVM loan of up to $6.6B conditionally approved” },
-{ date: “2024-06”, sp: “NR”, moodys: “NR”, fitch: “NR”, event: “VW invests $5B; joint venture announced” },
+{ date: "2025-06", sp: "NR", moodys: "NR", fitch: "NR", event: "$1.25B green notes issued (2031), redeemed 2026 floating-rate notes" },
+{ date: "2024-10", sp: "NR", moodys: "NR", fitch: "NR", event: "DOE ATVM loan of up to $6.6B conditionally approved" },
+{ date: "2024-06", sp: "NR", moodys: "NR", fitch: "NR", event: "VW invests $5B; joint venture announced" },
 ],
 financials: [
-{ period: “FY2025”, rev: 5387, ebitda: -2063, ni: -3626, debt: 4400, cash: 6082 },
-{ period: “FY2024”, rev: 4970, ebitda: -3200, ni: -4746, debt: 5400, cash: 7700 },
-{ period: “FY2023”, rev: 4434, ebitda: -4760, ni: -5432, debt: 4430, cash: 9410 },
-{ period: “FY2022”, rev: 1658, ebitda: -6340, ni: -6752, debt: 1500, cash: 11570 },
+{ period: "FY2025", rev: 5387, ebitda: -2063, ni: -3626, debt: 4400, cash: 6082 },
+{ period: "FY2024", rev: 4970, ebitda: -3200, ni: -4746, debt: 5400, cash: 7700 },
+{ period: "FY2023", rev: 4434, ebitda: -4760, ni: -5432, debt: 4430, cash: 9410 },
+{ period: "FY2022", rev: 1658, ebitda: -6340, ni: -6752, debt: 1500, cash: 11570 },
 ],
 research: [
-{ date: “2026-03-19”, firm: “Evercore ISI”, action: “Outperform”, pt: 22, summary: “Uber robotaxi deal validates R2 platform; $1.25B investment de-risks 2027-28 production ramp.” },
-{ date: “2026-03-12”, firm: “TD Cowen”, action: “Upgrade to Buy”, pt: 20, summary: “R2 reveal stronger than expected; $45K-$58K pricing opens mass-market addressable opportunity.” },
-{ date: “2026-03-10”, firm: “Goldman Sachs”, action: “Buy”, pt: 19, summary: “Physical AI and autonomous driving optionality underappreciated; R2 + Georgia plant are catalysts.” },
-{ date: “2026-02-17”, firm: “DA Davidson”, action: “Downgrade to UW”, pt: 11, summary: “Cash burn unsustainable without R2 success; EBITDA positive pushed beyond 2027.” },
-{ date: “2026-02-13”, firm: “Deutsche Bank”, action: “Upgrade to Buy”, pt: 18, summary: “R1 cost reductions improving; R2 platform economics fundamentally better than R1.” },
+{ date: "2026-03-19", firm: "Evercore ISI", action: "Outperform", pt: 22, summary: "Uber robotaxi deal validates R2 platform; $1.25B investment de-risks 2027-28 production ramp." },
+{ date: "2026-03-12", firm: "TD Cowen", action: "Upgrade to Buy", pt: 20, summary: "R2 reveal stronger than expected; $45K-$58K pricing opens mass-market addressable opportunity." },
+{ date: "2026-03-10", firm: "Goldman Sachs", action: "Buy", pt: 19, summary: "Physical AI and autonomous driving optionality underappreciated; R2 + Georgia plant are catalysts." },
+{ date: "2026-02-17", firm: "DA Davidson", action: "Downgrade to UW", pt: 11, summary: "Cash burn unsustainable without R2 success; EBITDA positive pushed beyond 2027." },
+{ date: "2026-02-13", firm: "Deutsche Bank", action: "Upgrade to Buy", pt: 18, summary: "R1 cost reductions improving; R2 platform economics fundamentally better than R1." },
 ],
 },
 // ─── NEW PORTFOLIO ADDITIONS ─────────────────────────────────────────────
 {
-id: “CENT”,
-name: “Central Garden & Pet Co.”,
-sector: “Consumer Products”,
+id: "CENT",
+name: "Central Garden & Pet Co.",
+sector: "Consumer Products",
 exposure: 15000000,
-sp: “BB”,
-moodys: “B1”,
-fitch: “BB”,
-impliedRating: “BB-”,
-outlook: “Stable”,
+sp: "BB",
+moodys: "B1",
+fitch: "BB",
+impliedRating: "BB-",
+outlook: "Stable",
 watchlist: false,
 cds5y: 320,
 cds5yChg: -10,
@@ -379,118 +379,118 @@ debtToEquity: 0.75,
 currentRatio: 1.86,
 roic: 8.2,
 cashBurnQtr: 70,
-liquidityRunway: “Adequate — investment grade profile”,
+liquidityRunway: "Adequate — investment grade profile",
 adjBurn: {
 adjEBITDA: 430,
-adjEBITDA_src: “FY2025 10-K; non-GAAP adj EBITDA”,
+adjEBITDA_src: "FY2025 10-K; non-GAAP adj EBITDA",
 incomeTaxes: 55,
-incomeTaxes_src: “FY2025 10-K; ~25% effective rate”,
+incomeTaxes_src: "FY2025 10-K; ~25% effective rate",
 prefDividends: 0,
-prefDividends_src: “No preferred stock outstanding”,
+prefDividends_src: "No preferred stock outstanding",
 maintCapex: 30,
 totalCapex: 55,
-totalCapex_src: “FY2026 guidance $50-60M; FY2025 actual ~$55M”,
+totalCapex_src: "FY2026 guidance $50-60M; FY2025 actual ~$55M",
 currentLTD: 0,
-currentLTD_src: “No near-term debt maturities until 2028”,
+currentLTD_src: "No near-term debt maturities until 2028",
 intExpCash: 62,
-intExpCash_src: “FY2025 10-K; senior notes interest”,
+intExpCash_src: "FY2025 10-K; senior notes interest",
 },
 liquidityBreakdown: {
 totalLiquidity: 1471,
 components: [
-{ category: “Cash & Cash Equivalents”, amount: 721, type: “cash”, sub: [
-{ label: “Unrestricted Cash”, amount: 680 },
-{ label: “Restricted Cash”, amount: 41 },
+{ category: "Cash & Cash Equivalents", amount: 721, type: "cash", sub: [
+{ label: "Unrestricted Cash", amount: 680 },
+{ label: "Restricted Cash", amount: 41 },
 ]},
-{ category: “Undrawn Credit Facilities”, amount: 750, type: “facility”, sub: [] },
+{ category: "Undrawn Credit Facilities", amount: 750, type: "facility", sub: [] },
 ],
 facilities: [
-{ name: “ABL Revolving Credit Facility”, committed: 750, drawn: 0, available: 750, maturity: “2028”, rate: “SOFR + spread”, secured: “Senior Secured”, notes: “No borrowings outstanding at FY2025 year-end; availability based on borrowing base of eligible inventory & receivables” },
+{ name: "ABL Revolving Credit Facility", committed: 750, drawn: 0, available: 750, maturity: "2028", rate: "SOFR + spread", secured: "Senior Secured", notes: "No borrowings outstanding at FY2025 year-end; availability based on borrowing base of eligible inventory & receivables" },
 ],
 debtMaturities: [
-{ year: “2026”, amount: 0, desc: “No maturities” },
-{ year: “2027”, amount: 0, desc: “No maturities” },
-{ year: “2028”, amount: 600, desc: “6.125% Senior Notes due 2028” },
-{ year: “2029”, amount: 0, desc: “No maturities” },
-{ year: “2030”, amount: 600, desc: “4.125% Senior Notes due 2030” },
-{ year: “Other”, amount: 0, desc: “” },
+{ year: "2026", amount: 0, desc: "No maturities" },
+{ year: "2027", amount: 0, desc: "No maturities" },
+{ year: "2028", amount: 600, desc: "6.125% Senior Notes due 2028" },
+{ year: "2029", amount: 0, desc: "No maturities" },
+{ year: "2030", amount: 600, desc: "4.125% Senior Notes due 2030" },
+{ year: "Other", amount: 0, desc: "" },
 ],
 },
-earningsDate: “2026-05-06”,
-earningsTime: “After Close”,
-lastEarnings: “Beat — EPS $0.21 vs $0.14 est.”,
+earningsDate: "2026-05-06",
+earningsTime: "After Close",
+lastEarnings: "Beat — EPS $0.21 vs $0.14 est.",
 earningsCallSummary: {
-date: “February 4, 2026”,
-quarter: “Q1 FY2026 (Dec 2025)”,
-source: “SEC Filing: Exhibit 99.1 (Q1 FY2026 Earnings Release)”,
+date: "February 4, 2026",
+quarter: "Q1 FY2026 (Dec 2025)",
+source: "SEC Filing: Exhibit 99.1 (Q1 FY2026 Earnings Release)",
 keyFinancials: [
-“Q1 net sales $617M, down 6% YoY — driven by shipment timing shift into Q2 and portfolio optimization”,
-“Gross margin expanded 110 bps to 30.9%; non-GAAP gross margin 30.8%”,
-“GAAP diluted EPS $0.11; non-GAAP EPS $0.21 (flat YoY, beat consensus of $0.14)”,
-“Net interest expense $8M, consistent with prior year”,
+"Q1 net sales $617M, down 6% YoY — driven by shipment timing shift into Q2 and portfolio optimization",
+"Gross margin expanded 110 bps to 30.9%; non-GAAP gross margin 30.8%",
+"GAAP diluted EPS $0.11; non-GAAP EPS $0.21 (flat YoY, beat consensus of $0.14)",
+"Net interest expense $8M, consistent with prior year",
 ],
 production: [
-“Revenue decline attributed to retailer spring inventory shipment timing, not demand destruction”,
-“Continued portfolio optimization — rationalizing lower-margin pet durables and select live plants”,
-“Closed UK operations; transitioning European business to direct model”,
-“Completed Champion USA tuck-in acquisition post-quarter (livestock feed-through fly control)”,
+"Revenue decline attributed to retailer spring inventory shipment timing, not demand destruction",
+"Continued portfolio optimization — rationalizing lower-margin pet durables and select live plants",
+"Closed UK operations; transitioning European business to direct model",
+"Completed Champion USA tuck-in acquisition post-quarter (livestock feed-through fly control)",
 ],
 creditRelevant: [
-“Total debt $1.2B unchanged; gross leverage 2.9x (within 3.0-3.5x target range)”,
-“No ABL borrowings outstanding at quarter-end — $750M revolver fully available”,
-“Cash position of $721M — record level”,
-“Reaffirmed FY2026 non-GAAP diluted EPS guidance of $2.70 or better”,
-“CapEx guidance $50-60M for fiscal 2026”,
+"Total debt $1.2B unchanged; gross leverage 2.9x (within 3.0-3.5x target range)",
+"No ABL borrowings outstanding at quarter-end — $750M revolver fully available",
+"Cash position of $721M — record level",
+"Reaffirmed FY2026 non-GAAP diluted EPS guidance of $2.70 or better",
+"CapEx guidance $50-60M for fiscal 2026",
 ],
 strategicItems: [
-“Cost & Simplicity program embedded in operations — closed 16 legacy facilities to date”,
-“Central to Home strategy focused on pet and garden consumables and innovation”,
-“Increased M&A activity anticipated, particularly in consumable businesses”,
-“Investing in digital capabilities and e-commerce to adapt to shifting consumer behaviors”,
+"Cost & Simplicity program embedded in operations — closed 16 legacy facilities to date",
+"Central to Home strategy focused on pet and garden consumables and innovation",
+"Increased M&A activity anticipated, particularly in consumable businesses",
+"Investing in digital capabilities and e-commerce to adapt to shifting consumer behaviors",
 ],
 analystQA: [
-“Path to growth? — CEO Lahanas: Embedding innovation in culture alongside cost discipline; results will build over time”,
-“Consumer headwinds? — Management: Consumer still value-focused; portfolio optimization improving margin mix despite top-line pressure”,
+"Path to growth? — CEO Lahanas: Embedding innovation in culture alongside cost discipline; results will build over time",
+"Consumer headwinds? — Management: Consumer still value-focused; portfolio optimization improving margin mix despite top-line pressure",
 ],
 },
-analystRating: “Hold”,
+analystRating: "Hold",
 targetPrice: 42.00,
 news: [
-{ date: “2026-02-04”, src: “Business Wire”, headline: “Central Garden & Pet Q1 FY2026 earnings beat on margins despite 6% revenue decline”, sentiment: “positive” },
-{ date: “2026-01-15”, src: “Reuters”, headline: “Central Garden completes Champion USA tuck-in acquisition for livestock segment”, sentiment: “positive” },
-{ date: “2025-11-24”, src: “Zacks”, headline: “Central Garden delivers record FY2025 bottom-line results and cash position”, sentiment: “positive” },
+{ date: "2026-02-04", src: "Business Wire", headline: "Central Garden & Pet Q1 FY2026 earnings beat on margins despite 6% revenue decline", sentiment: "positive" },
+{ date: "2026-01-15", src: "Reuters", headline: "Central Garden completes Champion USA tuck-in acquisition for livestock segment", sentiment: "positive" },
+{ date: "2025-11-24", src: "Zacks", headline: "Central Garden delivers record FY2025 bottom-line results and cash position", sentiment: "positive" },
 ],
 ratingHistory: [
-{ date: “2025-06”, sp: “BB”, moodys: “B1”, fitch: “BB”, event: “Stable outlook reaffirmed; Cost & Simplicity driving margin improvement” },
-{ date: “2024-01”, sp: “BB”, moodys: “B1”, fitch: “BB”, event: “Moody’s affirms B1 CFR with stable outlook” },
+{ date: "2025-06", sp: "BB", moodys: "B1", fitch: "BB", event: "Stable outlook reaffirmed; Cost & Simplicity driving margin improvement" },
+{ date: "2024-01", sp: "BB", moodys: "B1", fitch: "BB", event: "Moody's affirms B1 CFR with stable outlook" },
 ],
 financials: [
-{ period: “FY2025”, rev: 3350, ebitda: 430, ni: 165, debt: 1200, cash: 721 },
-{ period: “FY2024”, rev: 3280, ebitda: 385, ni: 118, debt: 1200, cash: 580 },
-{ period: “FY2023”, rev: 3170, ebitda: 340, ni: 89, debt: 1250, cash: 510 },
-{ period: “FY2022”, rev: 3640, ebitda: 410, ni: 156, debt: 1300, cash: 450 },
+{ period: "FY2025", rev: 3350, ebitda: 430, ni: 165, debt: 1200, cash: 721 },
+{ period: "FY2024", rev: 3280, ebitda: 385, ni: 118, debt: 1200, cash: 580 },
+{ period: "FY2023", rev: 3170, ebitda: 340, ni: 89, debt: 1250, cash: 510 },
+{ period: "FY2022", rev: 3640, ebitda: 410, ni: 156, debt: 1300, cash: 450 },
 ],
 research: [
-{ date: “2026-02-05”, firm: “Zacks”, action: “Hold”, pt: 40, summary: “Q1 beat on margins but revenue miss on shipment timing; portfolio optimization ongoing.” },
-{ date: “2025-11-25”, firm: “KeyBanc”, action: “Overweight”, pt: 45, summary: “Record cash position and deleveraging track support credit improvement thesis.” },
+{ date: "2026-02-05", firm: "Zacks", action: "Hold", pt: 40, summary: "Q1 beat on margins but revenue miss on shipment timing; portfolio optimization ongoing." },
+{ date: "2025-11-25", firm: "KeyBanc", action: "Overweight", pt: 45, summary: "Record cash position and deleveraging track support credit improvement thesis." },
 ],
 debtMaturities: {
 items: [
-{ year: “2028”, amount: 600, desc: “6.125% Senior Notes due 2028” },
-{ year: “2030”, amount: 600, desc: “4.125% Senior Notes due 2030” },
+{ year: "2028", amount: 600, desc: "6.125% Senior Notes due 2028" },
+{ year: "2030", amount: 600, desc: "4.125% Senior Notes due 2030" },
 ],
 },
 },
 {
-id: “IHRT”,
-name: “iHeartMedia Inc.”,
-sector: “Media / Broadcasting”,
+id: "IHRT",
+name: "iHeartMedia Inc.",
+sector: "Media / Broadcasting",
 exposure: 20000000,
-sp: “CCC+”,
-moodys: “Caa2”,
-fitch: “NR”,
-impliedRating: “CCC”,
-outlook: “Negative”,
+sp: "CCC+",
+moodys: "Caa2",
+fitch: "NR",
+impliedRating: "CCC",
+outlook: "Negative",
 watchlist: true,
 cds5y: 2800,
 cds5yChg: 150,
@@ -518,120 +518,120 @@ debtToEquity: -3.0,
 currentRatio: 1.26,
 roic: -3.5,
 cashBurnQtr: 35,
-liquidityRunway: “Tight — $640M total liquidity”,
+liquidityRunway: "Tight — $640M total liquidity",
 adjBurn: {
 adjEBITDA: 768,
-adjEBITDA_src: “FY2025 Earnings Release; consolidated adj EBITDA”,
+adjEBITDA_src: "FY2025 Earnings Release; consolidated adj EBITDA",
 incomeTaxes: 15,
-incomeTaxes_src: “Minimal cash taxes; NOL carryforwards from 2019 bankruptcy”,
+incomeTaxes_src: "Minimal cash taxes; NOL carryforwards from 2019 bankruptcy",
 prefDividends: 0,
-prefDividends_src: “No preferred stock”,
+prefDividends_src: "No preferred stock",
 maintCapex: 40,
 totalCapex: 80,
-totalCapex_src: “FY2025 estimated; technology + infrastructure maintenance”,
+totalCapex_src: "FY2025 estimated; technology + infrastructure maintenance",
 currentLTD: 51,
-currentLTD_src: “Term loans due 2026 ($5.1M + $1.5M) + 6.375% notes ($44.6M) — most exchanged Dec 2024”,
+currentLTD_src: "Term loans due 2026 ($5.1M + $1.5M) + 6.375% notes ($44.6M) — most exchanged Dec 2024",
 intExpCash: 440,
-intExpCash_src: “FY2025; weighted avg ~9% on ~$4.8B total debt”,
+intExpCash_src: "FY2025; weighted avg ~9% on ~$4.8B total debt",
 },
 liquidityBreakdown: {
 totalLiquidity: 640,
 components: [
-{ category: “Cash & Cash Equivalents”, amount: 271, type: “cash”, sub: [
-{ label: “Unrestricted Cash”, amount: 271 },
+{ category: "Cash & Cash Equivalents", amount: 271, type: "cash", sub: [
+{ label: "Unrestricted Cash", amount: 271 },
 ]},
-{ category: “Undrawn Credit Facilities”, amount: 369, type: “facility”, sub: [] },
+{ category: "Undrawn Credit Facilities", amount: 369, type: "facility", sub: [] },
 ],
 facilities: [
-{ name: “ABL Revolving Credit Facility”, committed: 450, drawn: 81, available: 369, maturity: “2027”, rate: “SOFR + spread”, secured: “Senior Secured”, notes: “Asset-based revolver; availability = cash + AR borrowing base; total liquidity $640M per Q4 2025 earnings release” },
+{ name: "ABL Revolving Credit Facility", committed: 450, drawn: 81, available: 369, maturity: "2027", rate: "SOFR + spread", secured: "Senior Secured", notes: "Asset-based revolver; availability = cash + AR borrowing base; total liquidity $640M per Q4 2025 earnings release" },
 ],
 debtMaturities: [
-{ year: “2026”, amount: 51, desc: “Remaining term loans + 6.375% notes not exchanged” },
-{ year: “2027”, amount: 79, desc: “5.25% secured notes ($7M) + 8.375% unsecured ($72M)” },
-{ year: “2028”, amount: 277, desc: “4.75% Senior Secured Notes” },
-{ year: “2029”, amount: 2858, desc: “Term Loan ($2,140M) + 9.125% 1L Notes ($718M)” },
-{ year: “2030”, amount: 1336, desc: “7.75% 1L Notes ($661M) + 10.875% 2L Notes ($675M)” },
-{ year: “2031”, amount: 178, desc: “7.00% First Lien Notes” },
-{ year: “Other”, amount: 0, desc: “” },
+{ year: "2026", amount: 51, desc: "Remaining term loans + 6.375% notes not exchanged" },
+{ year: "2027", amount: 79, desc: "5.25% secured notes ($7M) + 8.375% unsecured ($72M)" },
+{ year: "2028", amount: 277, desc: "4.75% Senior Secured Notes" },
+{ year: "2029", amount: 2858, desc: "Term Loan ($2,140M) + 9.125% 1L Notes ($718M)" },
+{ year: "2030", amount: 1336, desc: "7.75% 1L Notes ($661M) + 10.875% 2L Notes ($675M)" },
+{ year: "2031", amount: 178, desc: "7.00% First Lien Notes" },
+{ year: "Other", amount: 0, desc: "" },
 ],
 },
-earningsDate: “2026-05-11”,
-earningsTime: “After Close”,
-lastEarnings: “Miss — adj. EBITDA $220M vs $246M prior yr”,
+earningsDate: "2026-05-11",
+earningsTime: "After Close",
+lastEarnings: "Miss — adj. EBITDA $220M vs $246M prior yr",
 earningsCallSummary: {
-date: “March 2, 2026”,
-quarter: “Q4 FY2025”,
-source: “SEC Filing: Q4 FY2025 Earnings Release + Earnings Call”,
+date: "March 2, 2026",
+quarter: "Q4 FY2025",
+source: "SEC Filing: Q4 FY2025 Earnings Release + Earnings Call",
 keyFinancials: [
-“Q4 consolidated revenue: results announced March 2, 2026”,
-“Q4 adjusted EBITDA $220M, down 10.5% YoY from $246M”,
-“Q4 operating income $86M, down 18% from $105M in Q4 2024”,
-“FY2025 GAAP operating loss of -$21M (improved from -$763M in 2024 which included $923M impairment)”,
-“Cash balance $271M, total liquidity $640M as of Dec 31, 2025”,
+"Q4 consolidated revenue: results announced March 2, 2026",
+"Q4 adjusted EBITDA $220M, down 10.5% YoY from $246M",
+"Q4 operating income $86M, down 18% from $105M in Q4 2024",
+"FY2025 GAAP operating loss of -$21M (improved from -$763M in 2024 which included $923M impairment)",
+"Cash balance $271M, total liquidity $640M as of Dec 31, 2025",
 ],
 production: [
-“Q4 free cash flow of $138M; FCF including real estate sales of $158M”,
-“Cash provided by operating activities $156M in Q4”,
-“No. 1 audio company in America, reaching 250M+ people monthly”,
+"Q4 free cash flow of $138M; FCF including real estate sales of $158M",
+"Cash provided by operating activities $156M in Q4",
+"No. 1 audio company in America, reaching 250M+ people monthly",
 ],
 creditRelevant: [
-“Completed $4.8B comprehensive debt exchange in Dec 2024 — reduced total debt by $440M”,
-“Exchanged near-term maturities (2026-2028 notes) into new 2029-2031 first/second lien notes”,
-“Remaining debt stack: $2.14B Term Loan (2029), $718M 9.125% 1L (2029), $661M 7.75% 1L (2030), $178M 7.00% 1L (2031), $675M 10.875% 2L (2030)”,
-“Very high leverage at ~6.3x gross; interest coverage thin at 1.7x”,
-“Negative stockholders equity of -$1.6B reflects accumulated impairments”,
+"Completed $4.8B comprehensive debt exchange in Dec 2024 — reduced total debt by $440M",
+"Exchanged near-term maturities (2026-2028 notes) into new 2029-2031 first/second lien notes",
+"Remaining debt stack: $2.14B Term Loan (2029), $718M 9.125% 1L (2029), $661M 7.75% 1L (2030), $178M 7.00% 1L (2031), $675M 10.875% 2L (2030)",
+"Very high leverage at ~6.3x gross; interest coverage thin at 1.7x",
+"Negative stockholders equity of -$1.6B reflects accumulated impairments",
 ],
 strategicItems: [
-“Digital revenue growth from podcasting and streaming platforms”,
-“iHeartPodcasts is #1 podcast publisher globally”,
-“Secular headwinds in traditional radio advertising”,
-“Focus on cost management and digital transformation”,
+"Digital revenue growth from podcasting and streaming platforms",
+"iHeartPodcasts is #1 podcast publisher globally",
+"Secular headwinds in traditional radio advertising",
+"Focus on cost management and digital transformation",
 ],
 analystQA: [
-“Revenue outlook for Q1 2026? — Management provided Q1 2026 revenue and EBITDA guidance during earnings call”,
-“Debt sustainability? — Exchange transaction extended maturities but total burden remains very high at ~6x leverage”,
+"Revenue outlook for Q1 2026? — Management provided Q1 2026 revenue and EBITDA guidance during earnings call",
+"Debt sustainability? — Exchange transaction extended maturities but total burden remains very high at ~6x leverage",
 ],
 },
-analystRating: “Sell”,
+analystRating: "Sell",
 targetPrice: 2.50,
 news: [
-{ date: “2026-03-02”, src: “Business Wire”, headline: “iHeartMedia reports Q4/FY2025 results; adj EBITDA declines 10.5%”, sentiment: “negative” },
-{ date: “2025-12-22”, src: “Reuters”, headline: “iHeartMedia completes $4.8B debt restructuring, reduces debt by $440M”, sentiment: “positive” },
-{ date: “2025-11-10”, src: “CNBC”, headline: “iHeartMedia Q3 revenue flat as traditional radio ad spend stagnates”, sentiment: “negative” },
+{ date: "2026-03-02", src: "Business Wire", headline: "iHeartMedia reports Q4/FY2025 results; adj EBITDA declines 10.5%", sentiment: "negative" },
+{ date: "2025-12-22", src: "Reuters", headline: "iHeartMedia completes $4.8B debt restructuring, reduces debt by $440M", sentiment: "positive" },
+{ date: "2025-11-10", src: "CNBC", headline: "iHeartMedia Q3 revenue flat as traditional radio ad spend stagnates", sentiment: "negative" },
 ],
 ratingHistory: [
-{ date: “2025-12”, sp: “CCC+”, moodys: “Caa2”, fitch: “NR”, event: “Completed $4.8B comprehensive debt exchange” },
-{ date: “2024-11”, sp: “CCC+”, moodys: “Caa2”, fitch: “NR”, event: “Entered TSA with 80% of debt holders for exchange” },
+{ date: "2025-12", sp: "CCC+", moodys: "Caa2", fitch: "NR", event: "Completed $4.8B comprehensive debt exchange" },
+{ date: "2024-11", sp: "CCC+", moodys: "Caa2", fitch: "NR", event: "Entered TSA with 80% of debt holders for exchange" },
 ],
 financials: [
-{ period: “FY2025”, rev: 3730, ebitda: 768, ni: -320, debt: 4800, cash: 271 },
-{ period: “FY2024”, rev: 3800, ebitda: 820, ni: -714, debt: 5200, cash: 315 },
-{ period: “FY2023”, rev: 3820, ebitda: 845, ni: -175, debt: 5400, cash: 290 },
-{ period: “FY2022”, rev: 3960, ebitda: 880, ni: -210, debt: 5580, cash: 380 },
+{ period: "FY2025", rev: 3730, ebitda: 768, ni: -320, debt: 4800, cash: 271 },
+{ period: "FY2024", rev: 3800, ebitda: 820, ni: -714, debt: 5200, cash: 315 },
+{ period: "FY2023", rev: 3820, ebitda: 845, ni: -175, debt: 5400, cash: 290 },
+{ period: "FY2022", rev: 3960, ebitda: 880, ni: -210, debt: 5580, cash: 380 },
 ],
 research: [
-{ date: “2026-03-03”, firm: “Wells Fargo”, action: “Underweight”, pt: 1.00, summary: “Leverage unsustainable at 6x+; radio ad market in structural decline; digital pivot insufficient.” },
-{ date: “2025-12-23”, firm: “B. Riley”, action: “Neutral”, pt: 2.00, summary: “Debt exchange extends maturities but doesn’t solve fundamental over-leverage problem.” },
+{ date: "2026-03-03", firm: "Wells Fargo", action: "Underweight", pt: 1.00, summary: "Leverage unsustainable at 6x+; radio ad market in structural decline; digital pivot insufficient." },
+{ date: "2025-12-23", firm: "B. Riley", action: "Neutral", pt: 2.00, summary: "Debt exchange extends maturities but doesn't solve fundamental over-leverage problem." },
 ],
 debtMaturities: {
 items: [
-{ year: “2029”, amount: 2858, desc: “Term Loan ($2.14B) + 9.125% 1L Notes ($718M)” },
-{ year: “2030”, amount: 1336, desc: “7.75% 1L Notes ($661M) + 10.875% 2L Notes ($675M)” },
-{ year: “2031”, amount: 178, desc: “7.00% First Lien Notes” },
-{ year: “Other”, amount: 400, desc: “Remaining near-term maturities + ABL” },
+{ year: "2029", amount: 2858, desc: "Term Loan ($2.14B) + 9.125% 1L Notes ($718M)" },
+{ year: "2030", amount: 1336, desc: "7.75% 1L Notes ($661M) + 10.875% 2L Notes ($675M)" },
+{ year: "2031", amount: 178, desc: "7.00% First Lien Notes" },
+{ year: "Other", amount: 400, desc: "Remaining near-term maturities + ABL" },
 ],
 },
 },
 {
-id: “BEUSA”,
-name: “Beusa Investments LLC”,
-sector: “Energy / Oilfield Services”,
+id: "BEUSA",
+name: "Beusa Investments LLC",
+sector: "Energy / Oilfield Services",
 exposure: 10000000,
-sp: “NR”,
-moodys: “NR”,
-fitch: “NR”,
-impliedRating: “B-”,
-outlook: “Stable”,
+sp: "NR",
+moodys: "NR",
+fitch: "NR",
+impliedRating: "B-",
+outlook: "Stable",
 watchlist: true,
 cds5y: null,
 cds5yChg: null,
@@ -659,93 +659,93 @@ debtToEquity: 1.33,
 currentRatio: 1.50,
 roic: 5.0,
 cashBurnQtr: 6,
-liquidityRunway: “Private — limited visibility”,
+liquidityRunway: "Private — limited visibility",
 adjBurn: {
 adjEBITDA: 55,
-adjEBITDA_src: “Estimated from bank group information; private company”,
+adjEBITDA_src: "Estimated from bank group information; private company",
 incomeTaxes: 5,
-incomeTaxes_src: “Estimated; pass-through entity structure likely”,
+incomeTaxes_src: "Estimated; pass-through entity structure likely",
 prefDividends: 0,
-prefDividends_src: “No preferred stock known”,
+prefDividends_src: "No preferred stock known",
 maintCapex: 15,
 totalCapex: 25,
-totalCapex_src: “Estimated; equipment fleet maintenance + growth capex”,
+totalCapex_src: "Estimated; equipment fleet maintenance + growth capex",
 currentLTD: 10,
-currentLTD_src: “Estimated current portion of equipment financing”,
+currentLTD_src: "Estimated current portion of equipment financing",
 intExpCash: 20,
-intExpCash_src: “Estimated; ~10% rate on $200M total debt”,
+intExpCash_src: "Estimated; ~10% rate on $200M total debt",
 },
 liquidityBreakdown: {
 totalLiquidity: 75,
 components: [
-{ category: “Cash & Cash Equivalents”, amount: 45, type: “cash”, sub: [
-{ label: “Unrestricted Cash”, amount: 45 },
+{ category: "Cash & Cash Equivalents", amount: 45, type: "cash", sub: [
+{ label: "Unrestricted Cash", amount: 45 },
 ]},
-{ category: “Undrawn Credit Facilities”, amount: 30, type: “facility”, sub: [] },
+{ category: "Undrawn Credit Facilities", amount: 30, type: "facility", sub: [] },
 ],
 facilities: [
-{ name: “Revolving Credit Facility”, committed: 50, drawn: 20, available: 30, maturity: “2027”, rate: “SOFR + 3.50%”, secured: “Senior Secured”, notes: “Private — estimated from bank group data; asset-based facility secured by equipment” },
+{ name: "Revolving Credit Facility", committed: 50, drawn: 20, available: 30, maturity: "2027", rate: "SOFR + 3.50%", secured: "Senior Secured", notes: "Private — estimated from bank group data; asset-based facility secured by equipment" },
 ],
 debtMaturities: [
-{ year: “2026”, amount: 10, desc: “Current portion of equipment term loans” },
-{ year: “2027”, amount: 60, desc: “Revolver maturity + equipment loans” },
-{ year: “2028”, amount: 80, desc: “Term loan facilities” },
-{ year: “Other”, amount: 50, desc: “Other secured obligations” },
+{ year: "2026", amount: 10, desc: "Current portion of equipment term loans" },
+{ year: "2027", amount: 60, desc: "Revolver maturity + equipment loans" },
+{ year: "2028", amount: 80, desc: "Term loan facilities" },
+{ year: "Other", amount: 50, desc: "Other secured obligations" },
 ],
 },
 earningsDate: null,
 earningsTime: null,
-lastEarnings: “Private — no public earnings”,
+lastEarnings: "Private — no public earnings",
 earningsCallSummary: {
-date: “N/A”,
-quarter: “Private Company”,
-source: “Private company — financials from bank group information package”,
+date: "N/A",
+quarter: "Private Company",
+source: "Private company — financials from bank group information package",
 keyFinancials: [
-“Private company — Beusa Holdings / Beusa Energy, The Woodlands, TX”,
-“Estimated revenue $100M-$250M based on industry data; exact figures from bank package only”,
-“Parent company of Evolution Well Services (electric frac) and Dynamis Power Solutions”,
+"Private company — Beusa Holdings / Beusa Energy, The Woodlands, TX",
+"Estimated revenue $100M-$250M based on industry data; exact figures from bank package only",
+"Parent company of Evolution Well Services (electric frac) and Dynamis Power Solutions",
 ],
 production: [
-“Operations across Haynesville/Bossier (LA), Permian (TX/NM), Eagle Ford (TX), Marcellus/Utica (PA/OH)”,
-“Vertically integrated: E&P, electric frac (Evolution), turbine power (Dynamis), logistics”,
-“~140-200 employees across operations”,
+"Operations across Haynesville/Bossier (LA), Permian (TX/NM), Eagle Ford (TX), Marcellus/Utica (PA/OH)",
+"Vertically integrated: E&P, electric frac (Evolution), turbine power (Dynamis), logistics",
+"~140-200 employees across operations",
 ],
 creditRelevant: [
-“Private — limited financial transparency; rely on bank group reporting”,
-“Small-to-midsize oilfield services company with commodity exposure”,
-“Evolution Well Services is market leader in electric hydraulic fracturing — growing segment”,
-“Capital-intensive business model with equipment fleet financing needs”,
+"Private — limited financial transparency; rely on bank group reporting",
+"Small-to-midsize oilfield services company with commodity exposure",
+"Evolution Well Services is market leader in electric hydraulic fracturing — growing segment",
+"Capital-intensive business model with equipment fleet financing needs",
 ],
 strategicItems: [
-“Electric frac technology differentiator — 100% electric equipment reduces emissions”,
-“Dynamis expanding into data center and grid stabilization power solutions”,
-“30-year operating history in energy sector”,
+"Electric frac technology differentiator — 100% electric equipment reduces emissions",
+"Dynamis expanding into data center and grid stabilization power solutions",
+"30-year operating history in energy sector",
 ],
 analystQA: [],
 },
-analystRating: “NR”,
+analystRating: "NR",
 targetPrice: null,
 news: [
-{ date: “2025-11-25”, src: “Company”, headline: “Beusa Energy rebrands, highlighting integrated energy solutions beyond oil & gas”, sentiment: “positive” },
+{ date: "2025-11-25", src: "Company", headline: "Beusa Energy rebrands, highlighting integrated energy solutions beyond oil & gas", sentiment: "positive" },
 ],
 ratingHistory: [],
 financials: [
-{ period: “FY2025E”, rev: 250, ebitda: 55, ni: 10, debt: 200, cash: 45 },
-{ period: “FY2024E”, rev: 220, ebitda: 48, ni: 5, debt: 210, cash: 35 },
+{ period: "FY2025E", rev: 250, ebitda: 55, ni: 10, debt: 200, cash: 45 },
+{ period: "FY2024E", rev: 220, ebitda: 48, ni: 5, debt: 210, cash: 35 },
 ],
 research: [],
 debtMaturities: { items: [] },
 },
 {
-id: “SMC”,
-name: “Summit Midstream Corp.”,
-sector: “Midstream / Energy”,
+id: "SMC",
+name: "Summit Midstream Corp.",
+sector: "Midstream / Energy",
 exposure: 12000000,
-sp: “NR”,
-moodys: “NR”,
-fitch: “NR”,
-impliedRating: “B”,
-outlook: “Stable”,
+sp: "NR",
+moodys: "NR",
+fitch: "NR",
+impliedRating: "B",
+outlook: "Stable",
 watchlist: true,
 cds5y: 650,
 cds5yChg: -25,
@@ -773,118 +773,118 @@ debtToEquity: 1.98,
 currentRatio: 0.68,
 roic: 3.5,
 cashBurnQtr: 4,
-liquidityRunway: “Adequate — $500M ABL + FCF”,
+liquidityRunway: "Adequate — $500M ABL + FCF",
 adjBurn: {
 adjEBITDA: 243,
-adjEBITDA_src: “FY2025 Earnings Release; reported adj EBITDA $242.6M”,
+adjEBITDA_src: "FY2025 Earnings Release; reported adj EBITDA $242.6M",
 incomeTaxes: 5,
-incomeTaxes_src: “FY2025 10-K; minimal cash taxes; NOL carryforwards”,
+incomeTaxes_src: "FY2025 10-K; minimal cash taxes; NOL carryforwards",
 prefDividends: 0,
-prefDividends_src: “Series A preferred — accrued dividends, planning repayment”,
+prefDividends_src: "Series A preferred — accrued dividends, planning repayment",
 maintCapex: 18,
 totalCapex: 89,
-totalCapex_src: “FY2025 actual $89M; includes $15-20M maintenance + growth connections”,
+totalCapex_src: "FY2025 actual $89M; includes $15-20M maintenance + growth connections",
 currentLTD: 7,
-currentLTD_src: “Remaining term loans due 2026 (~$7M)”,
+currentLTD_src: "Remaining term loans due 2026 (~$7M)",
 intExpCash: 90,
-intExpCash_src: “FY2025; ~9.5% weighted avg on $930M total debt + Permian facility”,
+intExpCash_src: "FY2025; ~9.5% weighted avg on $930M total debt + Permian facility",
 },
 liquidityBreakdown: {
 totalLiquidity: 458,
 components: [
-{ category: “Cash & Cash Equivalents”, amount: 21, type: “cash”, sub: [
-{ label: “Unrestricted Cash”, amount: 21 },
+{ category: "Cash & Cash Equivalents", amount: 21, type: "cash", sub: [
+{ label: "Unrestricted Cash", amount: 21 },
 ]},
-{ category: “Undrawn Credit Facilities”, amount: 437, type: “facility”, sub: [] },
+{ category: "Undrawn Credit Facilities", amount: 437, type: "facility", sub: [] },
 ],
 facilities: [
-{ name: “ABL Revolving Credit Facility”, committed: 500, drawn: 112, available: 387, maturity: “2028”, rate: “SOFR + spread”, secured: “Senior Secured”, notes: “Gross availability $810M per borrowing base (exceeds $500M commitments); $112M drawn at year-end; $40M repayment planned from Double E distribution (pro forma ~$72M drawn); first lien leverage 0.5x vs 2.5x max covenant; $0.8M issued but undrawn LCs” },
-{ name: “Permian Transmission Term Loan”, committed: 440, drawn: 340, available: 50, maturity: “Mar 2031”, rate: “SOFR + spread”, secured: “Project Secured”, notes: “New $440M facility (closed Mar 2026): $340M drawn at closing + $50M committed delayed draw for expansion + $50M accordion; replaced prior Permian facility ($112.7M balance) and subsidiary preferred equity” },
+{ name: "ABL Revolving Credit Facility", committed: 500, drawn: 112, available: 387, maturity: "2028", rate: "SOFR + spread", secured: "Senior Secured", notes: "Gross availability $810M per borrowing base (exceeds $500M commitments); $112M drawn at year-end; $40M repayment planned from Double E distribution (pro forma ~$72M drawn); first lien leverage 0.5x vs 2.5x max covenant; $0.8M issued but undrawn LCs" },
+{ name: "Permian Transmission Term Loan", committed: 440, drawn: 340, available: 50, maturity: "Mar 2031", rate: "SOFR + spread", secured: "Project Secured", notes: "New $440M facility (closed Mar 2026): $340M drawn at closing + $50M committed delayed draw for expansion + $50M accordion; replaced prior Permian facility ($112.7M balance) and subsidiary preferred equity" },
 ],
 debtMaturities: [
-{ year: “2026”, amount: 7, desc: “Remaining term loans” },
-{ year: “2027”, amount: 7, desc: “5.25% Senior Secured Notes” },
-{ year: “2028”, amount: 389, desc: “4.75% Senior Secured Notes ($277M) + ABL drawn ($112M)” },
-{ year: “2029”, amount: 350, desc: “8.50% Senior Secured Notes” },
-{ year: “2031”, amount: 340, desc: “Permian Transmission Term Loan” },
-{ year: “Other”, amount: 250, desc: “Second Lien Notes + other” },
+{ year: "2026", amount: 7, desc: "Remaining term loans" },
+{ year: "2027", amount: 7, desc: "5.25% Senior Secured Notes" },
+{ year: "2028", amount: 389, desc: "4.75% Senior Secured Notes ($277M) + ABL drawn ($112M)" },
+{ year: "2029", amount: 350, desc: "8.50% Senior Secured Notes" },
+{ year: "2031", amount: 340, desc: "Permian Transmission Term Loan" },
+{ year: "Other", amount: 250, desc: "Second Lien Notes + other" },
 ],
 },
-earningsDate: “2026-05-15”,
-earningsTime: “After Close”,
-lastEarnings: “In-line — adj EBITDA $58.6M (Q4)”,
+earningsDate: "2026-05-15",
+earningsTime: "After Close",
+lastEarnings: "In-line — adj EBITDA $58.6M (Q4)",
 earningsCallSummary: {
-date: “March 16, 2026”,
-quarter: “Q4 FY2025”,
-source: “SEC Filing: Q4 FY2025 Earnings Release + Earnings Call”,
+date: "March 16, 2026",
+quarter: "Q4 FY2025",
+source: "SEC Filing: Q4 FY2025 Earnings Release + Earnings Call",
 keyFinancials: [
-“Q4 adjusted EBITDA $58.6M; FY2025 adjusted EBITDA $243M”,
-“Q4 distributable cash flow $33.7M; Q4 free cash flow $17.0M”,
-“FY2025 capex $89M ($19M in Q4); 2026 EBITDA guidance $225M-$265M”,
-“Net debt ~$930M at year-end; total leverage 4.1x (excl. Tall Oak earnout)”,
+"Q4 adjusted EBITDA $58.6M; FY2025 adjusted EBITDA $243M",
+"Q4 distributable cash flow $33.7M; Q4 free cash flow $17.0M",
+"FY2025 capex $89M ($19M in Q4); 2026 EBITDA guidance $225M-$265M",
+"Net debt ~$930M at year-end; total leverage 4.1x (excl. Tall Oak earnout)",
 ],
 production: [
-“Average daily natural gas throughput increasing on wholly owned systems”,
-“Double E Pipeline signed three new 10+-year firm take-or-pay contracts”,
-“Launched binding open season on Double E to increase firm capacity by up to 50% to ~2.4 Bcf/d”,
+"Average daily natural gas throughput increasing on wholly owned systems",
+"Double E Pipeline signed three new 10+-year firm take-or-pay contracts",
+"Launched binding open season on Double E to increase firm capacity by up to 50% to ~2.4 Bcf/d",
 ],
 creditRelevant: [
-“Total leverage 4.1x — elevated but improving; interest coverage 2.7x (covenant minimum 2.0x)”,
-“ABL Revolver: $500M committed, $810M gross availability; borrowing base well in excess”,
-“In compliance with all financial covenants as of Dec 31, 2025”,
-“First lien leverage 0.5x vs. 2.5x max covenant — significant headroom”,
-“Permian Transmission Credit Facility balance $112.7M, declining via scheduled payments”,
+"Total leverage 4.1x — elevated but improving; interest coverage 2.7x (covenant minimum 2.0x)",
+"ABL Revolver: $500M committed, $810M gross availability; borrowing base well in excess",
+"In compliance with all financial covenants as of Dec 31, 2025",
+"First lien leverage 0.5x vs. 2.5x max covenant — significant headroom",
+"Permian Transmission Credit Facility balance $112.7M, declining via scheduled payments",
 ],
 strategicItems: [
-“Double E pipeline driving Permian segment EBITDA growth from $34M (2025) to ~$60M target by 2029”,
-“New 10-year crude gathering contract in Divide County, ND (200K+ acres)”,
-“Piceance MVC payments declining from $17M (2025) to $13M (2026), rolling off fully in 2027”,
-“Planning to resume common stock dividend after Series A preferred repayment”,
+"Double E pipeline driving Permian segment EBITDA growth from $34M (2025) to ~$60M target by 2029",
+"New 10-year crude gathering contract in Divide County, ND (200K+ acres)",
+"Piceance MVC payments declining from $17M (2025) to $13M (2026), rolling off fully in 2027",
+"Planning to resume common stock dividend after Series A preferred repayment",
 ],
 analystQA: [
-“2026 EBITDA bridge? — CFO Mault: Guidance of $225M-$265M reflects customer development schedules and Double E contract ramps”,
-“Deleveraging timeline? — Management: Targeting further debt reduction through FCF; pro forma net debt ~$890M after $40M ABL repayment”,
+"2026 EBITDA bridge? — CFO Mault: Guidance of $225M-$265M reflects customer development schedules and Double E contract ramps",
+"Deleveraging timeline? — Management: Targeting further debt reduction through FCF; pro forma net debt ~$890M after $40M ABL repayment",
 ],
 },
-analystRating: “Hold”,
+analystRating: "Hold",
 targetPrice: 32.00,
 news: [
-{ date: “2026-03-16”, src: “PR Newswire”, headline: “Summit Midstream reports Q4/FY2025; signs new 10-year Double E contracts”, sentiment: “positive” },
-{ date: “2025-08-12”, src: “SEC”, headline: “Summit Midstream Q2 adj EBITDA $61.1M; expects FY near low end of guidance”, sentiment: “negative” },
+{ date: "2026-03-16", src: "PR Newswire", headline: "Summit Midstream reports Q4/FY2025; signs new 10-year Double E contracts", sentiment: "positive" },
+{ date: "2025-08-12", src: "SEC", headline: "Summit Midstream Q2 adj EBITDA $61.1M; expects FY near low end of guidance", sentiment: "negative" },
 ],
 ratingHistory: [
-{ date: “2025-01”, sp: “NR”, moodys: “NR”, fitch: “NR”, event: “$250M Second Lien add-on executed” },
-{ date: “2024-10”, sp: “NR”, moodys: “NR”, fitch: “NR”, event: “Tall Oak Midstream III acquisition completed” },
+{ date: "2025-01", sp: "NR", moodys: "NR", fitch: "NR", event: "$250M Second Lien add-on executed" },
+{ date: "2024-10", sp: "NR", moodys: "NR", fitch: "NR", event: "Tall Oak Midstream III acquisition completed" },
 ],
 financials: [
-{ period: “FY2025”, rev: 430, ebitda: 243, ni: -25, debt: 930, cash: 21 },
-{ period: “FY2024”, rev: 430, ebitda: 225, ni: -122, debt: 977, cash: 23 },
-{ period: “FY2023”, rev: 400, ebitda: 210, ni: -80, debt: 1050, cash: 18 },
+{ period: "FY2025", rev: 430, ebitda: 243, ni: -25, debt: 930, cash: 21 },
+{ period: "FY2024", rev: 430, ebitda: 225, ni: -122, debt: 977, cash: 23 },
+{ period: "FY2023", rev: 400, ebitda: 210, ni: -80, debt: 1050, cash: 18 },
 ],
 research: [
-{ date: “2026-03-17”, firm: “Stifel”, action: “Hold”, pt: 30, summary: “Double E contract wins de-risk Permian growth; leverage still elevated at 4.1x but trajectory improving.” },
+{ date: "2026-03-17", firm: "Stifel", action: "Hold", pt: 30, summary: "Double E contract wins de-risk Permian growth; leverage still elevated at 4.1x but trajectory improving." },
 ],
 debtMaturities: {
 items: [
-{ year: “2026”, amount: 7, desc: “Remaining term loans due 2026” },
-{ year: “2027”, amount: 7, desc: “5.25% Senior Secured Notes” },
-{ year: “2028”, amount: 389, desc: “4.75% Senior Secured Notes + ABL drawn” },
-{ year: “2029”, amount: 350, desc: “8.50% Senior Secured Notes” },
-{ year: “2031”, amount: 340, desc: “Permian Transmission Term Loan” },
-{ year: “Other”, amount: 250, desc: “Second Lien Notes + other” },
+{ year: "2026", amount: 7, desc: "Remaining term loans due 2026" },
+{ year: "2027", amount: 7, desc: "5.25% Senior Secured Notes" },
+{ year: "2028", amount: 389, desc: "4.75% Senior Secured Notes + ABL drawn" },
+{ year: "2029", amount: 350, desc: "8.50% Senior Secured Notes" },
+{ year: "2031", amount: 340, desc: "Permian Transmission Term Loan" },
+{ year: "Other", amount: 250, desc: "Second Lien Notes + other" },
 ],
 },
 },
 {
-id: “UPBD”,
-name: “Upbound Group Inc.”,
-sector: “Consumer Finance / RTO”,
+id: "UPBD",
+name: "Upbound Group Inc.",
+sector: "Consumer Finance / RTO",
 exposure: 18000000,
-sp: “BB-”,
-moodys: “Ba3”,
-fitch: “NR”,
-impliedRating: “BB-”,
-outlook: “Stable”,
+sp: "BB-",
+moodys: "Ba3",
+fitch: "NR",
+impliedRating: "BB-",
+outlook: "Stable",
 watchlist: false,
 cds5y: 380,
 cds5yChg: 5,
@@ -912,117 +912,117 @@ debtToEquity: 2.66,
 currentRatio: 2.50,
 roic: 9.9,
 cashBurnQtr: 44,
-liquidityRunway: “Adequate — strong FCF generation”,
+liquidityRunway: "Adequate — strong FCF generation",
 adjBurn: {
 adjEBITDA: 500,
-adjEBITDA_src: “FY2025 guidance $500-$510M adj EBITDA excl. SBC”,
+adjEBITDA_src: "FY2025 guidance $500-$510M adj EBITDA excl. SBC",
 incomeTaxes: 35,
-incomeTaxes_src: “FY2025 estimated; ~22% effective on adjusted pre-tax”,
+incomeTaxes_src: "FY2025 estimated; ~22% effective on adjusted pre-tax",
 prefDividends: 0,
-prefDividends_src: “No preferred stock”,
+prefDividends_src: "No preferred stock",
 maintCapex: 30,
 totalCapex: 50,
-totalCapex_src: “FY2025 estimated; store maintenance + technology investment”,
+totalCapex_src: "FY2025 estimated; store maintenance + technology investment",
 currentLTD: 45,
-currentLTD_src: “Estimated current portion of term loan amortization”,
+currentLTD_src: "Estimated current portion of term loan amortization",
 intExpCash: 115,
-intExpCash_src: “FY2025; ~6.7% weighted avg on $1.73B total debt”,
+intExpCash_src: "FY2025; ~6.7% weighted avg on $1.73B total debt",
 },
 liquidityBreakdown: {
 totalLiquidity: 620,
 components: [
-{ category: “Cash & Cash Equivalents”, amount: 120, type: “cash”, sub: [
-{ label: “Unrestricted Cash”, amount: 120 },
+{ category: "Cash & Cash Equivalents", amount: 120, type: "cash", sub: [
+{ label: "Unrestricted Cash", amount: 120 },
 ]},
-{ category: “Undrawn Credit Facilities”, amount: 500, type: “facility”, sub: [] },
+{ category: "Undrawn Credit Facilities", amount: 500, type: "facility", sub: [] },
 ],
 facilities: [
-{ name: “ABL Revolving Credit Facility”, committed: 600, drawn: 100, available: 500, maturity: “2028”, rate: “SOFR + spread”, secured: “Senior Secured”, notes: “Availability based on eligible lease receivables borrowing base; strong current ratio of 2.5x supports liquidity” },
+{ name: "ABL Revolving Credit Facility", committed: 600, drawn: 100, available: 500, maturity: "2028", rate: "SOFR + spread", secured: "Senior Secured", notes: "Availability based on eligible lease receivables borrowing base; strong current ratio of 2.5x supports liquidity" },
 ],
 debtMaturities: [
-{ year: “2026”, amount: 0, desc: “No maturities” },
-{ year: “2027”, amount: 0, desc: “No maturities” },
-{ year: “2028”, amount: 875, desc: “Term Loan B + Senior Secured Notes” },
-{ year: “2029”, amount: 500, desc: “Senior Unsecured Notes” },
-{ year: “Other”, amount: 355, desc: “ABL + other secured” },
+{ year: "2026", amount: 0, desc: "No maturities" },
+{ year: "2027", amount: 0, desc: "No maturities" },
+{ year: "2028", amount: 875, desc: "Term Loan B + Senior Secured Notes" },
+{ year: "2029", amount: 500, desc: "Senior Unsecured Notes" },
+{ year: "Other", amount: 355, desc: "ABL + other secured" },
 ],
 },
-earningsDate: “2026-04-30”,
-earningsTime: “Before Open”,
-lastEarnings: “Beat — non-GAAP EPS $1.00 vs $0.95 est.”,
+earningsDate: "2026-04-30",
+earningsTime: "Before Open",
+lastEarnings: "Beat — non-GAAP EPS $1.00 vs $0.95 est.",
 earningsCallSummary: {
-date: “Q4 FY2025 (pending — not yet reported)”,
-quarter: “FY2025 Full Year”,
-source: “SEC Filings: Q1-Q3 FY2025 Earnings Releases”,
+date: "Q4 FY2025 (pending — not yet reported)",
+quarter: "FY2025 Full Year",
+source: "SEC Filings: Q1-Q3 FY2025 Earnings Releases",
 keyFinancials: [
-“Q3 FY2025 revenue $1,168M; FY2025 revenue guidance $4.60B-$4.75B”,
-“Q3 adj EBITDA $123.6M (up 5.7% YoY); FY2025 EBITDA guidance $500-$510M”,
-“Q3 non-GAAP diluted EPS $1.00 vs $0.95 prior year”,
-“2026 outlook: revenue $4.7B-$4.95B; adj EBITDA $500M-$535M”,
+"Q3 FY2025 revenue $1,168M; FY2025 revenue guidance $4.60B-$4.75B",
+"Q3 adj EBITDA $123.6M (up 5.7% YoY); FY2025 EBITDA guidance $500-$510M",
+"Q3 non-GAAP diluted EPS $1.00 vs $0.95 prior year",
+"2026 outlook: revenue $4.7B-$4.95B; adj EBITDA $500M-$535M",
 ],
 production: [
-“Acima (virtual lease-to-own): Growing GMV through retail partner expansion; rising LCO rates a concern”,
-“Rent-A-Center: Same-store sales stabilizing; company-owned SSS down 3.6% (improving sequentially)”,
-“Brigit (fintech acquisition Jan 2025): Subscription-based financial tools for underserved consumers”,
-“~1,800 Rent-A-Center store locations in US, Mexico, Puerto Rico”,
+"Acima (virtual lease-to-own): Growing GMV through retail partner expansion; rising LCO rates a concern",
+"Rent-A-Center: Same-store sales stabilizing; company-owned SSS down 3.6% (improving sequentially)",
+"Brigit (fintech acquisition Jan 2025): Subscription-based financial tools for underserved consumers",
+"~1,800 Rent-A-Center store locations in US, Mexico, Puerto Rico",
 ],
 creditRelevant: [
-“Net leverage ~2.9x; within manageable range for BB-minus credit”,
-“Strong FCF generation ($150-$200M FY2025 guidance) supports deleveraging”,
-“Acima LCO (lease charge-off) rates trending — key credit metric; Q3 at 9.7%”,
-“High debt-to-equity at 2.67x reflects acquisition-related leverage (Acima, Brigit)”,
-“Current ratio strong at 2.5x — ample short-term liquidity”,
+"Net leverage ~2.9x; within manageable range for BB-minus credit",
+"Strong FCF generation ($150-$200M FY2025 guidance) supports deleveraging",
+"Acima LCO (lease charge-off) rates trending — key credit metric; Q3 at 9.7%",
+"High debt-to-equity at 2.67x reflects acquisition-related leverage (Acima, Brigit)",
+"Current ratio strong at 2.5x — ample short-term liquidity",
 ],
 strategicItems: [
-“Omnichannel strategy: Acima (digital/virtual) + Rent-A-Center (stores) + Brigit (fintech)”,
-“Serving credit-constrained / non-prime consumers — counter-cyclical demand element”,
-“Fahmi Karam became CEO (previously CFO); focus on execution and shareholder value”,
-“Quarterly dividend of $0.39/share maintained”,
+"Omnichannel strategy: Acima (digital/virtual) + Rent-A-Center (stores) + Brigit (fintech)",
+"Serving credit-constrained / non-prime consumers — counter-cyclical demand element",
+"Fahmi Karam became CEO (previously CFO); focus on execution and shareholder value",
+"Quarterly dividend of $0.39/share maintained",
 ],
 analystQA: [
-“Acima growth vs. credit quality? — Management: Tighter underwriting to manage LCO rates while growing retail partnerships”,
-“Leverage reduction path? — CFO: FCF of $150-200M annually; expect deleveraging from earnings growth rather than debt paydown”,
+"Acima growth vs. credit quality? — Management: Tighter underwriting to manage LCO rates while growing retail partnerships",
+"Leverage reduction path? — CFO: FCF of $150-200M annually; expect deleveraging from earnings growth rather than debt paydown",
 ],
 },
-analystRating: “Buy”,
+analystRating: "Buy",
 targetPrice: 22.00,
 news: [
-{ date: “2026-02-20”, src: “Business Wire”, headline: “Upbound posts strong FY2025 results; sets 2026 outlook for revenue growth and EBITDA expansion”, sentiment: “positive” },
-{ date: “2025-10-30”, src: “Seeking Alpha”, headline: “Upbound Q3: Acima LCO rates rising but non-GAAP EPS beats; EBITDA guidance lowered modestly”, sentiment: “negative” },
-{ date: “2025-05-01”, src: “Business Wire”, headline: “Upbound Q1 2025 revenue up 7.3% YoY; Brigit acquisition adding segment diversification”, sentiment: “positive” },
+{ date: "2026-02-20", src: "Business Wire", headline: "Upbound posts strong FY2025 results; sets 2026 outlook for revenue growth and EBITDA expansion", sentiment: "positive" },
+{ date: "2025-10-30", src: "Seeking Alpha", headline: "Upbound Q3: Acima LCO rates rising but non-GAAP EPS beats; EBITDA guidance lowered modestly", sentiment: "negative" },
+{ date: "2025-05-01", src: "Business Wire", headline: "Upbound Q1 2025 revenue up 7.3% YoY; Brigit acquisition adding segment diversification", sentiment: "positive" },
 ],
 ratingHistory: [
-{ date: “2025-01”, sp: “BB-”, moodys: “Ba3”, fitch: “NR”, event: “Brigit fintech acquisition completed ($460M)” },
-{ date: “2024-06”, sp: “BB-”, moodys: “Ba3”, fitch: “NR”, event: “Ratings affirmed with stable outlook” },
+{ date: "2025-01", sp: "BB-", moodys: "Ba3", fitch: "NR", event: "Brigit fintech acquisition completed ($460M)" },
+{ date: "2024-06", sp: "BB-", moodys: "Ba3", fitch: "NR", event: "Ratings affirmed with stable outlook" },
 ],
 financials: [
-{ period: “FY2025E”, rev: 4680, ebitda: 500, ni: 130, debt: 1730, cash: 120 },
-{ period: “FY2024”, rev: 4320, ebitda: 455, ni: 121, debt: 1750, cash: 105 },
-{ period: “FY2023”, rev: 3990, ebitda: 420, ni: 95, debt: 1650, cash: 90 },
-{ period: “FY2022”, rev: 4300, ebitda: 475, ni: 185, debt: 1500, cash: 115 },
+{ period: "FY2025E", rev: 4680, ebitda: 500, ni: 130, debt: 1730, cash: 120 },
+{ period: "FY2024", rev: 4320, ebitda: 455, ni: 121, debt: 1750, cash: 105 },
+{ period: "FY2023", rev: 3990, ebitda: 420, ni: 95, debt: 1650, cash: 90 },
+{ period: "FY2022", rev: 4300, ebitda: 475, ni: 185, debt: 1500, cash: 115 },
 ],
 research: [
-{ date: “2026-03-01”, firm: “Loop Capital”, action: “Buy”, pt: 22, summary: “Acima growth + Brigit diversification underappreciated; 2026 EBITDA expansion should drive re-rating.” },
-{ date: “2025-12-15”, firm: “Seeking Alpha”, action: “Hold”, pt: 18, summary: “Cheap valuation justified by elevated leverage, Acima credit stress, and store count headwinds.” },
+{ date: "2026-03-01", firm: "Loop Capital", action: "Buy", pt: 22, summary: "Acima growth + Brigit diversification underappreciated; 2026 EBITDA expansion should drive re-rating." },
+{ date: "2025-12-15", firm: "Seeking Alpha", action: "Hold", pt: 18, summary: "Cheap valuation justified by elevated leverage, Acima credit stress, and store count headwinds." },
 ],
 debtMaturities: {
 items: [
-{ year: “2028”, amount: 875, desc: “Term Loan B + Senior Secured Notes” },
-{ year: “2029”, amount: 500, desc: “Senior Unsecured Notes” },
-{ year: “Other”, amount: 355, desc: “ABL + other secured facilities” },
+{ year: "2028", amount: 875, desc: "Term Loan B + Senior Secured Notes" },
+{ year: "2029", amount: 500, desc: "Senior Unsecured Notes" },
+{ year: "Other", amount: 355, desc: "ABL + other secured facilities" },
 ],
 },
 },
 {
-id: “WSC”,
-name: “WillScot Holdings Corp.”,
-sector: “Industrial Services / Modular Space”,
+id: "WSC",
+name: "WillScot Holdings Corp.",
+sector: "Industrial Services / Modular Space",
 exposure: 22000000,
-sp: “BB+”,
-moodys: “Ba2”,
-fitch: “NR”,
-impliedRating: “BB+”,
-outlook: “Stable”,
+sp: "BB+",
+moodys: "Ba2",
+fitch: "NR",
+impliedRating: "BB+",
+outlook: "Stable",
 watchlist: false,
 cds5y: 220,
 cds5yChg: -5,
@@ -1050,121 +1050,121 @@ debtToEquity: 1.06,
 currentRatio: 0.76,
 roic: 16.7,
 cashBurnQtr: 112,
-liquidityRunway: “Strong — $1.6B ABL availability”,
+liquidityRunway: "Strong — $1.6B ABL availability",
 adjBurn: {
 adjEBITDA: 971,
-adjEBITDA_src: “FY2025 Earnings Release; adj EBITDA ~$971M at 42.5% margin”,
+adjEBITDA_src: "FY2025 Earnings Release; adj EBITDA ~$971M at 42.5% margin",
 incomeTaxes: 50,
-incomeTaxes_src: “FY2025 estimated; ~25% effective rate on adjusted pre-tax”,
+incomeTaxes_src: "FY2025 estimated; ~25% effective rate on adjusted pre-tax",
 prefDividends: 0,
-prefDividends_src: “No preferred stock”,
+prefDividends_src: "No preferred stock",
 maintCapex: 100,
 totalCapex: 200,
-totalCapex_src: “FY2025 net capex estimated; fleet maintenance + growth”,
+totalCapex_src: "FY2025 net capex estimated; fleet maintenance + growth",
 currentLTD: 50,
-currentLTD_src: “Redeemed $50M of 7.375% 2031 notes in Q4 2025; ongoing amortization”,
+currentLTD_src: "Redeemed $50M of 7.375% 2031 notes in Q4 2025; ongoing amortization",
 intExpCash: 218,
-intExpCash_src: “FY2025; weighted avg ~5.7% after swaps on ~$3.4B debt; per Q3 2025 earnings”,
+intExpCash_src: "FY2025; weighted avg ~5.7% after swaps on ~$3.4B debt; per Q3 2025 earnings",
 },
 liquidityBreakdown: {
 totalLiquidity: 1635,
 components: [
-{ category: “Cash & Cash Equivalents”, amount: 35, type: “cash”, sub: [
-{ label: “Unrestricted Cash”, amount: 35 },
+{ category: "Cash & Cash Equivalents", amount: 35, type: "cash", sub: [
+{ label: "Unrestricted Cash", amount: 35 },
 ]},
-{ category: “Undrawn Credit Facilities”, amount: 1600, type: “facility”, sub: [] },
+{ category: "Undrawn Credit Facilities", amount: 1600, type: "facility", sub: [] },
 ],
 facilities: [
-{ name: “ABL Revolving Credit Facility”, committed: 3600, drawn: 2000, available: 1600, maturity: “Oct 2030”, rate: “SOFR + spread”, secured: “Senior Secured”, notes: “Amended Oct 2025 extending maturity to 2030; ~$5M annual interest savings; availability based on fleet asset borrowing base; 89% fixed after $1.25B swaps” },
+{ name: "ABL Revolving Credit Facility", committed: 3600, drawn: 2000, available: 1600, maturity: "Oct 2030", rate: "SOFR + spread", secured: "Senior Secured", notes: "Amended Oct 2025 extending maturity to 2030; ~$5M annual interest savings; availability based on fleet asset borrowing base; 89% fixed after $1.25B swaps" },
 ],
 debtMaturities: [
-{ year: “2026”, amount: 0, desc: “No maturities” },
-{ year: “2027”, amount: 0, desc: “No maturities” },
-{ year: “2028”, amount: 1000, desc: “Senior Secured Notes due 2028” },
-{ year: “2029”, amount: 900, desc: “Senior Secured Notes due 2029” },
-{ year: “2030”, amount: 1000, desc: “ABL Facility (maturity Oct 2030) + Notes” },
-{ year: “2031”, amount: 500, desc: “7.375% Senior Secured Notes (partially redeemed)” },
-{ year: “Other”, amount: 0, desc: “” },
+{ year: "2026", amount: 0, desc: "No maturities" },
+{ year: "2027", amount: 0, desc: "No maturities" },
+{ year: "2028", amount: 1000, desc: "Senior Secured Notes due 2028" },
+{ year: "2029", amount: 900, desc: "Senior Secured Notes due 2029" },
+{ year: "2030", amount: 1000, desc: "ABL Facility (maturity Oct 2030) + Notes" },
+{ year: "2031", amount: 500, desc: "7.375% Senior Secured Notes (partially redeemed)" },
+{ year: "Other", amount: 0, desc: "" },
 ],
 },
-earningsDate: “2026-05-07”,
-earningsTime: “Before Open”,
-lastEarnings: “Mixed — adj EBITDA $250M, net loss $187M (impairment)”,
+earningsDate: "2026-05-07",
+earningsTime: "Before Open",
+lastEarnings: "Mixed — adj EBITDA $250M, net loss $187M (impairment)",
 earningsCallSummary: {
-date: “February 19, 2026”,
-quarter: “Q4 FY2025”,
-source: “SEC Filing: Q4 FY2025 Earnings Release + Press Release”,
+date: "February 19, 2026",
+quarter: "Q4 FY2025",
+source: "SEC Filing: Q4 FY2025 Earnings Release + Press Release",
 keyFinancials: [
-“Q4 revenue $566M; FY2025 revenue ~$2,282M (down from $2,396M in FY2024)”,
-“Q4 adjusted EBITDA $250M (44.2% margin); FY2025 adj EBITDA ~$971M”,
-“Q4 net loss of -$187M due to non-cash impairment; adj net income $55M”,
-“FY2025 net income $134M; adj income ~$219M”,
+"Q4 revenue $566M; FY2025 revenue ~$2,282M (down from $2,396M in FY2024)",
+"Q4 adjusted EBITDA $250M (44.2% margin); FY2025 adj EBITDA ~$971M",
+"Q4 net loss of -$187M due to non-cash impairment; adj net income $55M",
+"FY2025 net income $134M; adj income ~$219M",
 ],
 production: [
-“Average modular space monthly rates up 5.2% YoY; portable storage rates up 1.9%”,
-“Units on rent declined slightly due to macro-related end-market softness”,
-“Pending order book up 7% YoY — supports new lease activations”,
-“2026 outlook: Revenue ~$2,225-$2,425M; Adj EBITDA ~$980-$1,080M”,
+"Average modular space monthly rates up 5.2% YoY; portable storage rates up 1.9%",
+"Units on rent declined slightly due to macro-related end-market softness",
+"Pending order book up 7% YoY — supports new lease activations",
+"2026 outlook: Revenue ~$2,225-$2,425M; Adj EBITDA ~$980-$1,080M",
 ],
 creditRelevant: [
-“Net Debt / adj EBITDA at 3.5x — within target range of 3.0-3.5x”,
-“Redeemed $50M of 7.375% 2031 notes using ABL to optimize interest costs”,
-“ABL Facility amended Oct 2025 — maturity extended to Oct 2030; ~$5M annual interest savings”,
-“ABL availability ~$1.6B; next debt maturity not until 2028”,
-“Weighted avg pre-tax interest rate ~5.7% (89% fixed after swaps)”,
-“Annual cash interest expense ~$218M”,
+"Net Debt / adj EBITDA at 3.5x — within target range of 3.0-3.5x",
+"Redeemed $50M of 7.375% 2031 notes using ABL to optimize interest costs",
+"ABL Facility amended Oct 2025 — maturity extended to Oct 2030; ~$5M annual interest savings",
+"ABL availability ~$1.6B; next debt maturity not until 2028",
+"Weighted avg pre-tax interest rate ~5.7% (89% fixed after swaps)",
+"Annual cash interest expense ~$218M",
 ],
 strategicItems: [
-“3-5 year financial milestones: $3B revenue, $1.5B adj EBITDA, $700M adj FCF”,
-“Value-added products and services (VAPS) driving rate expansion”,
-“Tuck-in acquisition pipeline progressing alongside organic growth”,
-“Returned $21M to shareholders in Q3 via buybacks and dividends”,
+"3-5 year financial milestones: $3B revenue, $1.5B adj EBITDA, $700M adj FCF",
+"Value-added products and services (VAPS) driving rate expansion",
+"Tuck-in acquisition pipeline progressing alongside organic growth",
+"Returned $21M to shareholders in Q3 via buybacks and dividends",
 ],
 analystQA: [
-“Organic growth vs. M&A? — CEO Soultz: Multiple levers to achieve growth through different end-market backdrops; nimble approach”,
-“Leverage trajectory? — Management: Comfortable within 3.0-3.5x range; FCF generation and EBITDA growth support current levels”,
+"Organic growth vs. M&A? — CEO Soultz: Multiple levers to achieve growth through different end-market backdrops; nimble approach",
+"Leverage trajectory? — Management: Comfortable within 3.0-3.5x range; FCF generation and EBITDA growth support current levels",
 ],
 },
-analystRating: “Buy”,
+analystRating: "Buy",
 targetPrice: 38.00,
 news: [
-{ date: “2026-02-19”, src: “Globe Newswire”, headline: “WillScot reports Q4/FY2025 results; adj EBITDA margins resilient at 44%”, sentiment: “positive” },
-{ date: “2025-10-16”, src: “Business Wire”, headline: “WillScot amends ABL facility — extends maturity to 2030, reduces borrowing costs”, sentiment: “positive” },
-{ date: “2025-05-01”, src: “Reuters”, headline: “WillScot Q1 results in-line; reaffirms FY2025 outlook; pending order book up 7%”, sentiment: “positive” },
+{ date: "2026-02-19", src: "Globe Newswire", headline: "WillScot reports Q4/FY2025 results; adj EBITDA margins resilient at 44%", sentiment: "positive" },
+{ date: "2025-10-16", src: "Business Wire", headline: "WillScot amends ABL facility — extends maturity to 2030, reduces borrowing costs", sentiment: "positive" },
+{ date: "2025-05-01", src: "Reuters", headline: "WillScot Q1 results in-line; reaffirms FY2025 outlook; pending order book up 7%", sentiment: "positive" },
 ],
 ratingHistory: [
-{ date: “2025-10”, sp: “BB+”, moodys: “Ba2”, fitch: “NR”, event: “ABL maturity extended to 2030; stable outlook maintained” },
-{ date: “2025-03”, sp: “BB+”, moodys: “Ba2”, fitch: “NR”, event: “Investor Day: 3-5 year targets of $3B rev, $1.5B EBITDA, $700M adj FCF” },
+{ date: "2025-10", sp: "BB+", moodys: "Ba2", fitch: "NR", event: "ABL maturity extended to 2030; stable outlook maintained" },
+{ date: "2025-03", sp: "BB+", moodys: "Ba2", fitch: "NR", event: "Investor Day: 3-5 year targets of $3B rev, $1.5B EBITDA, $700M adj FCF" },
 ],
 financials: [
-{ period: “FY2025”, rev: 2282, ebitda: 971, ni: 134, debt: 3400, cash: 35 },
-{ period: “FY2024”, rev: 2396, ebitda: 1063, ni: 28, debt: 3500, cash: 40 },
-{ period: “FY2023”, rev: 2365, ebitda: 1061, ni: 342, debt: 3400, cash: 45 },
-{ period: “FY2022”, rev: 2140, ebitda: 930, ni: 290, debt: 3200, cash: 50 },
+{ period: "FY2025", rev: 2282, ebitda: 971, ni: 134, debt: 3400, cash: 35 },
+{ period: "FY2024", rev: 2396, ebitda: 1063, ni: 28, debt: 3500, cash: 40 },
+{ period: "FY2023", rev: 2365, ebitda: 1061, ni: 342, debt: 3400, cash: 45 },
+{ period: "FY2022", rev: 2140, ebitda: 930, ni: 290, debt: 3200, cash: 50 },
 ],
 research: [
-{ date: “2026-02-20”, firm: “RBC Capital”, action: “Outperform”, pt: 40, summary: “Recurring revenue model provides stability; pricing power + VAPS penetration support margin expansion path.” },
-{ date: “2025-10-17”, firm: “Morgan Stanley”, action: “Overweight”, pt: 42, summary: “ABL refinancing positive; 3-5 year targets ambitious but achievable given track record.” },
+{ date: "2026-02-20", firm: "RBC Capital", action: "Outperform", pt: 40, summary: "Recurring revenue model provides stability; pricing power + VAPS penetration support margin expansion path." },
+{ date: "2025-10-17", firm: "Morgan Stanley", action: "Overweight", pt: 42, summary: "ABL refinancing positive; 3-5 year targets ambitious but achievable given track record." },
 ],
 debtMaturities: {
 items: [
-{ year: “2028”, amount: 1000, desc: “Senior Secured Notes due 2028” },
-{ year: “2029”, amount: 900, desc: “Senior Secured Notes due 2029” },
-{ year: “2030”, amount: 1000, desc: “ABL Facility (extended Oct 2030) + Notes” },
-{ year: “2031”, amount: 500, desc: “7.375% Senior Secured Notes (partially redeemed)” },
+{ year: "2028", amount: 1000, desc: "Senior Secured Notes due 2028" },
+{ year: "2029", amount: 900, desc: "Senior Secured Notes due 2029" },
+{ year: "2030", amount: 1000, desc: "ABL Facility (extended Oct 2030) + Notes" },
+{ year: "2031", amount: 500, desc: "7.375% Senior Secured Notes (partially redeemed)" },
 ],
 },
 },
 {
-id: “JSWUSA”,
-name: “JSW Steel USA Inc.”,
-sector: “Steel / Metals”,
+id: "JSWUSA",
+name: "JSW Steel USA Inc.",
+sector: "Steel / Metals",
 exposure: 8000000,
-sp: “NR”,
-moodys: “NR”,
-fitch: “NR”,
-impliedRating: “BB-”,
-outlook: “Stable”,
+sp: "NR",
+moodys: "NR",
+fitch: "NR",
+impliedRating: "BB-",
+outlook: "Stable",
 watchlist: true,
 cds5y: null,
 cds5yChg: null,
@@ -1192,92 +1192,92 @@ debtToEquity: 0.88,
 currentRatio: 1.40,
 roic: 5.5,
 cashBurnQtr: 21,
-liquidityRunway: “Backed by JSW Group ($24B parent)”,
+liquidityRunway: "Backed by JSW Group ($24B parent)",
 adjBurn: {
 adjEBITDA: 85,
-adjEBITDA_src: “Estimated from parent disclosures; US operations profitable at operating level per JSW Steel FY24-25 filings”,
+adjEBITDA_src: "Estimated from parent disclosures; US operations profitable at operating level per JSW Steel FY24-25 filings",
 incomeTaxes: 8,
-incomeTaxes_src: “Estimated; US federal + Ohio state taxes”,
+incomeTaxes_src: "Estimated; US federal + Ohio state taxes",
 prefDividends: 0,
-prefDividends_src: “No preferred stock; subsidiary of JSW Steel Ltd”,
+prefDividends_src: "No preferred stock; subsidiary of JSW Steel Ltd",
 maintCapex: 20,
 totalCapex: 40,
-totalCapex_src: “Estimated; ongoing EAF modernization + rolling mill upgrades”,
+totalCapex_src: "Estimated; ongoing EAF modernization + rolling mill upgrades",
 currentLTD: 15,
-currentLTD_src: “Estimated current portion of conduit revenue bonds + working capital facilities”,
+currentLTD_src: "Estimated current portion of conduit revenue bonds + working capital facilities",
 intExpCash: 22,
-intExpCash_src: “Estimated; ~6% on $350M debt including conduit bonds”,
+intExpCash_src: "Estimated; ~6% on $350M debt including conduit bonds",
 },
 liquidityBreakdown: {
 totalLiquidity: 120,
 components: [
-{ category: “Cash & Cash Equivalents”, amount: 60, type: “cash”, sub: [
-{ label: “Unrestricted Cash”, amount: 55 },
-{ label: “Restricted Cash (bond proceeds)”, amount: 5 },
+{ category: "Cash & Cash Equivalents", amount: 60, type: "cash", sub: [
+{ label: "Unrestricted Cash", amount: 55 },
+{ label: "Restricted Cash (bond proceeds)", amount: 5 },
 ]},
-{ category: “Undrawn Credit Facilities”, amount: 60, type: “facility”, sub: [] },
+{ category: "Undrawn Credit Facilities", amount: 60, type: "facility", sub: [] },
 ],
 facilities: [
-{ name: “Working Capital Facility”, committed: 75, drawn: 15, available: 60, maturity: “2027”, rate: “SOFR + 2.50%”, secured: “Senior Secured”, notes: “Secured by inventory and receivables; parent JSW Group implicit backstop” },
+{ name: "Working Capital Facility", committed: 75, drawn: 15, available: 60, maturity: "2027", rate: "SOFR + 2.50%", secured: "Senior Secured", notes: "Secured by inventory and receivables; parent JSW Group implicit backstop" },
 ],
 debtMaturities: [
-{ year: “2026”, amount: 15, desc: “Current portion of term facilities” },
-{ year: “2027”, amount: 25, desc: “Working capital facility maturity” },
-{ year: “2028”, amount: 160, desc: “Tax-exempt conduit revenue bonds (Jefferson County Port Authority)” },
-{ year: “Other”, amount: 150, desc: “Parent-backed facilities + other” },
+{ year: "2026", amount: 15, desc: "Current portion of term facilities" },
+{ year: "2027", amount: 25, desc: "Working capital facility maturity" },
+{ year: "2028", amount: 160, desc: "Tax-exempt conduit revenue bonds (Jefferson County Port Authority)" },
+{ year: "Other", amount: 150, desc: "Parent-backed facilities + other" },
 ],
 },
 earningsDate: null,
 earningsTime: null,
-lastEarnings: “Private — parent JSW Steel FY25 reported”,
+lastEarnings: "Private — parent JSW Steel FY25 reported",
 earningsCallSummary: {
-date: “N/A”,
-quarter: “Private Subsidiary”,
-source: “Private subsidiary of JSW Steel Limited (India) — financials from bank group / parent disclosures”,
+date: "N/A",
+quarter: "Private Subsidiary",
+source: "Private subsidiary of JSW Steel Limited (India) — financials from bank group / parent disclosures",
 keyFinancials: [
-“Private US subsidiary of JSW Group ($24B Indian conglomerate)”,
-“Estimated US revenue ~$1.2B across Ohio (Mingo Junction) and Texas (Baytown) operations”,
-“Parent JSW Steel reported consolidated net debt of INR 76,563 crores (~$9.1B) as of March 2025”,
-“Parent leverage improved — net debt/EBITDA declining on healthy cash generation”,
+"Private US subsidiary of JSW Group ($24B Indian conglomerate)",
+"Estimated US revenue ~$1.2B across Ohio (Mingo Junction) and Texas (Baytown) operations",
+"Parent JSW Steel reported consolidated net debt of INR 76,563 crores (~$9.1B) as of March 2025",
+"Parent leverage improved — net debt/EBITDA declining on healthy cash generation",
 ],
 production: [
-“Two US locations: Mingo Junction, OH (EAF + slab caster + 80" hot rolling mill) and Baytown, TX (plate mill)”,
-“Ohio facility acquired 2018 for ~$81M; invested $119M+ in modernization”,
-“Produces hot rolled coil (HRC) and plate for energy, infrastructure, and renewable sectors”,
-“Largest and most modern Consteel EAF technology in North America”,
+"Two US locations: Mingo Junction, OH (EAF + slab caster + 80\" hot rolling mill) and Baytown, TX (plate mill)",
+"Ohio facility acquired 2018 for ~$81M; invested $119M+ in modernization",
+"Produces hot rolled coil (HRC) and plate for energy, infrastructure, and renewable sectors",
+"Largest and most modern Consteel EAF technology in North America",
 ],
 creditRelevant: [
-“Private — limited standalone financial transparency; rely on bank group reporting”,
-“Implicit parent support from JSW Steel Ltd (India) — one of India’s largest steelmakers”,
-“US operations profitable at operating level per parent disclosures (FY2023-2024)”,
-“Cyclical steel industry exposure — margins sensitive to scrap prices and HRC/plate spreads”,
-“$160M in tax-exempt conduit revenue bonds issued via Jefferson County Port Authority for plant upgrades”,
+"Private — limited standalone financial transparency; rely on bank group reporting",
+"Implicit parent support from JSW Steel Ltd (India) — one of India's largest steelmakers",
+"US operations profitable at operating level per parent disclosures (FY2023-2024)",
+"Cyclical steel industry exposure — margins sensitive to scrap prices and HRC/plate spreads",
+"$160M in tax-exempt conduit revenue bonds issued via Jefferson County Port Authority for plant upgrades",
 ],
 strategicItems: [
-“Growing focus on ‘melted and manufactured in USA’ products for infrastructure and renewable energy”,
-“ESG differentiator: Consteel EAF technology produces among the cleanest steel globally”,
-“Parent JSW Group has 29.7 MTPA installed capacity worldwide; global scale advantage”,
-“Potential beneficiary of US infrastructure spending and domestic steel tariff protection”,
+"Growing focus on 'melted and manufactured in USA' products for infrastructure and renewable energy",
+"ESG differentiator: Consteel EAF technology produces among the cleanest steel globally",
+"Parent JSW Group has 29.7 MTPA installed capacity worldwide; global scale advantage",
+"Potential beneficiary of US infrastructure spending and domestic steel tariff protection",
 ],
 analystQA: [],
 },
-analystRating: “NR”,
+analystRating: "NR",
 targetPrice: null,
 news: [
-{ date: “2025-05-05”, src: “Recycling Today”, headline: “JSW Steel USA plans $119M+ investment in Ohio EAF mill for renewable energy steel”, sentiment: “positive” },
-{ date: “2025-03-15”, src: “JSW Group”, headline: “Parent JSW Steel FY25: net debt declined; healthy domestic demand in India supports operations”, sentiment: “positive” },
+{ date: "2025-05-05", src: "Recycling Today", headline: "JSW Steel USA plans $119M+ investment in Ohio EAF mill for renewable energy steel", sentiment: "positive" },
+{ date: "2025-03-15", src: "JSW Group", headline: "Parent JSW Steel FY25: net debt declined; healthy domestic demand in India supports operations", sentiment: "positive" },
 ],
 ratingHistory: [],
 financials: [
-{ period: “FY2025E”, rev: 1200, ebitda: 85, ni: 25, debt: 350, cash: 60 },
-{ period: “FY2024E”, rev: 1100, ebitda: 72, ni: 15, debt: 320, cash: 50 },
-{ period: “FY2023E”, rev: 950, ebitda: 60, ni: 8, debt: 280, cash: 40 },
+{ period: "FY2025E", rev: 1200, ebitda: 85, ni: 25, debt: 350, cash: 60 },
+{ period: "FY2024E", rev: 1100, ebitda: 72, ni: 15, debt: 320, cash: 50 },
+{ period: "FY2023E", rev: 950, ebitda: 60, ni: 8, debt: 280, cash: 40 },
 ],
 research: [],
 debtMaturities: {
 items: [
-{ year: “2028”, amount: 160, desc: “Tax-exempt conduit revenue bonds (Jefferson County Port Authority)” },
-{ year: “Other”, amount: 190, desc: “Working capital + parent-backed facilities” },
+{ year: "2028", amount: 160, desc: "Tax-exempt conduit revenue bonds (Jefferson County Port Authority)" },
+{ year: "Other", amount: 190, desc: "Working capital + parent-backed facilities" },
 ],
 },
 },
@@ -1286,210 +1286,210 @@ items: [
 // ─── CREDIT AGREEMENT SUMMARIES ──────────────────────────────────────────
 const CREDIT_AGREEMENTS = {
 LCID: {
-facilityName: “ABL Credit Facility”,
-agent: “Bank of America, N.A.”,
-syndicate: “Citi, Barclays, Goldman Sachs, JPMorgan, BNP Paribas, RBC, HSBC, MUFG, SMBC, Wells Fargo”,
-committed: 1000, accordion: 500, maturity: “June 9, 2027”,
+facilityName: "ABL Credit Facility",
+agent: "Bank of America, N.A.",
+syndicate: "Citi, Barclays, Goldman Sachs, JPMorgan, BNP Paribas, RBC, HSBC, MUFG, SMBC, Wells Fargo",
+committed: 1000, accordion: 500, maturity: "June 9, 2027",
 lcSublimit: 350, swinglineSublimit: 100,
-borrowingBase: “Eligible borrowing base assets (receivables, inventory, and other eligible assets), subject to reserves. Availability is less than full commitment — currently only a portion of the $1.0B is accessible based on borrowing base value.”,
-bbFormula: “Lesser of (a) Aggregate Commitments and (b) BB = [Eligible Receivables × advance rate] + [Eligible Inventory × advance rate] + [Other Eligible Assets] − Reserves”,
-pricing: “SOFR + applicable margin (based on avg. excess availability); or Base Rate + applicable margin”,
-security: “First-priority perfected security interest in substantially all assets of Loan Parties, excluding intellectual property”,
+borrowingBase: "Eligible borrowing base assets (receivables, inventory, and other eligible assets), subject to reserves. Availability is less than full commitment — currently only a portion of the $1.0B is accessible based on borrowing base value.",
+bbFormula: "Lesser of (a) Aggregate Commitments and (b) BB = [Eligible Receivables × advance rate] + [Eligible Inventory × advance rate] + [Other Eligible Assets] − Reserves",
+pricing: "SOFR + applicable margin (based on avg. excess availability); or Base Rate + applicable margin",
+security: "First-priority perfected security interest in substantially all assets of Loan Parties, excluding intellectual property",
 financialCovenants: [
-{ covenant: “Minimum Liquidity”, test: “$1.0B at all times”, status: “Active”, notes: “Pre-FCCR Covenant Trigger Date; falls away if FCCR > 1.00x for 2 consecutive quarters and Company elects to trigger” },
-{ covenant: “Springing FCCR”, test: “1.00:1.00 minimum”, status: “Not yet triggered”, notes: “Only effective after Company elects FCCR Covenant Trigger Date” },
+{ covenant: "Minimum Liquidity", test: "$1.0B at all times", status: "Active", notes: "Pre-FCCR Covenant Trigger Date; falls away if FCCR > 1.00x for 2 consecutive quarters and Company elects to trigger" },
+{ covenant: "Springing FCCR", test: "1.00:1.00 minimum", status: "Not yet triggered", notes: "Only effective after Company elects FCCR Covenant Trigger Date" },
 ],
-negativeCov: “Restrictions on: additional indebtedness, liens, investments, restricted payments, asset sales, affiliate transactions; subject to customary baskets and exceptions”,
+negativeCov: "Restrictions on: additional indebtedness, liens, investments, restricted payments, asset sales, affiliate transactions; subject to customary baskets and exceptions",
 availCurrent: 397, drawnCurrent: 0,
-covenantCompliance: “In compliance as of Dec 31, 2025”,
-otherFacilities: “$2.0B DDTL (PIF — requires no ABL availability); SIDF $665M; GIB ~$266M”,
-src: “8-K (Jun 2022); 10-K FY2024; Q2 FY2025 10-Q”,
+covenantCompliance: "In compliance as of Dec 31, 2025",
+otherFacilities: "$2.0B DDTL (PIF — requires no ABL availability); SIDF $665M; GIB ~$266M",
+src: "8-K (Jun 2022); 10-K FY2024; Q2 FY2025 10-Q",
 },
 RIVN: {
-facilityName: “ABL Revolving Credit Facility (A&R)”,
-agent: “JPMorgan Chase Bank, N.A.”,
-syndicate: “JPMorgan-led syndicate”,
-committed: 1500, accordion: 0, maturity: “April 19, 2028”,
+facilityName: "ABL Revolving Credit Facility (A&R)",
+agent: "JPMorgan Chase Bank, N.A.",
+syndicate: "JPMorgan-led syndicate",
+committed: 1500, accordion: 0, maturity: "April 19, 2028",
 lcSublimit: 1000, swinglineSublimit: 0,
-borrowingBase: “Availability = lesser of borrowing base and $1.5B committed cap, reduced by borrowings and outstanding LCs.”,
-bbFormula: “Lesser of (a) $1,500M Cap and (b) BB − Outstanding Borrowings − Outstanding LCs”,
-pricing: “SOFR + applicable margin; or Base Rate + margin (adjust based on excess availability)”,
-security: “First-priority lien on ABL Priority Collateral (inventory, receivables, deposit accounts). Second-priority on Green Note collateral.”,
+borrowingBase: "Availability = lesser of borrowing base and $1.5B committed cap, reduced by borrowings and outstanding LCs.",
+bbFormula: "Lesser of (a) $1,500M Cap and (b) BB − Outstanding Borrowings − Outstanding LCs",
+pricing: "SOFR + applicable margin; or Base Rate + margin (adjust based on excess availability)",
+security: "First-priority lien on ABL Priority Collateral (inventory, receivables, deposit accounts). Second-priority on Green Note collateral.",
 financialCovenants: [
-{ covenant: “Minimum Liquidity”, test: “$1.0B at all times”, status: “Active”, notes: “Falls away upon FCCR > 1.0x for 2 consecutive quarters” },
+{ covenant: "Minimum Liquidity", test: "$1.0B at all times", status: "Active", notes: "Falls away upon FCCR > 1.0x for 2 consecutive quarters" },
 ],
-negativeCov: “Customary: restrictions on additional debt, liens, investments, restricted payments, asset sales, affiliate transactions”,
+negativeCov: "Customary: restrictions on additional debt, liens, investments, restricted payments, asset sales, affiliate transactions",
 availCurrent: 508, drawnCurrent: 0,
-covenantCompliance: “In compliance as of Dec 31, 2025”,
-otherFacilities: “DOE ATVM: up to $6.6B (conditional); VW JV: $2.0B expected 2026”,
-src: “8-K (Apr 2023); 10-Q Q3 FY2025; Q4 FY2025 Earnings”,
+covenantCompliance: "In compliance as of Dec 31, 2025",
+otherFacilities: "DOE ATVM: up to $6.6B (conditional); VW JV: $2.0B expected 2026",
+src: "8-K (Apr 2023); 10-Q Q3 FY2025; Q4 FY2025 Earnings",
 },
 CENT: {
-facilityName: “Fourth A&R ABL Credit Facility”,
-agent: “Truist Bank”,
-syndicate: “Truist-led syndicate”,
-committed: 600, accordion: 400, maturity: “November 7, 2030”,
+facilityName: "Fourth A&R ABL Credit Facility",
+agent: "Truist Bank",
+syndicate: "Truist-led syndicate",
+committed: 600, accordion: 400, maturity: "November 7, 2030",
 lcSublimit: 50, swinglineSublimit: 75,
-borrowingBase: “Eligible receivables, inventory, and at Company’s election eligible real property, minus reserves.”,
-bbFormula: “BB = [Eligible A/R × advance rate] + [Eligible Inventory × advance rate] + [Elected Real Property] − Reserves”,
-pricing: “SOFR (floor 0%) + margin (1.00%–1.50% based on avg. availability); Base Rate + margin (0.00%–0.50%). Unused fee: tiered based on utilization.”,
-security: “Substantially all assets, including pledges of domestic and certain foreign subsidiary equity”,
+borrowingBase: "Eligible receivables, inventory, and at Company's election eligible real property, minus reserves.",
+bbFormula: "BB = [Eligible A/R × advance rate] + [Eligible Inventory × advance rate] + [Elected Real Property] − Reserves",
+pricing: "SOFR (floor 0%) + margin (1.00%–1.50% based on avg. availability); Base Rate + margin (0.00%–0.50%). Unused fee: tiered based on utilization.",
+security: "Substantially all assets, including pledges of domestic and certain foreign subsidiary equity",
 financialCovenants: [
-{ covenant: “Springing FCCR”, test: “1.00:1.00 minimum”, status: “Not triggered”, notes: “Triggered only when availability falls below specified threshold” },
+{ covenant: "Springing FCCR", test: "1.00:1.00 minimum", status: "Not triggered", notes: "Triggered only when availability falls below specified threshold" },
 ],
-negativeCov: “Customary ABL covenants: restrictions on debt, liens, investments, restricted payments, asset sales, affiliate transactions”,
+negativeCov: "Customary ABL covenants: restrictions on debt, liens, investments, restricted payments, asset sales, affiliate transactions",
 availCurrent: 600, drawnCurrent: 0,
-covenantCompliance: “In compliance; fully undrawn at closing (Nov 2025)”,
-otherFacilities: “Senior Notes: 4.125% due 2030, 4.125% due 2031”,
-src: “8-K (Nov 7, 2025); 10-K FY2023”,
+covenantCompliance: "In compliance; fully undrawn at closing (Nov 2025)",
+otherFacilities: "Senior Notes: 4.125% due 2030, 4.125% due 2031",
+src: "8-K (Nov 7, 2025); 10-K FY2023",
 },
 IHRT: {
-facilityName: “New ABL Facility”,
-agent: “Bank of America, N.A.”,
-syndicate: “BofA-led syndicate (refinanced May 2022)”,
-committed: 450, accordion: 150, maturity: “May 2027”,
+facilityName: "New ABL Facility",
+agent: "Bank of America, N.A.",
+syndicate: "BofA-led syndicate (refinanced May 2022)",
+committed: 450, accordion: 150, maturity: "May 2027",
 lcSublimit: 450, swinglineSublimit: 0,
-borrowingBase: “90% of eligible A/R + 100% of qualified cash (capped at 5% of BB for trigger calcs), minus availability reserves.”,
-bbFormula: “BB = [90% × Eligible A/R] + [100% × Qualified Cash (max 5% of BB for triggers)] − Availability Reserves”,
-pricing: “SOFR (+ 10 bps CSA) + applicable margin; or Base Rate + margin; or Eurocurrency rate for foreign currencies”,
-security: “First-priority lien on substantially all assets of iHeartCommunications and subsidiary guarantors”,
+borrowingBase: "90% of eligible A/R + 100% of qualified cash (capped at 5% of BB for trigger calcs), minus availability reserves.",
+bbFormula: "BB = [90% × Eligible A/R] + [100% × Qualified Cash (max 5% of BB for triggers)] − Availability Reserves",
+pricing: "SOFR (+ 10 bps CSA) + applicable margin; or Base Rate + margin; or Eurocurrency rate for foreign currencies",
+security: "First-priority lien on substantially all assets of iHeartCommunications and subsidiary guarantors",
 financialCovenants: [
-{ covenant: “Springing FCCR”, test: “1.00:1.00 minimum”, status: “Not triggered”, notes: “Triggered when availability < greater of (a) $40M and (b) 10% of aggregate commitments” },
-{ covenant: “Cash Dominion”, test: “Triggered at low availability”, status: “Not triggered”, notes: “Requires sweep of collections to pay down revolver when availability below threshold” },
+{ covenant: "Springing FCCR", test: "1.00:1.00 minimum", status: "Not triggered", notes: "Triggered when availability < greater of (a) $40M and (b) 10% of aggregate commitments" },
+{ covenant: "Cash Dominion", test: "Triggered at low availability", status: "Not triggered", notes: "Requires sweep of collections to pay down revolver when availability below threshold" },
 ],
-negativeCov: “Restrictions on: additional indebtedness, liens, investments, restricted payments, asset sales, sale-leasebacks, mergers, affiliate transactions”,
+negativeCov: "Restrictions on: additional indebtedness, liens, investments, restricted payments, asset sales, sale-leasebacks, mergers, affiliate transactions",
 availCurrent: 425, drawnCurrent: 0,
-covenantCompliance: “In compliance; no principal drawn (LCs: ~$25M outstanding)”,
-otherFacilities: “Term Loan ~$2.58B (2029); 5.25% Sr Sec Notes (2027); 8.375% Sr Sec Notes (2027); 4.75% Sr Unsec Notes (2028)”,
-src: “8-K (May 2022); 10-K FY2022; ABL Credit Agreement (May 2019, as amended)”,
+covenantCompliance: "In compliance; no principal drawn (LCs: ~$25M outstanding)",
+otherFacilities: "Term Loan ~$2.58B (2029); 5.25% Sr Sec Notes (2027); 8.375% Sr Sec Notes (2027); 4.75% Sr Unsec Notes (2028)",
+src: "8-K (May 2022); 10-K FY2022; ABL Credit Agreement (May 2019, as amended)",
 },
 SMC: {
-facilityName: “ABL Revolving Credit Facility”,
-agent: “Syndicate-led”,
-syndicate: “Bank syndicate”,
-committed: 500, accordion: 0, maturity: “2028”,
+facilityName: "ABL Revolving Credit Facility",
+agent: "Syndicate-led",
+syndicate: "Bank syndicate",
+committed: 500, accordion: 0, maturity: "2028",
 lcSublimit: 0, swinglineSublimit: 0,
-borrowingBase: “Gross availability $810M per borrowing base (exceeds $500M commitment cap). Availability limited by committed amount.”,
-bbFormula: “Lesser of (a) $500M Cap and (b) BB − Outstanding Borrowings − Outstanding LCs”,
-pricing: “SOFR + applicable spread”,
-security: “Senior Secured — first priority lien on midstream assets”,
+borrowingBase: "Gross availability $810M per borrowing base (exceeds $500M commitment cap). Availability limited by committed amount.",
+bbFormula: "Lesser of (a) $500M Cap and (b) BB − Outstanding Borrowings − Outstanding LCs",
+pricing: "SOFR + applicable spread",
+security: "Senior Secured — first priority lien on midstream assets",
 financialCovenants: [
-{ covenant: “Min. Interest Coverage”, test: “2.0x minimum”, status: “Pass (2.7x actual)”, notes: “Tested periodically; significant headroom” },
-{ covenant: “Max. First Lien Leverage”, test: “2.5x maximum”, status: “Pass (0.5x actual)”, notes: “Well within covenant; substantial headroom” },
+{ covenant: "Min. Interest Coverage", test: "2.0x minimum", status: "Pass (2.7x actual)", notes: "Tested periodically; significant headroom" },
+{ covenant: "Max. First Lien Leverage", test: "2.5x maximum", status: "Pass (0.5x actual)", notes: "Well within covenant; substantial headroom" },
 ],
-negativeCov: “Customary restrictions on additional debt, liens, investments, dividends/distributions, asset sales, affiliate transactions”,
+negativeCov: "Customary restrictions on additional debt, liens, investments, dividends/distributions, asset sales, affiliate transactions",
 availCurrent: 387, drawnCurrent: 112,
-covenantCompliance: “In compliance with all financial covenants as of Dec 31, 2025”,
-otherFacilities: “Permian Transmission TL: $440M (2031); 5.25% Notes (2027); 4.75% Notes (2028); 8.50% Notes (2029); Second Lien”,
-src: “Q4 FY2025 Earnings Release (Mar 16, 2026); Earnings Call Transcript”,
+covenantCompliance: "In compliance with all financial covenants as of Dec 31, 2025",
+otherFacilities: "Permian Transmission TL: $440M (2031); 5.25% Notes (2027); 4.75% Notes (2028); 8.50% Notes (2029); Second Lien",
+src: "Q4 FY2025 Earnings Release (Mar 16, 2026); Earnings Call Transcript",
 },
 UPBD: {
-facilityName: “ABL Credit Facility”,
-agent: “JPMorgan Chase Bank, N.A.”,
-syndicate: “JPM-led syndicate”,
-committed: 550, accordion: 0, maturity: “June 7, 2029 (springing maturity provisions)”,
+facilityName: "ABL Credit Facility",
+agent: "JPMorgan Chase Bank, N.A.",
+syndicate: "JPM-led syndicate",
+committed: 550, accordion: 0, maturity: "June 7, 2029 (springing maturity provisions)",
 lcSublimit: 0, swinglineSublimit: 0,
-borrowingBase: “Tied to eligible installment sales accounts, inventory, and eligible lease/rental contracts, reduced by reserves.”,
-bbFormula: “Lesser of (a) Aggregate Commitments and (b) BB = [Eligible Installment Sales Accounts] + [Eligible Inventory] + [Eligible Lease Contracts] − Reserves”,
-pricing: “Adjusted Term SOFR + margin (1.50%–2.00%). Total rate: 6.28% at Sep 30, 2025 (2.00% margin). Unused fee: 0.250%–0.375%.”,
-security: “Substantially all assets of Upbound Group and restricted subsidiaries”,
+borrowingBase: "Tied to eligible installment sales accounts, inventory, and eligible lease/rental contracts, reduced by reserves.",
+bbFormula: "Lesser of (a) Aggregate Commitments and (b) BB = [Eligible Installment Sales Accounts] + [Eligible Inventory] + [Eligible Lease Contracts] − Reserves",
+pricing: "Adjusted Term SOFR + margin (1.50%–2.00%). Total rate: 6.28% at Sep 30, 2025 (2.00% margin). Unused fee: 0.250%–0.375%.",
+security: "Substantially all assets of Upbound Group and restricted subsidiaries",
 financialCovenants: [
-{ covenant: “Borrowing Base Limit”, test: “Borrowings ≤ lesser of BB and commitments”, status: “Active”, notes: “No standalone financial maintenance covenant — relies on BB structure” },
+{ covenant: "Borrowing Base Limit", test: "Borrowings ≤ lesser of BB and commitments", status: "Active", notes: "No standalone financial maintenance covenant — relies on BB structure" },
 ],
-negativeCov: “Restrictions on: liens, sale-leasebacks, additional indebtedness, guarantees, mergers/consolidations, asset sales, dividends, restricted payments, and subordinated debt redemption”,
+negativeCov: "Restrictions on: liens, sale-leasebacks, additional indebtedness, guarantees, mergers/consolidations, asset sales, dividends, restricted payments, and subordinated debt redemption",
 availCurrent: 550, drawnCurrent: 0,
-covenantCompliance: “In compliance as of Sep 30, 2025”,
-otherFacilities: “Senior Secured Term Loan (~$800M); Senior Secured Notes; Senior Unsecured Notes”,
-src: “10-Q Q3 FY2025; 10-Q Q1 FY2025; Original ABL (Feb 2021)”,
+covenantCompliance: "In compliance as of Sep 30, 2025",
+otherFacilities: "Senior Secured Term Loan (~$800M); Senior Secured Notes; Senior Unsecured Notes",
+src: "10-Q Q3 FY2025; 10-Q Q1 FY2025; Original ABL (Feb 2021)",
 },
 WSC: {
-facilityName: “Amended ABL Revolver (Seventh Amendment)”,
-agent: “Bank of America, N.A.”,
-syndicate: “BofA Securities, JPMorgan, PNC, Wells Fargo, M&T Bank, MUFG, ING Capital ($4.0B total commitments pre-accordion)”,
-committed: 3000, accordion: 1000, maturity: “October 16, 2030”,
+facilityName: "Amended ABL Revolver (Seventh Amendment)",
+agent: "Bank of America, N.A.",
+syndicate: "BofA Securities, JPMorgan, PNC, Wells Fargo, M&T Bank, MUFG, ING Capital ($4.0B total commitments pre-accordion)",
+committed: 3000, accordion: 1000, maturity: "October 16, 2030",
 lcSublimit: 0, swinglineSublimit: 0,
-borrowingBase: “Fleet NOLV (Net Orderly Liquidation Value) + eligible lease receivables + other eligible assets. BB significantly exceeds committed facility.”,
-bbFormula: “Lesser of (a) $3.0B Cap and (b) BB (Fleet NOLV + Eligible Receivables + Other) − Outstanding Borrowings − LCs”,
-pricing: “Term SOFR + 137.5 bps (down from 160 bps); Base Rate + 37.5 bps. Step-downs to 125 bps / 112.5 bps. ~$5M/yr savings.”,
-security: “Senior secured first-priority lien on substantially all assets (US Facility; UK provisions removed in Seventh Amendment)”,
+borrowingBase: "Fleet NOLV (Net Orderly Liquidation Value) + eligible lease receivables + other eligible assets. BB significantly exceeds committed facility.",
+bbFormula: "Lesser of (a) $3.0B Cap and (b) BB (Fleet NOLV + Eligible Receivables + Other) − Outstanding Borrowings − LCs",
+pricing: "Term SOFR + 137.5 bps (down from 160 bps); Base Rate + 37.5 bps. Step-downs to 125 bps / 112.5 bps. ~$5M/yr savings.",
+security: "Senior secured first-priority lien on substantially all assets (US Facility; UK provisions removed in Seventh Amendment)",
 financialCovenants: [
-{ covenant: “Springing FCCR”, test: “Triggered when excess availability below threshold”, status: “Not triggered”, notes: “No ongoing financial maintenance covenant when availability above trigger” },
+{ covenant: "Springing FCCR", test: "Triggered when excess availability below threshold", status: "Not triggered", notes: "No ongoing financial maintenance covenant when availability above trigger" },
 ],
-negativeCov: “Customary: restrictions on additional indebtedness, liens, investments, restricted payments, asset sales, mergers, affiliate transactions”,
+negativeCov: "Customary: restrictions on additional indebtedness, liens, investments, restricted payments, asset sales, mergers, affiliate transactions",
 availCurrent: 1400, drawnCurrent: 1484,
-covenantCompliance: “In compliance as of Sep 30, 2025”,
-otherFacilities: “4.625% Secured Notes (2028, ~$496M); Secured Notes (2029, ~$525M); Secured Notes (2031, ~$535M)”,
-src: “8-K (Oct 17, 2025 — Seventh Amendment); 10-Q Q3 FY2025”,
+covenantCompliance: "In compliance as of Sep 30, 2025",
+otherFacilities: "4.625% Secured Notes (2028, ~$496M); Secured Notes (2029, ~$525M); Secured Notes (2031, ~$535M)",
+src: "8-K (Oct 17, 2025 — Seventh Amendment); 10-Q Q3 FY2025",
 },
 BEUSA: {
-facilityName: “Private — not publicly available”,
-agent: “N/A”, syndicate: “Private bank group”, committed: 0, accordion: 0, maturity: “N/A”,
+facilityName: "Private — not publicly available",
+agent: "N/A", syndicate: "Private bank group", committed: 0, accordion: 0, maturity: "N/A",
 lcSublimit: 0, swinglineSublimit: 0,
-borrowingBase: “Not disclosed (private). Assumed standard OFS ABL on eligible receivables and equipment.”,
-bbFormula: “Not available”, pricing: “Not disclosed”, security: “Assumed secured by company assets”,
-financialCovenants: [{ covenant: “Not disclosed”, test: “N/A”, status: “N/A”, notes: “Rely on bank group reporting” }],
-negativeCov: “Not disclosed”, availCurrent: 0, drawnCurrent: 0,
-covenantCompliance: “Not available — monitor via bank group”, otherFacilities: “N/A”,
-src: “Private company — no SEC filings”,
+borrowingBase: "Not disclosed (private). Assumed standard OFS ABL on eligible receivables and equipment.",
+bbFormula: "Not available", pricing: "Not disclosed", security: "Assumed secured by company assets",
+financialCovenants: [{ covenant: "Not disclosed", test: "N/A", status: "N/A", notes: "Rely on bank group reporting" }],
+negativeCov: "Not disclosed", availCurrent: 0, drawnCurrent: 0,
+covenantCompliance: "Not available — monitor via bank group", otherFacilities: "N/A",
+src: "Private company — no SEC filings",
 },
 JSWUSA: {
-facilityName: “Private — not publicly available”,
-agent: “N/A”, syndicate: “Private bank group”, committed: 0, accordion: 0, maturity: “N/A”,
+facilityName: "Private — not publicly available",
+agent: "N/A", syndicate: "Private bank group", committed: 0, accordion: 0, maturity: "N/A",
 lcSublimit: 0, swinglineSublimit: 0,
-borrowingBase: “Not disclosed. Assumed standard steel/metals ABL on eligible receivables, inventory, equipment.”,
-bbFormula: “Not available”, pricing: “Not disclosed”, security: “Assumed secured; implicit parent support from JSW Group”,
-financialCovenants: [{ covenant: “Not disclosed”, test: “N/A”, status: “N/A”, notes: “Rely on bank group + JSW Group disclosures” }],
-negativeCov: “Not disclosed”, availCurrent: 0, drawnCurrent: 0,
-covenantCompliance: “Not available — monitor via bank group”, otherFacilities: “Parent: JSW Group implicit support”,
-src: “Private company — no SEC filings”,
+borrowingBase: "Not disclosed. Assumed standard steel/metals ABL on eligible receivables, inventory, equipment.",
+bbFormula: "Not available", pricing: "Not disclosed", security: "Assumed secured; implicit parent support from JSW Group",
+financialCovenants: [{ covenant: "Not disclosed", test: "N/A", status: "N/A", notes: "Rely on bank group + JSW Group disclosures" }],
+negativeCov: "Not disclosed", availCurrent: 0, drawnCurrent: 0,
+covenantCompliance: "Not available — monitor via bank group", otherFacilities: "Parent: JSW Group implicit support",
+src: "Private company — no SEC filings",
 },
 };
 
 // ─── UTILITIES ──────────────────────────────────────────────────────────────
 const fmt = (n, d = 0) => {
-if (n === null || n === undefined) return “\u2014”;
+if (n === null || n === undefined) return "\u2014";
 if (Math.abs(n) >= 1e9) return `$${(n / 1e9).toFixed(1)}B`;
 if (Math.abs(n) >= 1e6) return `$${(n / 1e6).toFixed(d)}M`;
 if (Math.abs(n) >= 1e3) return `$${(n / 1e3).toFixed(d)}K`;
 return `$${n.toFixed(d)}`;
 };
-const fmtNum = (n, d = 1) => (n === null || n === undefined ? “\u2014” : n.toFixed(d));
-const pct = (n) => (n === null || n === undefined ? “\u2014” : `${n > 0 ? "+" : ""}${n.toFixed(1)}%`);
-const bps = (n) => (n === null || n === undefined ? “\u2014” : `${n > 0 ? "+" : ""}${n}`);
+const fmtNum = (n, d = 1) => (n === null || n === undefined ? "\u2014" : n.toFixed(d));
+const pct = (n) => (n === null || n === undefined ? "\u2014" : `${n > 0 ? "+" : ""}${n.toFixed(1)}%`);
+const bps = (n) => (n === null || n === undefined ? "\u2014" : `${n > 0 ? "+" : ""}${n}`);
 
 const ratingScore = (r) => {
-const map = { AAA: 1, “AA+”: 2, AA: 3, “AA-”: 4, “A+”: 5, A: 6, “A-”: 7, “BBB+”: 8, BBB: 9, “BBB-”: 10, “BB+”: 11, BB: 12, “BB-”: 13, “B+”: 14, B: 15, “B-”: 16, “CCC+”: 17, CCC: 18, NR: 20, Aaa: 1, Aa1: 2, Aa2: 3, Aa3: 4, A1: 5, A2: 6, A3: 7, Baa1: 8, Baa2: 9, Baa3: 10, Ba1: 11, Ba2: 12, Ba3: 13, B1: 14, B2: 15, B3: 16, Caa1: 17, Caa2: 18 };
+const map = { AAA: 1, "AA+": 2, AA: 3, "AA-": 4, "A+": 5, A: 6, "A-": 7, "BBB+": 8, BBB: 9, "BBB-": 10, "BB+": 11, BB: 12, "BB-": 13, "B+": 14, B: 15, "B-": 16, "CCC+": 17, CCC: 18, NR: 20, Aaa: 1, Aa1: 2, Aa2: 3, Aa3: 4, A1: 5, A2: 6, A3: 7, Baa1: 8, Baa2: 9, Baa3: 10, Ba1: 11, Ba2: 12, Ba3: 13, B1: 14, B2: 15, B3: 16, Caa1: 17, Caa2: 18 };
 return map[r] || 20;
 };
 
 const ratingColor = (r) => {
-if (r === “NR”) return “#64748b”;
+if (r === "NR") return "#64748b";
 const s = ratingScore(r);
-if (s <= 4) return “#22c55e”;
-if (s <= 7) return “#84cc16”;
-if (s <= 10) return “#eab308”;
-if (s <= 13) return “#f97316”;
-return “#ef4444”;
+if (s <= 4) return "#22c55e";
+if (s <= 7) return "#84cc16";
+if (s <= 10) return "#eab308";
+if (s <= 13) return "#f97316";
+return "#ef4444";
 };
 
 const outlookIcon = (o) => {
-if (o === “Positive”) return “\u25B2”;
-if (o === “Negative”) return “\u25BC”;
-if (o === “Developing”) return “\u25C6”;
-return “\u25CF”;
+if (o === "Positive") return "\u25B2";
+if (o === "Negative") return "\u25BC";
+if (o === "Developing") return "\u25C6";
+return "\u25CF";
 };
 
 const outlookColor = (o) => {
-if (o === “Positive”) return “#22c55e”;
-if (o === “Negative”) return “#ef4444”;
-if (o === “Developing”) return “#f97316”;
-return “#94a3b8”;
+if (o === "Positive") return "#22c55e";
+if (o === "Negative") return "#ef4444";
+if (o === "Developing") return "#f97316";
+return "#94a3b8";
 };
 
 const sentimentColor = (s) => {
-if (s === “positive”) return “#22c55e”;
-if (s === “negative”) return “#ef4444”;
-return “#94a3b8”;
+if (s === "positive") return "#22c55e";
+if (s === "negative") return "#ef4444";
+return "#94a3b8";
 };
 
 // Compute LTM Adjusted Cash Flow from adjBurn object
@@ -1501,35 +1501,35 @@ return ab.adjEBITDA - ab.incomeTaxes - ab.prefDividends - capex - ab.currentLTD 
 };
 
 // ─── SPARKLINE ──────────────────────────────────────────────────────────────
-const Sparkline = ({ data, color = “#60a5fa”, w = 80, h = 24 }) => {
+const Sparkline = ({ data, color = "#60a5fa", w = 80, h = 24 }) => {
 if (!data || data.length < 2) return null;
-const mn = Math.min(…data);
-const mx = Math.max(…data);
+const mn = Math.min(...data);
+const mx = Math.max(...data);
 const range = mx - mn || 1;
-const pts = data.map((v, i) => `${(i / (data.length - 1)) * w},${h - ((v - mn) / range) * h}`).join(” “);
+const pts = data.map((v, i) => `${(i / (data.length - 1)) * w},${h - ((v - mn) / range) * h}`).join(" ");
 return (
-<svg width={w} height={h} style={{ display: “block” }}>
+<svg width={w} height={h} style={{ display: "block" }}>
 <polyline points={pts} fill="none" stroke={color} strokeWidth="1.5" strokeLinejoin="round" />
 </svg>
 );
 };
 
 // ─── BAR CHART ──────────────────────────────────────────────────────────────
-const MiniBar = ({ data, labels, color = “#60a5fa”, w = 200, h = 80 }) => {
+const MiniBar = ({ data, labels, color = "#60a5fa", w = 200, h = 80 }) => {
 if (!data || data.length === 0) return null;
-const mx = Math.max(…data.map(Math.abs));
+const mx = Math.max(...data.map(Math.abs));
 const barW = w / data.length - 4;
 const zeroY = h * 0.5;
 return (
-<svg width={w} height={h + 18} style={{ display: “block” }}>
+<svg width={w} height={h + 18} style={{ display: "block" }}>
 <line x1={0} y1={zeroY} x2={w} y2={zeroY} stroke="#334155" strokeWidth="0.5" />
 {data.map((v, i) => {
 const bh = (Math.abs(v) / (mx || 1)) * (h * 0.45);
 const isNeg = v < 0;
 return (
 <g key={i}>
-<rect x={i * (barW + 4) + 2} y={isNeg ? zeroY : zeroY - bh} width={barW} height={bh} rx={2} fill={isNeg ? “#ef4444” : color} opacity={0.85} />
-<text x={i * (barW + 4) + 2 + barW / 2} y={h + 14} textAnchor=“middle” fontSize=“9” fill=”#94a3b8”>{labels?.[i] || “”}</text>
+<rect x={i * (barW + 4) + 2} y={isNeg ? zeroY : zeroY - bh} width={barW} height={bh} rx={2} fill={isNeg ? "#ef4444" : color} opacity={0.85} />
+<text x={i * (barW + 4) + 2 + barW / 2} y={h + 14} textAnchor="middle" fontSize="9" fill="#94a3b8">{labels?.[i] || ""}</text>
 </g>
 );
 })}
@@ -1540,33 +1540,33 @@ return (
 // ─── MAIN APP ───────────────────────────────────────────────────────────────
 export default function CreditRiskMonitor() {
 const [selected, setSelected] = useState(null);
-const [tab, setTab] = useState(“overview”);
-const [detailTab, setDetailTab] = useState(“financials”);
+const [tab, setTab] = useState("overview");
+const [detailTab, setDetailTab] = useState("financials");
 const [now, setNow] = useState(new Date());
-const [winW, setWinW] = useState(typeof window !== “undefined” ? window.innerWidth : 1200);
+const [winW, setWinW] = useState(typeof window !== "undefined" ? window.innerWidth : 1200);
 const [watchlistOverrides, setWatchlistOverrides] = useState({});
 const [showOverrideModal, setShowOverrideModal] = useState(null);
-const [overrideReason, setOverrideReason] = useState(””);
+const [overrideReason, setOverrideReason] = useState("");
 
 // ─── NAVIGATION HISTORY ───────────────────────────────────────────────
-const [navHistory, setNavHistory] = useState([{ selected: null, tab: “overview”, detailTab: “financials” }]);
+const [navHistory, setNavHistory] = useState([{ selected: null, tab: "overview", detailTab: "financials" }]);
 const [navPos, setNavPos] = useState(0);
 const isNavigating = useRef(false); // prevent popstate feedback loops
 
 const navigate = useCallback((newSelected, newTab, newDetailTab) => {
-const entry = { selected: newSelected, tab: newTab || (newSelected ? tab : “overview”), detailTab: newDetailTab || “financials” };
+const entry = { selected: newSelected, tab: newTab || (newSelected ? tab : "overview"), detailTab: newDetailTab || "financials" };
 setSelected(entry.selected);
 setTab(entry.tab);
 setDetailTab(entry.detailTab);
 setNavHistory(prev => {
 const trimmed = prev.slice(0, navPos + 1);
-return […trimmed, entry];
+return [...trimmed, entry];
 });
 setNavPos(prev => prev + 1);
 // Push to browser history so phone back button works
 try {
 if (!isNavigating.current) {
-window.history.pushState(entry, “”, newSelected ? `#${newSelected}` : “#”);
+window.history.pushState(entry, "", newSelected ? `#${newSelected}` : "#");
 }
 } catch(e) {}
 }, [tab, navPos]);
@@ -1606,18 +1606,18 @@ const onPopState = (e) => {
 if (isNavigating.current) return;
 if (e.state) {
 setSelected(e.state.selected);
-setTab(e.state.tab || “overview”);
-setDetailTab(e.state.detailTab || “financials”);
+setTab(e.state.tab || "overview");
+setDetailTab(e.state.detailTab || "financials");
 // Find matching position in our history
 setNavPos(prev => Math.max(0, prev - 1));
 } else {
 setSelected(null);
-setTab(“overview”);
+setTab("overview");
 setNavPos(prev => Math.max(0, prev - 1));
 }
 };
-window.addEventListener(“popstate”, onPopState);
-return () => window.removeEventListener(“popstate”, onPopState);
+window.addEventListener("popstate", onPopState);
+return () => window.removeEventListener("popstate", onPopState);
 }, []);
 
 // ─── LIVE DATA STATE ──────────────────────────────────────────────────
@@ -1635,42 +1635,42 @@ const [projCapexChange, setProjCapexChange] = useState(0);  // -30% to +30%
 
 // ─── LIVE DATA FETCHERS ───────────────────────────────────────────────
 const fetchSecFilings = useCallback(async () => {
-setDataLoading(prev => ({ …prev, sec: true }));
+setDataLoading(prev => ({ ...prev, sec: true }));
 try {
-const resp = await fetch(”/api/sec_filings?all=true&days=30”);
+const resp = await fetch("/api/sec_filings?all=true&days=30");
 const data = await resp.json();
 if (data.filings) setSecFilings(data.filings);
-setDataError(prev => ({ …prev, sec: null }));
+setDataError(prev => ({ ...prev, sec: null }));
 } catch (e) {
-setDataError(prev => ({ …prev, sec: e.message }));
+setDataError(prev => ({ ...prev, sec: e.message }));
 }
-setDataLoading(prev => ({ …prev, sec: false }));
+setDataLoading(prev => ({ ...prev, sec: false }));
 }, []);
 
 const fetchLiveNews = useCallback(async () => {
-setDataLoading(prev => ({ …prev, news: true }));
+setDataLoading(prev => ({ ...prev, news: true }));
 try {
-const resp = await fetch(”/api/news?all=true&max=6”);
+const resp = await fetch("/api/news?all=true&max=6");
 const data = await resp.json();
 if (data.news) setLiveNews(data.news);
-setDataError(prev => ({ …prev, news: null }));
+setDataError(prev => ({ ...prev, news: null }));
 } catch (e) {
-setDataError(prev => ({ …prev, news: e.message }));
+setDataError(prev => ({ ...prev, news: e.message }));
 }
-setDataLoading(prev => ({ …prev, news: false }));
+setDataLoading(prev => ({ ...prev, news: false }));
 }, []);
 
 const fetchMarketData = useCallback(async () => {
-setDataLoading(prev => ({ …prev, market: true }));
+setDataLoading(prev => ({ ...prev, market: true }));
 try {
-const resp = await fetch(”/api/market_data?all=true”);
+const resp = await fetch("/api/market_data?all=true");
 const data = await resp.json();
 if (data.quotes) setMarketData(data.quotes);
-setDataError(prev => ({ …prev, market: null }));
+setDataError(prev => ({ ...prev, market: null }));
 } catch (e) {
-setDataError(prev => ({ …prev, market: e.message }));
+setDataError(prev => ({ ...prev, market: e.message }));
 }
-setDataLoading(prev => ({ …prev, market: false }));
+setDataLoading(prev => ({ ...prev, market: false }));
 }, []);
 
 const refreshAll = useCallback(() => {
@@ -1683,43 +1683,43 @@ setLastRefresh(new Date());
 useEffect(() => { refreshAll(); }, []);
 
 // Severity colors and icons
-const sevColor = { critical: “#dc2626”, material: “#f97316”, notable: “#eab308”, routine: “#64748b” };
-const sevIcon = { critical: “\u26D4”, material: “\u26A0”, notable: “\u25C6”, routine: “\u25CB” };
-const sentColor = { positive: “#22c55e”, negative: “#ef4444”, neutral: “#64748b” };
+const sevColor = { critical: "#dc2626", material: "#f97316", notable: "#eab308", routine: "#64748b" };
+const sevIcon = { critical: "\u26D4", material: "\u26A0", notable: "\u25C6", routine: "\u25CB" };
+const sentColor = { positive: "#22c55e", negative: "#ef4444", neutral: "#64748b" };
 
 // ─── PEER COMPARISON DATA ─────────────────────────────────────────────
 // ─── WATCHLIST ENGINE ─────────────────────────────────────────────────
 const autoWatchlistTriggers = (c) => {
 const triggers = [];
-if (c.sp === “NR” && c.moodys === “NR”) triggers.push(“Unrated by all agencies”);
-if (c.ebitda < 0) triggers.push(“Negative EBITDA”);
-const impliedMap = { “CCC+”: 17, CCC: 18, “CCC-”: 19, CC: 20, C: 21, D: 22 };
+if (c.sp === "NR" && c.moodys === "NR") triggers.push("Unrated by all agencies");
+if (c.ebitda < 0) triggers.push("Negative EBITDA");
+const impliedMap = { "CCC+": 17, CCC: 18, "CCC-": 19, CC: 20, C: 21, D: 22 };
 if (impliedMap[c.impliedRating]) triggers.push(`Implied rating ${c.impliedRating} (CCC-tier or below)`);
 if (c.intCov < 2 && c.intCov > -99) triggers.push(`Interest coverage ${c.intCov.toFixed(1)}x (below 2.0x)`);
 if (c.ebitda > 0 && c.totalDebt / c.ebitda > 5) triggers.push(`Gross leverage ${(c.totalDebt / c.ebitda).toFixed(1)}x (above 5.0x)`);
-if (!c.mktCap && c.sp === “NR”) triggers.push(“Private company with no public reporting”);
+if (!c.mktCap && c.sp === "NR") triggers.push("Private company with no public reporting");
 return triggers;
 };
 
 const getWatchlistStatus = (c) => {
 const override = watchlistOverrides[c.id];
-if (override) return { active: override.status, source: “override”, reason: override.reason, triggers: autoWatchlistTriggers(c) };
+if (override) return { active: override.status, source: "override", reason: override.reason, triggers: autoWatchlistTriggers(c) };
 const triggers = autoWatchlistTriggers(c);
-return { active: triggers.length > 0, source: “auto”, reason: null, triggers };
+return { active: triggers.length > 0, source: "auto", reason: null, triggers };
 };
 
 const toggleOverride = (id, status, reason) => {
 setWatchlistOverrides(prev => ({
-…prev,
-[id]: { status, reason, date: new Date().toISOString().split(“T”)[0], analyst: “Current User” }
+...prev,
+[id]: { status, reason, date: new Date().toISOString().split("T")[0], analyst: "Current User" }
 }));
 setShowOverrideModal(null);
-setOverrideReason(””);
+setOverrideReason("");
 };
 
 const clearOverride = (id) => {
 setWatchlistOverrides(prev => {
-const next = { …prev };
+const next = { ...prev };
 delete next[id];
 return next;
 });
@@ -1728,7 +1728,7 @@ return next;
 // ─── PEER COMPARISON DATA ─────────────────────────────────────────────
 const peerBenchmarks = useMemo(() => {
 const all_cos = PORTFOLIO;
-const median = (arr) => { if (!arr.length) return 0; const s = […arr].sort((a,b) => a-b); const m = Math.floor(s.length/2); return s.length % 2 ? s[m] : (s[m-1]+s[m])/2; };
+const median = (arr) => { if (!arr.length) return 0; const s = [...arr].sort((a,b) => a-b); const m = Math.floor(s.length/2); return s.length % 2 ? s[m] : (s[m-1]+s[m])/2; };
 return {
 medianLeverage: median(all_cos.filter(c => c.ebitda > 0).map(c => c.totalDebt / c.ebitda)),
 medianIntCov: median(all_cos.filter(c => c.intCov > 0 && c.intCov < 100).map(c => c.intCov)),
@@ -1741,7 +1741,7 @@ return Object.entries(sectors).map(([s, n]) => ({ sector: s, count: n, pct: (n /
 })(),
 ratingConc: (() => {
 const ratings = {};
-all_cos.forEach(c => { const r = c.impliedRating || “NR”; ratings[r] = (ratings[r] || 0) + 1; });
+all_cos.forEach(c => { const r = c.impliedRating || "NR"; ratings[r] = (ratings[r] || 0) + 1; });
 return Object.entries(ratings).map(([r, n]) => ({ rating: r, count: n, pct: (n / all_cos.length * 100) })).sort((a,b) => b.count - a.count);
 })(),
 watchlistPct: (all_cos.filter(c => getWatchlistStatus(c).active).length / all_cos.length * 100),
@@ -1755,8 +1755,8 @@ return () => clearInterval(t);
 
 useEffect(() => {
 const onResize = () => setWinW(window.innerWidth);
-window.addEventListener(“resize”, onResize);
-return () => window.removeEventListener(“resize”, onResize);
+window.addEventListener("resize", onResize);
+return () => window.removeEventListener("resize", onResize);
 }, []);
 
 const mob = winW < 768;
@@ -1766,48 +1766,47 @@ const px = mob ? 12 : 24; // responsive padding
 const totalExposure = PORTFOLIO.reduce((s, c) => s + c.exposure, 0);
 const negFcfCount = PORTFOLIO.filter((c) => c.fcf < 0).length;
 const watchCount = PORTFOLIO.filter((c) => getWatchlistStatus(c).active).length;
-const negOutlook = PORTFOLIO.filter((c) => c.outlook === “Negative” || c.outlook === “Developing”).length;
+const negOutlook = PORTFOLIO.filter((c) => c.outlook === "Negative" || c.outlook === "Developing").length;
 
-const allNews = PORTFOLIO.flatMap((c) => c.news.map((n) => ({ …n, ticker: c.id, company: c.name }))).sort((a, b) => b.date.localeCompare(a.date));
+const allNews = PORTFOLIO.flatMap((c) => c.news.map((n) => ({ ...n, ticker: c.id, company: c.name }))).sort((a, b) => b.date.localeCompare(a.date));
 
 const detail = selected ? PORTFOLIO.find((c) => c.id === selected) : null;
 
 // ─── STYLES ─────────────────────────────────────────────────────────────
-const root = { fontFamily: “‘Inter’, -apple-system, BlinkMacSystemFont, ‘Segoe UI’, sans-serif”, background: “#0a0e1a”, color: “#e2e8f0”, minHeight: “100vh”, fontSize: mob ? 13 : 13, WebkitFontSmoothing: “antialiased”, maxWidth: “100vw”, overflowX: “clip”, wordWrap: “break-word”, overflowWrap: “break-word” };
-const headerBar = { display: “flex”, alignItems: “center”, justifyContent: “space-between”, padding: mob ? “10px 12px” : “12px 24px”, borderBottom: “1px solid #1e293b”, background: “linear-gradient(180deg, #0f1629 0%, #0a0e1a 100%)”, flexWrap: mob ? “wrap” : “nowrap”, gap: mob ? 8 : 0 };
-const pill = (active) => ({ padding: mob ? “6px 10px” : “6px 16px”, borderRadius: 4, fontSize: mob ? 10 : 11, fontWeight: 600, letterSpacing: “0.5px”, cursor: “pointer”, border: “none”, background: active ? “#1d4ed8” : “transparent”, color: active ? “#fff” : “#64748b”, transition: “all .15s”, whiteSpace: “nowrap” });
-const card = { background: “#111827”, border: “1px solid #1e293b”, borderRadius: 8, padding: mob ? 12 : 16, overflow: “hidden”, minWidth: 0 };
-const kpiVal = { fontSize: mob ? 18 : 22, fontWeight: 700, color: “#f1f5f9”, lineHeight: 1.2, fontFamily: “‘JetBrains Mono’, monospace” };
-const kpiLabel = { fontSize: mob ? 9 : 10, color: “#64748b”, textTransform: “uppercase”, letterSpacing: “0.8px”, marginTop: 4, fontFamily: “‘Inter’, sans-serif” };
-const alertBanner = { background: “linear-gradient(90deg, #7f1d1d 0%, #991b1b 50%, #7f1d1d 100%)”, border: “1px solid #dc2626”, borderRadius: 6, padding: mob ? “8px 12px” : “10px 16px”, marginBottom: 16, display: “flex”, alignItems: “center”, gap: 10, fontSize: mob ? 11 : 12, color: “#fca5a5” };
-const sectionGrid = mob ? “1fr” : “1fr 1fr”;
+const root = { fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", background: "#0a0e1a", color: "#e2e8f0", minHeight: "100vh", fontSize: mob ? 13 : 13, WebkitFontSmoothing: "antialiased", maxWidth: "100vw", overflowX: "clip", wordWrap: "break-word", overflowWrap: "break-word" };
+const headerBar = { display: "flex", alignItems: "center", justifyContent: "space-between", padding: mob ? "10px 12px" : "12px 24px", borderBottom: "1px solid #1e293b", background: "linear-gradient(180deg, #0f1629 0%, #0a0e1a 100%)", flexWrap: mob ? "wrap" : "nowrap", gap: mob ? 10 : 0 };
+const pill = (active) => ({ padding: mob ? "8px 12px" : "6px 16px", borderRadius: 4, fontSize: mob ? 11 : 11, fontWeight: 600, letterSpacing: "0.5px", cursor: "pointer", border: "none", background: active ? "#1d4ed8" : "transparent", color: active ? "#fff" : "#64748b", transition: "all .15s", whiteSpace: "nowrap" });
+const card = { background: "#111827", border: "1px solid #1e293b", borderRadius: 8, padding: mob ? 12 : 16, overflow: "hidden", minWidth: 0 };
+const kpiVal = { fontSize: mob ? 18 : 22, fontWeight: 700, color: "#f1f5f9", lineHeight: 1.2, fontFamily: "'JetBrains Mono', monospace" };
+const kpiLabel = { fontSize: mob ? 9 : 10, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.8px", marginTop: 4, fontFamily: "'Inter', sans-serif" };
+const alertBanner = { background: "linear-gradient(90deg, #7f1d1d 0%, #991b1b 50%, #7f1d1d 100%)", border: "1px solid #dc2626", borderRadius: 6, padding: mob ? "8px 12px" : "10px 16px", marginBottom: 16, display: "flex", alignItems: "center", gap: 10, fontSize: mob ? 11 : 12, color: "#fca5a5" };
+const sectionGrid = mob ? "1fr" : "1fr 1fr";
 
 // ─── RENDER: DETAIL VIEW ──────────────────────────────────────────────────
 if (detail) {
 return (
 <div style={root}>
 <div style={headerBar}>
-<div style={{ display: “flex”, alignItems: “center”, gap: mob ? 6 : 10, flexWrap: “wrap” }}>
-<div style={{ display: “flex”, gap: 2 }}>
-<button onClick={goBack} disabled={!canGoBack} style={{ …pill(false), border: “1px solid #334155”, opacity: canGoBack ? 1 : 0.3, cursor: canGoBack ? “pointer” : “default”, padding: mob ? “6px 8px” : “6px 12px” }}>{”\u2190”}</button>
-<button onClick={goForward} disabled={!canGoForward} style={{ …pill(false), border: “1px solid #334155”, opacity: canGoForward ? 1 : 0.3, cursor: canGoForward ? “pointer” : “default”, padding: mob ? “6px 8px” : “6px 12px” }}>{”\u2192”}</button>
+<div style={{ display: "flex", alignItems: "center", gap: mob ? 8 : 10, flexWrap: "wrap", flex: 1, minWidth: 0 }}>
+<div style={{ display: "flex", gap: 2, flexShrink: 0 }}>
+<button onClick={goBack} disabled={!canGoBack} style={{ ...pill(false), border: "1px solid #334155", opacity: canGoBack ? 1 : 0.3, cursor: canGoBack ? "pointer" : "default", padding: mob ? "6px 8px" : "6px 12px" }}>{"\u2190"}</button>
+<button onClick={goForward} disabled={!canGoForward} style={{ ...pill(false), border: "1px solid #334155", opacity: canGoForward ? 1 : 0.3, cursor: canGoForward ? "pointer" : "default", padding: mob ? "6px 8px" : "6px 12px" }}>{"\u2192"}</button>
 </div>
-<button onClick={() => navigate(null, “overview”, “financials”)} style={{ …pill(false), border: “1px solid #334155” }}>Portfolio</button>
-<div>
-<span style={{ fontSize: mob ? 16 : 18, fontWeight: 700, color: “#f1f5f9” }}>{detail.id}</span>
-<span style={{ fontSize: mob ? 11 : 13, color: “#94a3b8”, marginLeft: 8 }}>{mob ? “” : detail.name}</span>
+<button onClick={() => navigate(null, "overview", "financials")} style={{ ...pill(false), border: "1px solid #334155", flexShrink: 0 }}>Portfolio</button>
+<div style={{ minWidth: 0, overflow: "hidden" }}>
+<span style={{ fontSize: mob ? 16 : 18, fontWeight: 700, color: "#f1f5f9" }}>{detail.id}</span>
+<span style={{ fontSize: mob ? 11 : 13, color: "#94a3b8", marginLeft: 8 }}>{mob ? "" : detail.name}</span>
 </div>
-{getWatchlistStatus(detail).active && <span style={{ background: “#7f1d1d”, color: “#fca5a5”, fontSize: 10, fontWeight: 700, padding: “3px 8px”, borderRadius: 3, textTransform: “uppercase”, letterSpacing: “0.5px” }}>{”\u26A0”} WATCHLIST</span>}
-{!getWatchlistStatus(detail).active && <span style={{ background: “#052e16”, color: “#86efac”, fontSize: 10, fontWeight: 700, padding: “3px 8px”, borderRadius: 3, textTransform: “uppercase”, letterSpacing: “0.5px” }}>{”\u2713”} ACTIVE</span>}
+{getWatchlistStatus(detail).active && <span style={{ background: "#7f1d1d", color: "#fca5a5", fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 3, textTransform: "uppercase", letterSpacing: "0.5px", flexShrink: 0 }}>{"\u26A0"} WATCHLIST</span>}
+{!getWatchlistStatus(detail).active && <span style={{ background: "#052e16", color: "#86efac", fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 3, textTransform: "uppercase", letterSpacing: "0.5px", flexShrink: 0 }}>{"\u2713"} ACTIVE</span>}
 </div>
-<div style={{ display: “flex”, gap: mob ? 4 : 6, overflowX: “auto”, WebkitOverflowScrolling: “touch”, width: mob ? “100%” : “auto” }}>
-{[“financials”, “ratings”, “filings”, “news”, “research”, “earnings”].map((t) => (
-<button key={t} onClick={() => setDetailTab(t)} style={pill(detailTab === t)}>{t === “filings” ? “SEC” : t}</button>
+<div style={{ display: "flex", gap: mob ? 4 : 6, overflowX: "auto", WebkitOverflowScrolling: "touch", width: mob ? "100%" : "auto", marginTop: mob ? 2 : 0, paddingBottom: mob ? 2 : 0 }}>
+{["financials", "ratings", "filings", "news", "research", "earnings"].map((t) => (
+<button key={t} onClick={() => setDetailTab(t)} style={pill(detailTab === t)}>{t === "filings" ? "SEC" : t}</button>
 ))}
 </div>
 </div>
 
-```
     {/* KPI strip */}
     <div style={{ display: "grid", gridTemplateColumns: mob ? "repeat(2, 1fr)" : tablet ? "repeat(4, 1fr)" : "repeat(8, 1fr)", gap: mob ? 8 : 12, padding: `16px ${px}px` }}>
       {[
@@ -3127,7 +3126,6 @@ return (
     </div>
   </div>
 );
-```
 
 }
 
@@ -3135,26 +3133,25 @@ return (
 return (
 <div style={root}>
 <div style={headerBar}>
-<div style={{ display: “flex”, alignItems: “center”, gap: mob ? 6 : 16, flex: 1, minWidth: 0 }}>
-<div style={{ display: “flex”, gap: 2, flexShrink: 0 }}>
-<button onClick={goBack} disabled={!canGoBack} style={{ …pill(false), border: “1px solid #334155”, opacity: canGoBack ? 1 : 0.3, cursor: canGoBack ? “pointer” : “default”, padding: mob ? “6px 8px” : “6px 12px” }}>{”\u2190”}</button>
-<button onClick={goForward} disabled={!canGoForward} style={{ …pill(false), border: “1px solid #334155”, opacity: canGoForward ? 1 : 0.3, cursor: canGoForward ? “pointer” : “default”, padding: mob ? “6px 8px” : “6px 12px” }}>{”\u2192”}</button>
+<div style={{ display: "flex", alignItems: "center", gap: mob ? 6 : 16, flex: 1, minWidth: 0 }}>
+<div style={{ display: "flex", gap: 2, flexShrink: 0 }}>
+<button onClick={goBack} disabled={!canGoBack} style={{ ...pill(false), border: "1px solid #334155", opacity: canGoBack ? 1 : 0.3, cursor: canGoBack ? "pointer" : "default", padding: mob ? "6px 8px" : "6px 12px" }}>{"\u2190"}</button>
+<button onClick={goForward} disabled={!canGoForward} style={{ ...pill(false), border: "1px solid #334155", opacity: canGoForward ? 1 : 0.3, cursor: canGoForward ? "pointer" : "default", padding: mob ? "6px 8px" : "6px 12px" }}>{"\u2192"}</button>
 </div>
-<div style={{ fontSize: mob ? 13 : 16, fontWeight: 800, letterSpacing: “-0.5px”, color: “#f1f5f9”, whiteSpace: “nowrap” }}>
-<span style={{ color: “#ef4444” }}>{”\u25C6”}</span> CREDIT RISK MONITOR
+<div style={{ fontSize: mob ? 13 : 16, fontWeight: 800, letterSpacing: "-0.5px", color: "#f1f5f9", whiteSpace: "nowrap" }}>
+<span style={{ color: "#ef4444" }}>{"\u25C6"}</span> CREDIT RISK MONITOR
 </div>
-{!mob && <div style={{ fontSize: 10, color: “#475569”, borderLeft: “1px solid #334155”, paddingLeft: 12 }}>
-{now.toLocaleDateString(“en-US”, { weekday: “short”, year: “numeric”, month: “short”, day: “numeric” })} {”\u00B7”} {now.toLocaleTimeString(“en-US”, { hour: “2-digit”, minute: “2-digit” })}
+{!mob && <div style={{ fontSize: 10, color: "#475569", borderLeft: "1px solid #334155", paddingLeft: 12 }}>
+{now.toLocaleDateString("en-US", { weekday: "short", year: "numeric", month: "short", day: "numeric" })} {"\u00B7"} {now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
 </div>}
 </div>
-<div style={{ display: “flex”, gap: mob ? 4 : 6, overflowX: “auto”, WebkitOverflowScrolling: “touch” }}>
-{[“overview”, “filings”, “news”, “analytics”, “calendar”].map((t) => (
-<button key={t} onClick={() => setTab(t)} style={pill(tab === t)}>{t === “filings” ? “SEC Filings” : t}</button>
+<div style={{ display: "flex", gap: mob ? 4 : 6, overflowX: "auto", WebkitOverflowScrolling: "touch", width: mob ? "100%" : "auto", marginTop: mob ? 2 : 0, paddingBottom: mob ? 2 : 0 }}>
+{["overview", "filings", "news", "analytics", "calendar"].map((t) => (
+<button key={t} onClick={() => setTab(t)} style={pill(tab === t)}>{t === "filings" ? "SEC Filings" : t}</button>
 ))}
 </div>
 </div>
 
-```
   {/* ALERT */}
   <div style={{ padding: `16px ${px}px 0` }}>
     <div style={alertBanner}>
@@ -3491,7 +3488,6 @@ return (
     </div>
   )}
 </div>
-```
 
 );
 }
