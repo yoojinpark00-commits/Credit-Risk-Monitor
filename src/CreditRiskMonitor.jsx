@@ -1763,14 +1763,59 @@ const mob = winW < 768;
 const tablet = winW >= 768 && winW < 1024;
 const px = mob ? 12 : 24; // responsive padding
 
-const totalExposure = PORTFOLIO.reduce((s, c) => s + c.exposure, 0);
-const negFcfCount = PORTFOLIO.filter((c) => c.fcf < 0).length;
-const watchCount = PORTFOLIO.filter((c) => getWatchlistStatus(c).active).length;
-const negOutlook = PORTFOLIO.filter((c) => c.outlook === "Negative" || c.outlook === "Developing").length;
+// ─── APPLY LIVE MARKET DATA TO PORTFOLIO ─────────────────────────────
+// Overlay live equity prices from API onto portfolio entries so all views
+// (KPIs, detail headers, tables) reflect current market data.
+const enrichedPortfolio = useMemo(() => {
+  if (Object.keys(marketData).length === 0) return PORTFOLIO;
+  return PORTFOLIO.map((c) => {
+    const quote = marketData[c.id];
+    if (!quote || quote.error) return c;
+    return {
+      ...c,
+      eqPrice: quote.price ?? c.eqPrice,
+      eqChg: quote.changePct ?? c.eqChg,
+      mktCap: quote.marketCap ? +(quote.marketCap / 1e9).toFixed(2) : c.mktCap,
+      _liveEquity: true,
+    };
+  });
+}, [marketData]);
 
-const allNews = PORTFOLIO.flatMap((c) => c.news.map((n) => ({ ...n, ticker: c.id, company: c.name }))).sort((a, b) => b.date.localeCompare(a.date));
+const totalExposure = enrichedPortfolio.reduce((s, c) => s + c.exposure, 0);
+const negFcfCount = enrichedPortfolio.filter((c) => c.fcf < 0).length;
+const watchCount = enrichedPortfolio.filter((c) => getWatchlistStatus(c).active).length;
+const negOutlook = enrichedPortfolio.filter((c) => c.outlook === "Negative" || c.outlook === "Developing").length;
 
-const detail = selected ? PORTFOLIO.find((c) => c.id === selected) : null;
+// ─── MERGE LIVE + STATIC NEWS ────────────────────────────────────────
+// Use live API news when available, fall back to hardcoded portfolio news.
+const allNews = useMemo(() => {
+  if (liveNews.length > 0) {
+    // Merge live news (from API) with static news, dedup by headline prefix
+    const seen = new Set();
+    const merged = [];
+    for (const n of liveNews) {
+      const key = (n.headline || "").slice(0, 50).toLowerCase();
+      if (!seen.has(key)) {
+        seen.add(key);
+        merged.push({ ...n, src: n.source || n.src, _live: true });
+      }
+    }
+    // Add static news not already covered
+    for (const c of enrichedPortfolio) {
+      for (const n of c.news) {
+        const key = (n.headline || "").slice(0, 50).toLowerCase();
+        if (!seen.has(key)) {
+          seen.add(key);
+          merged.push({ ...n, ticker: c.id, company: c.name });
+        }
+      }
+    }
+    return merged.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+  }
+  return enrichedPortfolio.flatMap((c) => c.news.map((n) => ({ ...n, ticker: c.id, company: c.name }))).sort((a, b) => b.date.localeCompare(a.date));
+}, [liveNews, enrichedPortfolio]);
+
+const detail = selected ? enrichedPortfolio.find((c) => c.id === selected) : null;
 
 // ─── STYLES ─────────────────────────────────────────────────────────────
 const root = { fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", background: "#0a0e1a", color: "#e2e8f0", minHeight: "100vh", fontSize: mob ? 13 : 13, WebkitFontSmoothing: "antialiased", maxWidth: "100vw", overflowX: "clip", wordWrap: "break-word", overflowWrap: "break-word" };
@@ -3156,7 +3201,7 @@ return (
   <div style={{ padding: `16px ${px}px 0` }}>
     <div style={alertBanner}>
       <span style={{ fontSize: 16 }}>{"\u26A0"}</span>
-      <div><b>Active Watchlist:</b> {watchCount} of {PORTFOLIO.length} credits on internal watchlist. Portfolio spans EV, media, energy, consumer, industrial, and steel sectors.</div>
+      <div><b>Active Watchlist:</b> {watchCount} of {enrichedPortfolio.length} credits on internal watchlist. Portfolio spans EV, media, energy, consumer, industrial, and steel sectors.</div>
     </div>
   </div>
 
@@ -3164,10 +3209,10 @@ return (
   <div style={{ display: "grid", gridTemplateColumns: mob ? "repeat(2, 1fr)" : tablet ? "repeat(3, 1fr)" : "repeat(5, 1fr)", gap: mob ? 8 : 12, padding: `0 ${px}px 16px` }}>
     {[
       { l: "Total Exposure", v: fmt(totalExposure) },
-      { l: "Credits Tracked", v: PORTFOLIO.length },
-      { l: "Agency Rated", v: `${PORTFOLIO.filter(c => c.sp !== "NR").length} / ${PORTFOLIO.length}`, c: PORTFOLIO.filter(c => c.sp !== "NR").length === PORTFOLIO.length ? "#22c55e" : "#eab308" },
+      { l: "Credits Tracked", v: enrichedPortfolio.length },
+      { l: "Agency Rated", v: `${enrichedPortfolio.filter(c => c.sp !== "NR").length} / ${enrichedPortfolio.length}`, c: enrichedPortfolio.filter(c => c.sp !== "NR").length === enrichedPortfolio.length ? "#22c55e" : "#eab308" },
       { l: "Neg. / Developing Outlook", v: negOutlook, c: "#ef4444" },
-      { l: "Negative FCF", v: `${negFcfCount} / ${PORTFOLIO.length}`, c: "#ef4444" },
+      { l: "Negative FCF", v: `${negFcfCount} / ${enrichedPortfolio.length}`, c: "#ef4444" },
     ].map((k, i) => (
       <div key={i} style={card}>
         <div style={{ ...kpiVal, color: k.c || "#f1f5f9" }}>{k.v}</div>
@@ -3181,7 +3226,7 @@ return (
       {mob ? (
         /* ─── MOBILE: Card layout ─── */
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {PORTFOLIO.map((c) => (
+          {enrichedPortfolio.map((c) => (
             <div key={c.id} onClick={() => { navigate(c.id, tab, "financials"); }} style={{ ...card, cursor: "pointer", padding: 14 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
                 <div>
@@ -3236,7 +3281,7 @@ return (
             </tr>
           </thead>
           <tbody>
-            {PORTFOLIO.map((c) => (
+            {enrichedPortfolio.map((c) => (
               <tr key={c.id} onClick={() => { navigate(c.id, tab, "financials"); }} style={{ cursor: "pointer", borderBottom: "1px solid #1e293b", transition: "background .1s" }}
                 onMouseEnter={(e) => (e.currentTarget.style.background = "#1e293b")}
                 onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
@@ -3381,7 +3426,7 @@ return (
               </tr>
             </thead>
             <tbody>
-              {PORTFOLIO.map((c) => {
+              {enrichedPortfolio.map((c) => {
                 const lev = c.ebitda > 0 ? (c.totalDebt / c.ebitda) : null;
                 const margin = c.revenue > 0 ? (c.ebitda / c.revenue * 100) : null;
                 const cf = ltmAdjCashFlow(c);
@@ -3463,10 +3508,10 @@ return (
     <div style={{ padding: `0 ${px}px 24px`, minWidth: 0, maxWidth: "100%" }}>
       <div style={card}>
         <div style={{ fontSize: 12, fontWeight: 700, color: "#94a3b8", marginBottom: 16, textTransform: "uppercase", letterSpacing: "0.5px" }}>Upcoming Earnings Calendar</div>
-        {[...PORTFOLIO].filter(c => c.earningsDate).sort((a, b) => a.earningsDate.localeCompare(b.earningsDate)).map((c, i) => {
+        {[...enrichedPortfolio].filter(c => c.earningsDate).sort((a, b) => a.earningsDate.localeCompare(b.earningsDate)).map((c, i) => {
           const days = Math.ceil((new Date(c.earningsDate) - now) / (1000 * 60 * 60 * 24));
           return (
-            <div key={i} style={{ display: "flex", alignItems: "center", gap: 16, padding: "14px 0", borderBottom: i < PORTFOLIO.length - 1 ? "1px solid #1e293b" : "none", cursor: "pointer" }}
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 16, padding: "14px 0", borderBottom: i < enrichedPortfolio.length - 1 ? "1px solid #1e293b" : "none", cursor: "pointer" }}
               onClick={() => { navigate(c.id, tab, "earnings"); }}>
               <div style={{ width: 52, textAlign: "center" }}>
                 <div style={{ fontSize: 18, fontWeight: 800, color: days <= 14 ? "#f97316" : "#3b82f6" }}>{days}</div>
