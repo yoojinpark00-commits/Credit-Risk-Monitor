@@ -395,13 +395,13 @@ const allNews = useMemo(() => {
 const detail = selected ? enrichedPortfolio.find((c) => c.id === selected) : null;
 
 // ─── STYLES ─────────────────────────────────────────────────────────────
-const root = { fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", background: "#0a0e1a", color: "#e2e8f0", minHeight: "100vh", fontSize: mob ? 13 : 13, WebkitFontSmoothing: "antialiased", maxWidth: "100vw", overflowX: "clip", wordWrap: "break-word", overflowWrap: "break-word" };
-const headerBar = { display: "flex", alignItems: "center", justifyContent: "space-between", padding: mob ? "10px 12px" : "12px 24px", borderBottom: "1px solid #1e293b", background: "linear-gradient(180deg, #0f1629 0%, #0a0e1a 100%)", flexWrap: mob ? "wrap" : "nowrap", gap: mob ? 10 : 0 };
-const pill = (active) => ({ padding: mob ? "8px 12px" : "6px 16px", borderRadius: 4, fontSize: mob ? 11 : 11, fontWeight: 600, letterSpacing: "0.5px", cursor: "pointer", border: "none", background: active ? "#1d4ed8" : "transparent", color: active ? "#fff" : "#64748b", transition: "all .15s", whiteSpace: "nowrap" });
-const card = { background: "#111827", border: "1px solid #1e293b", borderRadius: 8, padding: mob ? 12 : 16, overflow: "hidden", minWidth: 0 };
-const kpiVal = { fontSize: mob ? 18 : 22, fontWeight: 700, color: "#f1f5f9", lineHeight: 1.2, fontFamily: "'JetBrains Mono', monospace" };
-const kpiLabel = { fontSize: mob ? 9 : 10, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.8px", marginTop: 4, fontFamily: "'Inter', sans-serif" };
-const alertBanner = { background: "linear-gradient(90deg, #7f1d1d 0%, #991b1b 50%, #7f1d1d 100%)", border: "1px solid #dc2626", borderRadius: 6, padding: mob ? "8px 12px" : "10px 16px", marginBottom: 16, display: "flex", alignItems: "center", gap: 10, fontSize: mob ? 11 : 12, color: "#fca5a5" };
+const root = { fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", background: "#060a14", color: "#e2e8f0", minHeight: "100vh", fontSize: mob ? 13 : 14, WebkitFontSmoothing: "antialiased", MozOsxFontSmoothing: "grayscale", maxWidth: "100vw", overflowX: "clip", wordWrap: "break-word", overflowWrap: "break-word" };
+const headerBar = { display: "flex", alignItems: "center", justifyContent: "space-between", padding: mob ? "12px 16px" : "14px 28px", borderBottom: "1px solid rgba(148,163,184,0.08)", background: "rgba(15,22,41,0.85)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)", flexWrap: mob ? "wrap" : "nowrap", gap: mob ? 10 : 0, position: "sticky", top: 0, zIndex: 50 };
+const pill = (active) => ({ padding: mob ? "8px 14px" : "7px 18px", borderRadius: 6, fontSize: mob ? 11 : 11, fontWeight: 600, letterSpacing: "0.5px", cursor: "pointer", border: active ? "1px solid rgba(59,130,246,0.5)" : "1px solid transparent", background: active ? "linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%)" : "transparent", color: active ? "#fff" : "#94a3b8", transition: "all .2s ease", whiteSpace: "nowrap", textTransform: "capitalize" });
+const card = { background: "rgba(17,24,39,0.6)", border: "1px solid rgba(148,163,184,0.08)", borderRadius: 10, padding: mob ? 14 : 18, overflow: "hidden", minWidth: 0, backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)" };
+const kpiVal = { fontSize: mob ? 20 : 24, fontWeight: 700, color: "#f1f5f9", lineHeight: 1.2, fontFamily: "'JetBrains Mono', monospace" };
+const kpiLabel = { fontSize: mob ? 9 : 10, color: "#64748b", textTransform: "uppercase", letterSpacing: "1px", marginTop: 6, fontFamily: "'Inter', sans-serif" };
+const alertBanner = { background: "linear-gradient(135deg, rgba(127,29,29,0.6) 0%, rgba(153,27,27,0.4) 100%)", border: "1px solid rgba(220,38,38,0.3)", borderRadius: 8, padding: mob ? "10px 14px" : "12px 18px", marginBottom: 16, display: "flex", alignItems: "center", gap: 12, fontSize: mob ? 11 : 12, color: "#fca5a5", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)" };
 const sectionGrid = mob ? "1fr" : "1fr 1fr";
 
 // ─── RENDER: DETAIL VIEW ──────────────────────────────────────────────────
@@ -410,17 +410,17 @@ return (
 <div style={root}>
 <div style={headerBar}>
 <div style={{ display: "flex", alignItems: "center", gap: mob ? 8 : 10, flexWrap: "wrap", flex: 1, minWidth: 0 }}>
-<div style={{ display: "flex", gap: 2, flexShrink: 0 }}>
-<button onClick={goBack} disabled={!canGoBack} style={{ ...pill(false), border: "1px solid #334155", opacity: canGoBack ? 1 : 0.3, cursor: canGoBack ? "pointer" : "default", padding: mob ? "6px 8px" : "6px 12px" }}>{"\u2190"}</button>
-<button onClick={goForward} disabled={!canGoForward} style={{ ...pill(false), border: "1px solid #334155", opacity: canGoForward ? 1 : 0.3, cursor: canGoForward ? "pointer" : "default", padding: mob ? "6px 8px" : "6px 12px" }}>{"\u2192"}</button>
+<div style={{ display: "flex", gap: 3, flexShrink: 0 }}>
+<button onClick={goBack} disabled={!canGoBack} style={{ ...pill(false), border: "1px solid rgba(148,163,184,0.15)", opacity: canGoBack ? 1 : 0.3, cursor: canGoBack ? "pointer" : "default", padding: mob ? "6px 10px" : "7px 12px", borderRadius: 6 }}>{"\u2190"}</button>
+<button onClick={goForward} disabled={!canGoForward} style={{ ...pill(false), border: "1px solid rgba(148,163,184,0.15)", opacity: canGoForward ? 1 : 0.3, cursor: canGoForward ? "pointer" : "default", padding: mob ? "6px 10px" : "7px 12px", borderRadius: 6 }}>{"\u2192"}</button>
 </div>
-<button onClick={() => navigate(null, "overview", "financials")} style={{ ...pill(false), border: "1px solid #334155", flexShrink: 0 }}>Portfolio</button>
-<div style={{ minWidth: 0, overflow: "hidden" }}>
-<span style={{ fontSize: mob ? 16 : 18, fontWeight: 700, color: "#f1f5f9" }}>{detail.id}</span>
-<span style={{ fontSize: mob ? 11 : 13, color: "#94a3b8", marginLeft: 8 }}>{mob ? "" : detail.name}</span>
+<button onClick={() => navigate(null, "overview", "financials")} style={{ ...pill(false), border: "1px solid rgba(148,163,184,0.15)", flexShrink: 0, borderRadius: 6 }}>Portfolio</button>
+<div style={{ minWidth: 0, overflow: "hidden", display: "flex", alignItems: "baseline", gap: 8 }}>
+<span style={{ fontSize: mob ? 16 : 19, fontWeight: 800, color: "#f1f5f9", letterSpacing: "-0.3px" }}>{detail.id}</span>
+<span style={{ fontSize: mob ? 11 : 13, color: "#64748b", fontWeight: 500 }}>{mob ? "" : detail.name}</span>
 </div>
-{getWatchlistStatus(detail).active && <span style={{ background: "#7f1d1d", color: "#fca5a5", fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 3, textTransform: "uppercase", letterSpacing: "0.5px", flexShrink: 0 }}>{"\u26A0"} WATCHLIST</span>}
-{!getWatchlistStatus(detail).active && <span style={{ background: "#052e16", color: "#86efac", fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 3, textTransform: "uppercase", letterSpacing: "0.5px", flexShrink: 0 }}>{"\u2713"} ACTIVE</span>}
+{getWatchlistStatus(detail).active && <span style={{ background: "rgba(127,29,29,0.5)", color: "#fca5a5", fontSize: 10, fontWeight: 700, padding: "4px 10px", borderRadius: 20, textTransform: "uppercase", letterSpacing: "0.5px", flexShrink: 0, border: "1px solid rgba(220,38,38,0.2)" }}>{"\u26A0"} WATCHLIST</span>}
+{!getWatchlistStatus(detail).active && <span style={{ background: "rgba(5,46,22,0.5)", color: "#86efac", fontSize: 10, fontWeight: 700, padding: "4px 10px", borderRadius: 20, textTransform: "uppercase", letterSpacing: "0.5px", flexShrink: 0, border: "1px solid rgba(34,197,94,0.2)" }}>{"\u2713"} ACTIVE</span>}
 </div>
 <div style={{ display: "flex", gap: mob ? 4 : 6, overflowX: "auto", WebkitOverflowScrolling: "touch", width: mob ? "100%" : "auto", marginTop: mob ? 2 : 0, paddingBottom: mob ? 2 : 0 }}>
 {["financials", "ratings", "filings", "news", "research", "earnings"].map((t) => (
@@ -441,9 +441,10 @@ return (
         { l: detail.fcf > 0 ? "Adj. Cash Flow / Qtr" : "Cash Burn / Qtr", v: detail.fcf > 0 ? `+${fmt(Math.abs(detail.cashBurnQtr) * 1e6)}` : fmt(detail.cashBurnQtr * 1e6), c: detail.fcf > 0 ? "#22c55e" : "#ef4444" },
         { l: "Current Ratio", v: `${fmtNum(detail.currentRatio)}x`, c: detail.currentRatio >= 1.5 ? "#22c55e" : detail.currentRatio >= 1 ? "#eab308" : "#ef4444" },
       ].map((k, i) => (
-        <div key={i} style={card}>
-          <div style={{ ...kpiVal, fontSize: 16, color: k.c || "#f1f5f9" }}>{k.v}</div>
-          {k.sub && <div style={{ fontSize: 11, color: k.c, marginTop: 2 }}>{k.sub}</div>}
+        <div key={i} style={{ ...card, position: "relative", overflow: "hidden", animation: "fadeIn 0.3s ease forwards", animationDelay: `${i * 30}ms`, opacity: 0 }}>
+          <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: k.c || "#3b82f6", opacity: 0.5 }} />
+          <div style={{ ...kpiVal, fontSize: mob ? 15 : 17, color: k.c || "#f1f5f9", marginTop: 4 }}>{k.v}</div>
+          {k.sub && <div style={{ fontSize: 11, color: k.c, marginTop: 2, fontWeight: 600 }}>{k.sub}</div>}
           <div style={kpiLabel}>{k.l}</div>
         </div>
       ))}
@@ -1857,14 +1858,15 @@ return (
 <div style={root}>
 <div style={headerBar}>
 <div style={{ display: "flex", alignItems: "center", gap: mob ? 6 : 16, flex: 1, minWidth: 0 }}>
-<div style={{ display: "flex", gap: 2, flexShrink: 0 }}>
-<button onClick={goBack} disabled={!canGoBack} style={{ ...pill(false), border: "1px solid #334155", opacity: canGoBack ? 1 : 0.3, cursor: canGoBack ? "pointer" : "default", padding: mob ? "6px 8px" : "6px 12px" }}>{"\u2190"}</button>
-<button onClick={goForward} disabled={!canGoForward} style={{ ...pill(false), border: "1px solid #334155", opacity: canGoForward ? 1 : 0.3, cursor: canGoForward ? "pointer" : "default", padding: mob ? "6px 8px" : "6px 12px" }}>{"\u2192"}</button>
+<div style={{ display: "flex", gap: 3, flexShrink: 0 }}>
+<button onClick={goBack} disabled={!canGoBack} style={{ ...pill(false), border: "1px solid rgba(148,163,184,0.15)", opacity: canGoBack ? 1 : 0.3, cursor: canGoBack ? "pointer" : "default", padding: mob ? "6px 10px" : "7px 12px", borderRadius: 6 }}>{"\u2190"}</button>
+<button onClick={goForward} disabled={!canGoForward} style={{ ...pill(false), border: "1px solid rgba(148,163,184,0.15)", opacity: canGoForward ? 1 : 0.3, cursor: canGoForward ? "pointer" : "default", padding: mob ? "6px 10px" : "7px 12px", borderRadius: 6 }}>{"\u2192"}</button>
 </div>
-<div style={{ fontSize: mob ? 13 : 16, fontWeight: 800, letterSpacing: "-0.5px", color: "#f1f5f9", whiteSpace: "nowrap" }}>
-<span style={{ color: "#ef4444" }}>{"\u25C6"}</span> CREDIT RISK MONITOR
+<div style={{ fontSize: mob ? 14 : 17, fontWeight: 800, letterSpacing: "-0.5px", color: "#f1f5f9", whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 8 }}>
+<span style={{ color: "#ef4444", fontSize: mob ? 12 : 14, filter: "drop-shadow(0 0 6px rgba(239,68,68,0.4))" }}>{"\u25C6"}</span>
+<span>CREDIT RISK MONITOR</span>
 </div>
-{!mob && <div style={{ fontSize: 10, color: "#475569", borderLeft: "1px solid #334155", paddingLeft: 12 }}>
+{!mob && <div style={{ fontSize: 10, color: "#64748b", borderLeft: "1px solid rgba(148,163,184,0.1)", paddingLeft: 14, fontVariantNumeric: "tabular-nums" }}>
 {now.toLocaleDateString("en-US", { weekday: "short", year: "numeric", month: "short", day: "numeric" })} {"\u00B7"} {now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
 </div>}
 </div>
@@ -1884,16 +1886,17 @@ return (
   </div>
 
   {/* KPIs */}
-  <div style={{ display: "grid", gridTemplateColumns: mob ? "repeat(2, 1fr)" : tablet ? "repeat(3, 1fr)" : "repeat(5, 1fr)", gap: mob ? 8 : 12, padding: `0 ${px}px 16px` }}>
+  <div style={{ display: "grid", gridTemplateColumns: mob ? "repeat(2, 1fr)" : tablet ? "repeat(3, 1fr)" : "repeat(5, 1fr)", gap: mob ? 8 : 12, padding: `0 ${px}px 20px` }}>
     {[
-      { l: "Total Exposure", v: fmt(totalExposure) },
-      { l: "Credits Tracked", v: enrichedPortfolio.length },
-      { l: "Agency Rated", v: `${enrichedPortfolio.filter(c => c.sp !== "NR").length} / ${enrichedPortfolio.length}`, c: enrichedPortfolio.filter(c => c.sp !== "NR").length === enrichedPortfolio.length ? "#22c55e" : "#eab308" },
-      { l: "Neg. / Developing Outlook", v: negOutlook, c: "#ef4444" },
-      { l: "Negative FCF", v: `${negFcfCount} / ${enrichedPortfolio.length}`, c: "#ef4444" },
+      { l: "Total Exposure", v: fmt(totalExposure), accent: "#3b82f6" },
+      { l: "Credits Tracked", v: enrichedPortfolio.length, accent: "#8b5cf6" },
+      { l: "Agency Rated", v: `${enrichedPortfolio.filter(c => c.sp !== "NR").length} / ${enrichedPortfolio.length}`, c: enrichedPortfolio.filter(c => c.sp !== "NR").length === enrichedPortfolio.length ? "#22c55e" : "#eab308", accent: "#eab308" },
+      { l: "Neg. / Developing Outlook", v: negOutlook, c: "#ef4444", accent: "#ef4444" },
+      { l: "Negative FCF", v: `${negFcfCount} / ${enrichedPortfolio.length}`, c: "#ef4444", accent: "#ef4444" },
     ].map((k, i) => (
-      <div key={i} style={card}>
-        <div style={{ ...kpiVal, color: k.c || "#f1f5f9" }}>{k.v}</div>
+      <div key={i} style={{ ...card, position: "relative", overflow: "hidden", transition: "border-color .2s ease, transform .2s ease" }}>
+        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: k.accent || "#3b82f6", opacity: 0.6 }} />
+        <div style={{ ...kpiVal, color: k.c || "#f1f5f9", marginTop: 4 }}>{k.v}</div>
         <div style={kpiLabel}>{k.l}</div>
       </div>
     ))}
@@ -1905,7 +1908,7 @@ return (
         /* ─── MOBILE: Card layout ─── */
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {enrichedPortfolio.map((c) => (
-            <div key={c.id} onClick={() => { navigate(c.id, tab, "financials"); }} style={{ ...card, cursor: "pointer", padding: 14 }}>
+            <div key={c.id} onClick={() => { navigate(c.id, tab, "financials"); }} style={{ ...card, cursor: "pointer", padding: 16, transition: "border-color .2s ease", borderColor: getWatchlistStatus(c).active ? "rgba(239,68,68,0.15)" : "rgba(148,163,184,0.08)" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
                 <div>
                   <span style={{ fontWeight: 700, fontSize: 16 }}>{c.id}</span>
@@ -1954,15 +1957,15 @@ return (
           <thead>
             <tr>
               {[["Company","16%"],["Exposure","10%"],["Implied Rtg","9%"],["Outlook","9%"],["CDS 5Y","10%"],["Spread","9%"],["LTM Cash Flow","9%"],["Liquidity","9%"],["Equity","9%"],["Rev","7%"],["","3%"]].map(([h,w],i) => (
-                <th key={i} style={{ width: w, padding: "10px 8px", fontSize: 10, color: "#64748b", borderBottom: "1px solid #1e293b", textTransform: "uppercase", fontWeight: 600, letterSpacing: "0.5px", textAlign: "left" }}>{h}</th>
+                <th key={i} style={{ width: w, padding: "12px 10px", fontSize: 10, color: "#64748b", borderBottom: "1px solid rgba(148,163,184,0.08)", textTransform: "uppercase", fontWeight: 600, letterSpacing: "0.8px", textAlign: "left", background: "rgba(6,10,20,0.5)" }}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {enrichedPortfolio.map((c) => (
-              <tr key={c.id} onClick={() => { navigate(c.id, tab, "financials"); }} style={{ cursor: "pointer", borderBottom: "1px solid #1e293b", transition: "background .1s" }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = "#1e293b")}
-                onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+              <tr key={c.id} onClick={() => { navigate(c.id, tab, "financials"); }} style={{ cursor: "pointer", borderBottom: "1px solid rgba(148,163,184,0.06)", transition: "all .15s ease" }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(30,41,59,0.5)"; e.currentTarget.style.transform = "scale(1.002)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.transform = "scale(1)"; }}
               >
                 <td style={{ padding: "10px 8px" }}>
                   <div style={{ fontWeight: 700, fontSize: 13 }}>{c.id} {getWatchlistStatus(c).active && <span style={{ color: "#ef4444", fontSize: 11 }}>{"\u26A0"}</span>}</div>
@@ -2146,10 +2149,12 @@ return (
           </div>
           <div style={{ display: "grid", gridTemplateColumns: mob ? "1fr 1fr" : "repeat(4, 1fr)", gap: 8, minWidth: 0 }}>
             {Object.entries(marketData).map(([ticker, q]) => (
-              <div key={ticker} style={{ padding: "10px 12px", background: "#0a0e1a", borderRadius: 6, cursor: "pointer" }} onClick={() => { navigate(ticker, tab, "financials"); }}>
-                <div style={{ fontSize: 13, fontWeight: 700 }}>{ticker}</div>
-                <div style={{ fontSize: 18, fontWeight: 800, color: "#f1f5f9", marginTop: 2 }}>${q.price}</div>
-                <div style={{ fontSize: 11, fontWeight: 700, color: q.changePct >= 0 ? "#22c55e" : "#ef4444", marginTop: 2 }}>
+              <div key={ticker} style={{ padding: "12px 14px", background: "rgba(6,10,20,0.6)", borderRadius: 8, cursor: "pointer", border: "1px solid rgba(148,163,184,0.06)", transition: "all .2s ease" }} onClick={() => { navigate(ticker, tab, "financials"); }}
+                onMouseEnter={(e) => { e.currentTarget.style.borderColor = "rgba(59,130,246,0.2)"; e.currentTarget.style.background = "rgba(15,23,42,0.8)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.borderColor = "rgba(148,163,184,0.06)"; e.currentTarget.style.background = "rgba(6,10,20,0.6)"; }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "#94a3b8", letterSpacing: "0.5px" }}>{ticker}</div>
+                <div style={{ fontSize: 20, fontWeight: 800, color: "#f1f5f9", marginTop: 4, fontFamily: "'JetBrains Mono', monospace" }}>${q.price}</div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: q.changePct >= 0 ? "#22c55e" : "#ef4444", marginTop: 4, fontFamily: "'JetBrains Mono', monospace" }}>
                   {q.changePct >= 0 ? "+" : ""}{q.changePct?.toFixed(2)}%
                 </div>
               </div>
@@ -2164,9 +2169,9 @@ return (
   {tab === "news" && (
     <div style={{ padding: `0 ${px}px 24px`, minWidth: 0, maxWidth: "100%" }}>
       <div style={card}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: "#94a3b8", marginBottom: 16, textTransform: "uppercase", letterSpacing: "0.5px" }}>Portfolio News Feed</div>
+        <div style={{ fontSize: 12, fontWeight: 700, color: "#94a3b8", marginBottom: 16, textTransform: "uppercase", letterSpacing: "1px" }}>Portfolio News Feed</div>
         {allNews.map((n, i) => (
-          <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "12px 0", borderBottom: i < allNews.length - 1 ? "1px solid #1e293b" : "none" }}>
+          <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "14px 0", borderBottom: i < allNews.length - 1 ? "1px solid rgba(148,163,184,0.06)" : "none", transition: "background .15s ease" }}>
             <div style={{ width: 8, height: 8, borderRadius: "50%", background: sentimentColor(n.sentiment), marginTop: 5, flexShrink: 0 }} />
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.5 }}>{n.headline}</div>
