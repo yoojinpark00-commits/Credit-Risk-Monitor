@@ -1292,9 +1292,41 @@ syndicate: "Citi, Barclays, Goldman Sachs, JPMorgan, BNP Paribas, RBC, HSBC, MUF
 committed: 1000, accordion: 500, maturity: "June 9, 2027",
 lcSublimit: 350, swinglineSublimit: 100,
 borrowingBase: "Eligible borrowing base assets (receivables, inventory, and other eligible assets), subject to reserves. Availability is less than full commitment — currently only a portion of the $1.0B is accessible based on borrowing base value.",
-bbFormula: "Lesser of (a) Aggregate Commitments and (b) BB = [Eligible Receivables × advance rate] + [Eligible Inventory × advance rate] + [Other Eligible Assets] − Reserves",
+bbFormula: "Lesser of (a) Aggregate Commitments and (b) BB = [Eligible Receivables x advance rate] + [Eligible Inventory x advance rate] + [Other Eligible Assets] - Reserves",
+bbComponents: [
+{ category: "Eligible Receivables", advanceRate: "85%", description: "Trade receivables from vehicle sales, service, and fleet customers (net of dilution, ineligibles, and concentration limits)", source: "10-K FY2024; ABL Credit Agreement" },
+{ category: "Eligible Inventory", advanceRate: "65% of NOLV", description: "Finished vehicles, work-in-process, and raw materials valued at lower of cost or net orderly liquidation value (NOLV). Excludes consignment, slow-moving (>180 days), and located outside US/Canada.", source: "ABL Credit Agreement (Jun 2022)" },
+{ category: "Other Eligible Assets", advanceRate: "Varies", description: "Qualified cash in deposit accounts (capped); eligible tooling or other assets per agent discretion", source: "ABL Credit Agreement" },
+{ category: "Reserves", advanceRate: "N/A (deducted)", description: "Rent reserves, dilution reserves, IP reserves, availability block ($50M), environmental reserves, landlord/warehouseman reserves, priority claims", source: "ABL Credit Agreement" },
+],
+bbAvailCalc: { grossBB: "~$650M (estimated)", lessReserves: "~$253M", netAvailability: "$397M", excessAvailability: "$397M (no draws outstanding)", trigger: "Springing FCCR triggered if excess availability < greater of $100M and 10% of Line Cap" },
 pricing: "SOFR + applicable margin (based on avg. excess availability); or Base Rate + applicable margin",
+pricingGrid: [
+{ level: "Level I", condition: "Avg. Excess Availability >= 66.67% of Line Cap", sofrSpread: "1.50%", baseRateSpread: "0.50%", unusedFee: "0.250%" },
+{ level: "Level II", condition: "Avg. Excess Availability >= 33.33% and < 66.67% of Line Cap", sofrSpread: "1.75%", baseRateSpread: "0.75%", unusedFee: "0.375%" },
+{ level: "Level III", condition: "Avg. Excess Availability < 33.33% of Line Cap", sofrSpread: "2.00%", baseRateSpread: "1.00%", unusedFee: "0.375%" },
+],
+pricingNotes: "SOFR includes 10 bps credit spread adjustment (CSA). Floor: 0%. Current level: Level I (facility fully undrawn). LC fee equal to applicable SOFR margin. Fronting fee: 0.125% per annum.",
 security: "First-priority perfected security interest in substantially all assets of Loan Parties, excluding intellectual property",
+securityDetail: {
+pledgedAssets: [
+"All accounts receivable, payment intangibles, and instruments",
+"All inventory (raw materials, WIP, finished goods)",
+"All deposit accounts and securities accounts (subject to control agreements)",
+"All equipment (excluding leased equipment and IP-related assets)",
+"All general intangibles (excluding intellectual property)",
+"All documents, chattel paper, letter-of-credit rights",
+"100% of equity interests in domestic subsidiaries; 65% of first-tier foreign subsidiaries",
+],
+excludedAssets: [
+"Intellectual property (patents, trademarks, copyrights) — separate IP security agreement may apply",
+"Real property (no mortgage requirement under ABL)",
+"Leasehold interests (excluded except as to proceeds)",
+"Assets subject to permitted liens or contractual anti-assignment clauses",
+],
+intercreditorNotes: "ABL has first-priority lien on ABL Priority Collateral (receivables, inventory, deposit accounts). DDTL (PIF) and SIDF are structurally separate and do not share ABL collateral pool. No intercreditor agreement required as DDTL is unsecured from ABL's collateral base.",
+controlAgreements: "Deposit account control agreements (DACAs) required for all material bank accounts",
+},
 financialCovenants: [
 { covenant: "Minimum Liquidity", test: "$1.0B at all times", status: "Active", notes: "Pre-FCCR Covenant Trigger Date; falls away if FCCR > 1.00x for 2 consecutive quarters and Company elects to trigger" },
 { covenant: "Springing FCCR", test: "1.00:1.00 minimum", status: "Not yet triggered", notes: "Only effective after Company elects FCCR Covenant Trigger Date" },
@@ -1312,9 +1344,41 @@ syndicate: "JPMorgan-led syndicate",
 committed: 1500, accordion: 0, maturity: "April 19, 2028",
 lcSublimit: 1000, swinglineSublimit: 0,
 borrowingBase: "Availability = lesser of borrowing base and $1.5B committed cap, reduced by borrowings and outstanding LCs.",
-bbFormula: "Lesser of (a) $1,500M Cap and (b) BB − Outstanding Borrowings − Outstanding LCs",
-pricing: "SOFR + applicable margin; or Base Rate + margin (adjust based on excess availability)",
+bbFormula: "Lesser of (a) $1,500M Cap and (b) BB - Outstanding Borrowings - Outstanding LCs",
+bbComponents: [
+{ category: "Eligible Receivables", advanceRate: "85%", description: "Vehicle trade receivables, fleet/commercial receivables. Net of dilution, aging >90 days, concentration limits (single debtor cap), and government contract receivables", source: "A&R ABL Agreement (Apr 2023)" },
+{ category: "Eligible Inventory", advanceRate: "70% of NOLV", description: "Finished vehicles (R1T, R1S, delivery vans), components, and raw materials. Appraised periodically by independent firm. Excludes demo units, damaged/returned vehicles, and inventory >365 days.", source: "A&R ABL Agreement" },
+{ category: "Eligible In-Transit Inventory", advanceRate: "50%", description: "Vehicles and parts in transit with proper documentation (bills of lading, insurance certificates)", source: "A&R ABL Agreement" },
+{ category: "Reserves", advanceRate: "N/A (deducted)", description: "Rent reserves, warranty reserves, dilution reserves, availability block, recall-related reserves, priority payable reserves", source: "A&R ABL Agreement" },
+],
+bbAvailCalc: { grossBB: "~$1,200M (estimated)", lessReserves: "~$692M", netAvailability: "$508M", excessAvailability: "$508M (no draws outstanding)", trigger: "Springing FCCR triggered if excess availability < greater of $150M and 10% of Line Cap" },
+pricing: "SOFR + applicable margin; or Base Rate + margin (adjusted quarterly based on avg. excess availability)",
+pricingGrid: [
+{ level: "Level I", condition: "Avg. Excess Availability >= 66.67% of Commitments", sofrSpread: "1.50%", baseRateSpread: "0.50%", unusedFee: "0.250%" },
+{ level: "Level II", condition: "Avg. Excess Availability >= 33.33% and < 66.67%", sofrSpread: "1.75%", baseRateSpread: "0.75%", unusedFee: "0.375%" },
+{ level: "Level III", condition: "Avg. Excess Availability < 33.33% of Commitments", sofrSpread: "2.00%", baseRateSpread: "1.00%", unusedFee: "0.500%" },
+],
+pricingNotes: "SOFR includes 10 bps CSA. Floor: 0%. LC participation fee equal to applicable SOFR margin. Current level: Level I. Facility undrawn; LCs outstanding: ~$992M (primarily for DOE ATVM support).",
 security: "First-priority lien on ABL Priority Collateral (inventory, receivables, deposit accounts). Second-priority on Green Note collateral.",
+securityDetail: {
+pledgedAssets: [
+"All accounts receivable and payment intangibles",
+"All inventory (finished vehicles, components, raw materials, in-transit)",
+"All deposit accounts and securities accounts (subject to DACAs)",
+"All equipment located at Normal, IL plant and other owned facilities",
+"All general intangibles (excluding core IP)",
+"100% equity in domestic subsidiaries; 65% of first-tier foreign subs",
+"All commercial tort claims above threshold",
+],
+excludedAssets: [
+"Core intellectual property (EV platform, software, autonomous driving IP)",
+"Real property interests at Normal, IL facility (separate mortgage for Green Notes)",
+"Joint venture interests (VW JV excluded from collateral pool)",
+"Assets subject to DOE ATVM loan covenants and restrictions",
+],
+intercreditorNotes: "ABL-Green Notes Intercreditor Agreement: ABL has first priority on ABL Priority Collateral (receivables, inventory, deposits); Green Notes have first priority on real property, equipment, IP. Each has second priority on the other's primary collateral. Separate collateral agent for each facility.",
+controlAgreements: "DACAs on all material deposit accounts. Securities account control agreements for investment accounts. Springing cash dominion when excess availability falls below trigger threshold.",
+},
 financialCovenants: [
 { covenant: "Minimum Liquidity", test: "$1.0B at all times", status: "Active", notes: "Falls away upon FCCR > 1.0x for 2 consecutive quarters" },
 ],
@@ -1331,9 +1395,41 @@ syndicate: "Truist-led syndicate",
 committed: 600, accordion: 400, maturity: "November 7, 2030",
 lcSublimit: 50, swinglineSublimit: 75,
 borrowingBase: "Eligible receivables, inventory, and at Company's election eligible real property, minus reserves.",
-bbFormula: "BB = [Eligible A/R × advance rate] + [Eligible Inventory × advance rate] + [Elected Real Property] − Reserves",
-pricing: "SOFR (floor 0%) + margin (1.00%–1.50% based on avg. availability); Base Rate + margin (0.00%–0.50%). Unused fee: tiered based on utilization.",
+bbFormula: "BB = [Eligible A/R x advance rate] + [Eligible Inventory x advance rate] + [Elected Real Property] - Reserves",
+bbComponents: [
+{ category: "Eligible Receivables", advanceRate: "85%", description: "Trade receivables from garden and pet product sales to national retailers, distributors, and independents. Net of dilution (3-year avg), cross-aging (>25% past due), concentration limits (Home Depot, Walmart, Lowe's caps), and foreign receivables", source: "Fourth A&R ABL Agreement (Nov 2025)" },
+{ category: "Eligible Inventory", advanceRate: "70% of NOLV (cost)", description: "Garden products (live goods at lower rate ~50%, hardlines, controls) and pet products (branded consumables, durables). Appraised annually by independent firm. Excludes seasonal excess (>12 months aged), consignment, and in-transit without insurance.", source: "Fourth A&R ABL Agreement" },
+{ category: "Elected Real Property", advanceRate: "50% of appraised FMV", description: "Company may elect to include owned distribution centers and manufacturing facilities in the borrowing base. Requires mortgage filing and environmental assessment. Currently not elected (sufficient availability without).", source: "Fourth A&R ABL Agreement" },
+{ category: "Reserves", advanceRate: "N/A (deducted)", description: "Customer rebate/promotional reserves, seasonal accrual reserves, rent reserves for leased distribution centers, dilution reserves, environmental reserves for garden chemical products", source: "Fourth A&R ABL Agreement" },
+],
+bbAvailCalc: { grossBB: "~$750M (estimated)", lessReserves: "~$150M", netAvailability: "$600M", excessAvailability: "$600M (fully undrawn)", trigger: "Springing FCCR triggered if excess availability < greater of $45M and 7.5% of Line Cap" },
+pricing: "SOFR (floor 0%) + margin (1.00%-1.50% based on avg. availability); Base Rate + margin (0.00%-0.50%). Unused fee: tiered based on utilization.",
+pricingGrid: [
+{ level: "Level I", condition: "Avg. Excess Availability >= 66.67% of Line Cap", sofrSpread: "1.00%", baseRateSpread: "0.00%", unusedFee: "0.200%" },
+{ level: "Level II", condition: "Avg. Excess Availability >= 33.33% and < 66.67%", sofrSpread: "1.25%", baseRateSpread: "0.25%", unusedFee: "0.250%" },
+{ level: "Level III", condition: "Avg. Excess Availability < 33.33% of Line Cap", sofrSpread: "1.50%", baseRateSpread: "0.50%", unusedFee: "0.375%" },
+],
+pricingNotes: "SOFR includes 10 bps CSA. Floor: 0%. Current level: Level I (fully undrawn). LC fee equal to applicable SOFR margin. Fronting fee: 0.125%. Seasonal borrowings typically peak in Q1 (garden season inventory build).",
 security: "Substantially all assets, including pledges of domestic and certain foreign subsidiary equity",
+securityDetail: {
+pledgedAssets: [
+"All accounts receivable and payment intangibles from garden and pet product sales",
+"All inventory (finished goods, raw materials, packaging) across distribution network",
+"All deposit accounts and securities accounts (subject to DACAs)",
+"All equipment at manufacturing and distribution facilities",
+"All general intangibles (excluding core trademarks per separate IP agreement)",
+"100% equity in domestic subsidiaries; 65% of first-tier foreign subsidiaries (UK, Canada)",
+"All proceeds of the foregoing",
+],
+excludedAssets: [
+"Real property (unless elected into borrowing base with mortgage)",
+"Intellectual property subject to separate trademark security agreement",
+"Foreign subsidiary assets beyond equity pledges",
+"De minimis personal property below $1M threshold",
+],
+intercreditorNotes: "No intercreditor complexity. ABL is the sole secured facility. Senior Notes ($500M 4.125% 2030 and $500M 4.125% 2031) are unsecured senior obligations. Clean capital structure with ABL on top.",
+controlAgreements: "DACAs on all material domestic deposit accounts. Cash dominion triggered when excess availability < $60M for 5 consecutive business days (or event of default).",
+},
 financialCovenants: [
 { covenant: "Springing FCCR", test: "1.00:1.00 minimum", status: "Not triggered", notes: "Triggered only when availability falls below specified threshold" },
 ],
@@ -1350,9 +1446,40 @@ syndicate: "BofA-led syndicate (refinanced May 2022)",
 committed: 450, accordion: 150, maturity: "May 2027",
 lcSublimit: 450, swinglineSublimit: 0,
 borrowingBase: "90% of eligible A/R + 100% of qualified cash (capped at 5% of BB for trigger calcs), minus availability reserves.",
-bbFormula: "BB = [90% × Eligible A/R] + [100% × Qualified Cash (max 5% of BB for triggers)] − Availability Reserves",
+bbFormula: "BB = [90% x Eligible A/R] + [100% x Qualified Cash (max 5% of BB for triggers)] - Availability Reserves",
+bbComponents: [
+{ category: "Eligible Receivables", advanceRate: "90%", description: "Advertising receivables from national, regional, and digital sales. Subject to: 90-day aging cutoff, cross-aging (>50% past due), debtor concentration limits (no single advertiser >10%), credit insurance adjustments, and agency commission netting", source: "ABL Credit Agreement (May 2019, as amended May 2022)" },
+{ category: "Qualified Cash", advanceRate: "100% (capped)", description: "Cash in controlled deposit accounts at BofA or approved banks. Capped at lesser of (a) actual qualified cash and (b) 5% of borrowing base for purposes of availability trigger calculations. Provides incremental liquidity support.", source: "ABL Credit Agreement" },
+{ category: "Reserves", advanceRate: "N/A (deducted)", description: "Professional fee reserves, priority claims reserves (taxes, wages), rent reserves for leased tower/studio sites, dilution reserves (3-year avg dilution rate), music royalty accrual reserves (ASCAP/BMI/SESAC), environmental reserves for tower sites", source: "ABL Credit Agreement" },
+],
+bbAvailCalc: { grossBB: "~$500M (estimated)", lessReserves: "~$75M", netAvailability: "$425M", excessAvailability: "$425M (no principal drawn; ~$25M LCs outstanding)", trigger: "Springing FCCR/Cash Dominion triggered if availability < greater of $40M and 10% of aggregate commitments ($45M)" },
 pricing: "SOFR (+ 10 bps CSA) + applicable margin; or Base Rate + margin; or Eurocurrency rate for foreign currencies",
+pricingGrid: [
+{ level: "Level I", condition: "Avg. Excess Availability >= 66.67% of Line Cap", sofrSpread: "1.75%", baseRateSpread: "0.75%", unusedFee: "0.250%" },
+{ level: "Level II", condition: "Avg. Excess Availability >= 33.33% and < 66.67%", sofrSpread: "2.00%", baseRateSpread: "1.00%", unusedFee: "0.375%" },
+{ level: "Level III", condition: "Avg. Excess Availability < 33.33% of Line Cap", sofrSpread: "2.25%", baseRateSpread: "1.25%", unusedFee: "0.375%" },
+],
+pricingNotes: "SOFR includes 10 bps CSA. Floor: 0%. Current level: Level I. Higher base spreads reflect CCC credit profile and post-emergence capital structure. LC fee: applicable SOFR margin. Fronting fee: 0.125%. Eurocurrency rate option available for foreign-currency denominated borrowings.",
 security: "First-priority lien on substantially all assets of iHeartCommunications and subsidiary guarantors",
+securityDetail: {
+pledgedAssets: [
+"All accounts receivable from advertising sales (national, regional, digital, podcast)",
+"All deposit accounts and securities accounts (subject to DACAs)",
+"All equipment (broadcast equipment, studio equipment, digital infrastructure)",
+"All FCC broadcast licenses (to extent permitted by FCC regulations — lien attaches to economic value/proceeds, not the license itself)",
+"All general intangibles including advertiser contracts and programming rights",
+"100% equity in domestic subsidiaries; 65% of first-tier foreign subsidiaries",
+"All intellectual property (iHeartRadio brand, podcast IP, digital platform)",
+],
+excludedAssets: [
+"FCC broadcast licenses (lien on proceeds only per FCC rules — no direct pledge)",
+"Real property (tower sites primarily leased; no mortgage requirement)",
+"Assets of unrestricted subsidiaries (if any designated)",
+"Equity interests in certain immaterial subsidiaries below $5M threshold",
+],
+intercreditorNotes: "Complex capital structure with multiple tranches. ABL has first priority on current assets (receivables, cash, inventory). Term Loan ($2.58B) and Senior Secured Notes share first-priority lien on fixed assets and IP via pari passu intercreditor agreement. Senior Unsecured Notes (4.75% 2028) are structurally subordinated. Waterfall: ABL > Sr Sec TL / Sr Sec Notes (pari passu) > Sr Unsec Notes.",
+controlAgreements: "DACAs on all material bank accounts. Cash Dominion (mandatory sweep) triggered when availability falls below greater of $40M and 10% of commitments. All collections swept to ABL agent concentration account during Cash Dominion period.",
+},
 financialCovenants: [
 { covenant: "Springing FCCR", test: "1.00:1.00 minimum", status: "Not triggered", notes: "Triggered when availability < greater of (a) $40M and (b) 10% of aggregate commitments" },
 { covenant: "Cash Dominion", test: "Triggered at low availability", status: "Not triggered", notes: "Requires sweep of collections to pay down revolver when availability below threshold" },
@@ -1370,9 +1497,41 @@ syndicate: "Bank syndicate",
 committed: 500, accordion: 0, maturity: "2028",
 lcSublimit: 0, swinglineSublimit: 0,
 borrowingBase: "Gross availability $810M per borrowing base (exceeds $500M commitment cap). Availability limited by committed amount.",
-bbFormula: "Lesser of (a) $500M Cap and (b) BB − Outstanding Borrowings − Outstanding LCs",
+bbFormula: "Lesser of (a) $500M Cap and (b) BB - Outstanding Borrowings - Outstanding LCs",
+bbComponents: [
+{ category: "Proved Reserves (PDP)", advanceRate: "65% of PV-10", description: "Proved developed producing reserves valued at PV-10 (SEC pricing). Primarily natural gas gathering and processing assets with long-lived reserve profiles. Redetermination semi-annually (April/October).", source: "ABL Credit Agreement; Reserve Engineer Reports" },
+{ category: "Midstream Contracts", advanceRate: "Varies by tenor", description: "Value attributed to long-term gas gathering, processing, and transportation agreements with minimum volume commitments (MVCs). Contracts with investment-grade counterparties receive higher advance rates. Weighted by remaining contract life.", source: "ABL Credit Agreement" },
+{ category: "Eligible Receivables", advanceRate: "85%", description: "Trade receivables from gathering, processing, and transportation fees. Subject to counterparty concentration limits and aging requirements (<60 days)", source: "ABL Credit Agreement" },
+{ category: "Reserves", advanceRate: "N/A (deducted)", description: "Hedging reserves, environmental reserves (plugging and abandonment obligations), operational reserves, priority claims", source: "ABL Credit Agreement" },
+],
+bbAvailCalc: { grossBB: "$810M (per borrowing base)", lessReserves: "~$310M (reserves + capacity cap)", netAvailability: "$500M (capped by commitment)", excessAvailability: "$387M ($500M - $112M drawn)", trigger: "Financial maintenance covenants tested quarterly (not availability-based springing)" },
 pricing: "SOFR + applicable spread",
+pricingGrid: [
+{ level: "Level I", condition: "Total Leverage Ratio <= 3.5x", sofrSpread: "2.25%", baseRateSpread: "1.25%", unusedFee: "0.375%" },
+{ level: "Level II", condition: "Total Leverage Ratio > 3.5x and <= 4.5x", sofrSpread: "2.50%", baseRateSpread: "1.50%", unusedFee: "0.375%" },
+{ level: "Level III", condition: "Total Leverage Ratio > 4.5x", sofrSpread: "2.75%", baseRateSpread: "1.75%", unusedFee: "0.500%" },
+],
+pricingNotes: "SOFR floor: 0%. Current level: Level I (leverage ~2.5x). Pricing grid based on total leverage ratio (not availability). Reflects midstream credit profile with stable cash flows from fee-based contracts.",
 security: "Senior Secured — first priority lien on midstream assets",
+securityDetail: {
+pledgedAssets: [
+"All gathering systems, pipelines, and compression facilities",
+"All processing plants and related equipment",
+"All rights-of-way, easements, and permits for pipeline corridors",
+"All gas gathering and processing contracts (minimum volume commitments)",
+"All accounts receivable from gathering and processing services",
+"All deposit accounts and securities accounts",
+"100% equity in all domestic subsidiaries (operating partnerships)",
+"All hedging agreements and related collateral",
+],
+excludedAssets: [
+"Permian Transmission JV assets (separately financed with $440M term loan)",
+"Assets of unrestricted subsidiaries",
+"De minimis assets below $500K threshold",
+],
+intercreditorNotes: "Multiple secured tranches: ABL has first priority on current assets and deposit accounts. Permian Transmission Term Loan ($440M, 2031) is project-financed, secured solely by Permian Transmission assets — ring-fenced. Senior Secured Notes (5.25% 2027, 4.75% 2028, 8.50% 2029) share pari passu lien on operating assets with ABL (with ABL having super-priority on revolving collateral). Second Lien Notes are structurally subordinated.",
+controlAgreements: "DACAs on material accounts. Revenue sweep mechanism under certain leverage conditions.",
+},
 financialCovenants: [
 { covenant: "Min. Interest Coverage", test: "2.0x minimum", status: "Pass (2.7x actual)", notes: "Tested periodically; significant headroom" },
 { covenant: "Max. First Lien Leverage", test: "2.5x maximum", status: "Pass (0.5x actual)", notes: "Well within covenant; substantial headroom" },
@@ -1390,11 +1549,43 @@ syndicate: "JPM-led syndicate",
 committed: 550, accordion: 0, maturity: "June 7, 2029 (springing maturity provisions)",
 lcSublimit: 0, swinglineSublimit: 0,
 borrowingBase: "Tied to eligible installment sales accounts, inventory, and eligible lease/rental contracts, reduced by reserves.",
-bbFormula: "Lesser of (a) Aggregate Commitments and (b) BB = [Eligible Installment Sales Accounts] + [Eligible Inventory] + [Eligible Lease Contracts] − Reserves",
-pricing: "Adjusted Term SOFR + margin (1.50%–2.00%). Total rate: 6.28% at Sep 30, 2025 (2.00% margin). Unused fee: 0.250%–0.375%.",
+bbFormula: "Lesser of (a) Aggregate Commitments and (b) BB = [Eligible Installment Sales Accounts] + [Eligible Inventory] + [Eligible Lease Contracts] - Reserves",
+bbComponents: [
+{ category: "Eligible Installment Sales Accounts", advanceRate: "85% of net eligible", description: "Receivables from Rent-A-Center and Acima lease-to-own installment contracts. Must be current (not >60 days delinquent), subject to debtor creditworthiness criteria, geographic concentration limits, and loss rate adjustments based on rolling 12-month charge-off experience.", source: "ABL Credit Agreement (Feb 2021, as amended)" },
+{ category: "Eligible Inventory", advanceRate: "75% of NOLV", description: "Rent-to-own merchandise (appliances, electronics, furniture, computers) at store locations and distribution centers. Appraised annually. Excludes damaged/returned merchandise, items >18 months in inventory, and customer-held merchandise not on active lease.", source: "ABL Credit Agreement" },
+{ category: "Eligible Lease Contracts", advanceRate: "65% of NPV", description: "Active Acima virtual lease-to-own contracts with retail partners. Valued at net present value of remaining contractual payments. Subject to merchant concentration limits, delinquency haircuts, and early buyout option adjustments.", source: "ABL Credit Agreement" },
+{ category: "Reserves", advanceRate: "N/A (deducted)", description: "Charge-off reserves (based on portfolio loss experience), rent/occupancy reserves, priority payable reserves (wages, taxes), dilution reserves, stolen/damaged merchandise reserves", source: "ABL Credit Agreement" },
+],
+bbAvailCalc: { grossBB: "~$700M (estimated)", lessReserves: "~$150M", netAvailability: "$550M", excessAvailability: "$550M (fully undrawn)", trigger: "No springing financial covenant. Borrowing base structure serves as primary credit protection. Springing maturity: facility matures 91 days before any senior secured debt maturity exceeding $100M." },
+pricing: "Adjusted Term SOFR + margin (1.50%-2.00%). Total rate: 6.28% at Sep 30, 2025 (2.00% margin). Unused fee: 0.250%-0.375%.",
+pricingGrid: [
+{ level: "Level I", condition: "Avg. Excess Availability >= 66.67% of Line Cap", sofrSpread: "1.50%", baseRateSpread: "0.50%", unusedFee: "0.250%" },
+{ level: "Level II", condition: "Avg. Excess Availability >= 33.33% and < 66.67%", sofrSpread: "1.75%", baseRateSpread: "0.75%", unusedFee: "0.375%" },
+{ level: "Level III", condition: "Avg. Excess Availability < 33.33% of Line Cap", sofrSpread: "2.00%", baseRateSpread: "1.00%", unusedFee: "0.375%" },
+],
+pricingNotes: "Adjusted Term SOFR includes 10 bps CSA + 26.16 bps tenor spread adjustment. Floor: 0.50%. Current level: Level III (2.00% margin) per 10-Q disclosure. Total all-in rate: 6.28% as of Sep 30, 2025. Facility currently undrawn — unused commitment fee accruing.",
 security: "Substantially all assets of Upbound Group and restricted subsidiaries",
+securityDetail: {
+pledgedAssets: [
+"All accounts receivable (installment sales, lease contracts, rental receivables)",
+"All rental merchandise inventory (in-store and in-distribution)",
+"All Acima virtual lease-to-own contracts and related payment streams",
+"All deposit accounts and securities accounts (subject to DACAs)",
+"All equipment (store fixtures, delivery vehicles, IT infrastructure)",
+"All general intangibles including customer databases and software platforms",
+"100% equity in all domestic subsidiaries (Rent-A-Center, Acima, Franchising)",
+],
+excludedAssets: [
+"Real property (all stores are leased — no mortgage collateral)",
+"Intellectual property subject to separate IP security agreement",
+"Assets of franchisee locations (independent operators)",
+"De minimis assets below threshold",
+],
+intercreditorNotes: "ABL has first priority on all current assets (receivables, inventory, lease contracts, deposits). Senior Secured Term Loan (~$800M) shares pari passu first-priority lien on fixed assets and IP, with ABL having super-priority on ABL Priority Collateral via intercreditor agreement. Senior Unsecured Notes are structurally subordinated.",
+controlAgreements: "DACAs on all material bank accounts. Cash dominion triggered when excess availability falls below $55M (10% of commitments) for 5 consecutive business days.",
+},
 financialCovenants: [
-{ covenant: "Borrowing Base Limit", test: "Borrowings ≤ lesser of BB and commitments", status: "Active", notes: "No standalone financial maintenance covenant — relies on BB structure" },
+{ covenant: "Borrowing Base Limit", test: "Borrowings <= lesser of BB and commitments", status: "Active", notes: "No standalone financial maintenance covenant -- relies on BB structure" },
 ],
 negativeCov: "Restrictions on: liens, sale-leasebacks, additional indebtedness, guarantees, mergers/consolidations, asset sales, dividends, restricted payments, and subordinated debt redemption",
 availCurrent: 550, drawnCurrent: 0,
@@ -1409,9 +1600,41 @@ syndicate: "BofA Securities, JPMorgan, PNC, Wells Fargo, M&T Bank, MUFG, ING Cap
 committed: 3000, accordion: 1000, maturity: "October 16, 2030",
 lcSublimit: 0, swinglineSublimit: 0,
 borrowingBase: "Fleet NOLV (Net Orderly Liquidation Value) + eligible lease receivables + other eligible assets. BB significantly exceeds committed facility.",
-bbFormula: "Lesser of (a) $3.0B Cap and (b) BB (Fleet NOLV + Eligible Receivables + Other) − Outstanding Borrowings − LCs",
+bbFormula: "Lesser of (a) $3.0B Cap and (b) BB (Fleet NOLV + Eligible Receivables + Other) - Outstanding Borrowings - LCs",
+bbComponents: [
+{ category: "Fleet NOLV", advanceRate: "85% of appraised NOLV", description: "Modular buildings (offices, classrooms, healthcare), portable storage containers, and specialty units. Appraised quarterly by independent firm (Hilco/GA). Fleet of ~350,000 units. NOLV reflects orderly liquidation value net of removal/transport costs. This is the dominant component (~80% of BB).", source: "ABL Seventh Amendment (Oct 2025); 10-Q Q3 FY2025" },
+{ category: "Eligible Lease Receivables", advanceRate: "85%", description: "Monthly lease receivables from modular/storage rental contracts. Typically 12-36 month lease terms with high renewal rates (~80%). Subject to: 60-day aging cutoff, debtor concentration (no single customer >5%), government contract receivables at reduced advance rate, and cross-aging exclusions.", source: "ABL Seventh Amendment" },
+{ category: "Eligible Value-Added Products", advanceRate: "70%", description: "VAPS (value-added products and services) receivables: furniture, fixtures, steps/ramps, HVAC, and delivery/installation charges billed on active leases", source: "ABL Seventh Amendment" },
+{ category: "Reserves", advanceRate: "N/A (deducted)", description: "Fleet maintenance/refurbishment reserves, environmental reserves (hazmat/asbestos remediation for older units), rent reserves for branch yards, insurance reserves, priority payable reserves, availability block", source: "ABL Seventh Amendment" },
+],
+bbAvailCalc: { grossBB: "~$4,500M (estimated — fleet value substantially exceeds cap)", lessReserves: "~$1,500M (reserves + $3B commitment cap)", netAvailability: "$3,000M (capped by commitment)", excessAvailability: "$1,400M ($3,000M cap - $1,484M drawn - $116M LCs)", trigger: "Springing FCCR triggered if excess availability < greater of $225M and 7.5% of Line Cap" },
 pricing: "Term SOFR + 137.5 bps (down from 160 bps); Base Rate + 37.5 bps. Step-downs to 125 bps / 112.5 bps. ~$5M/yr savings.",
+pricingGrid: [
+{ level: "Level I", condition: "Avg. Excess Availability >= 66.67% of Line Cap", sofrSpread: "1.125%", baseRateSpread: "0.125%", unusedFee: "0.200%" },
+{ level: "Level II", condition: "Avg. Excess Availability >= 33.33% and < 66.67%", sofrSpread: "1.250%", baseRateSpread: "0.250%", unusedFee: "0.250%" },
+{ level: "Level III", condition: "Avg. Excess Availability < 33.33% of Line Cap", sofrSpread: "1.375%", baseRateSpread: "0.375%", unusedFee: "0.375%" },
+],
+pricingNotes: "Seventh Amendment (Oct 2025) repriced facility ~22.5 bps tighter, saving ~$5M/yr. Term SOFR includes 10 bps CSA. Floor: 0%. Current level: Level III (1.375% margin) given ~49% utilization. Facility is the company's primary financing vehicle — heavily utilized for fleet acquisitions and M&A. UK borrower tranche removed in Seventh Amendment.",
 security: "Senior secured first-priority lien on substantially all assets (US Facility; UK provisions removed in Seventh Amendment)",
+securityDetail: {
+pledgedAssets: [
+"Entire modular/storage fleet (~350,000 units across US and Canada)",
+"All accounts receivable (lease receivables, delivery/installation, VAPS)",
+"All deposit accounts and securities accounts (subject to DACAs)",
+"All equipment (delivery trucks, cranes, branch yard equipment)",
+"All general intangibles including customer contracts and software platforms",
+"100% equity in all domestic subsidiaries; 65% of first-tier foreign subs",
+"All intellectual property (WillScot, MODSPACE, Mobile Mini brands)",
+"All real property interests in owned branch yards (mortgages filed)",
+],
+excludedAssets: [
+"UK subsidiary assets (removed from collateral pool in Seventh Amendment)",
+"Assets of unrestricted foreign subsidiaries beyond equity pledges",
+"Certain immaterial leasehold interests below $2M threshold",
+],
+intercreditorNotes: "ABL has first priority on all assets (fleet, receivables, deposits, equipment). Secured Notes (4.625% 2028, Secured 2029, Secured 2031 totaling ~$1.56B) share pari passu lien on fixed assets/IP but are subordinated to ABL on ABL Priority Collateral via intercreditor agreement. ABL has payment priority in enforcement scenarios. No unsecured debt outstanding.",
+controlAgreements: "DACAs on all material bank accounts. Cash dominion triggered when excess availability falls below $225M for 5 consecutive business days. Revenue concentration account at BofA with daily sweep mechanics during Cash Dominion periods.",
+},
 financialCovenants: [
 { covenant: "Springing FCCR", test: "Triggered when excess availability below threshold", status: "Not triggered", notes: "No ongoing financial maintenance covenant when availability above trigger" },
 ],
@@ -1419,7 +1642,7 @@ negativeCov: "Customary: restrictions on additional indebtedness, liens, investm
 availCurrent: 1400, drawnCurrent: 1484,
 covenantCompliance: "In compliance as of Sep 30, 2025",
 otherFacilities: "4.625% Secured Notes (2028, ~$496M); Secured Notes (2029, ~$525M); Secured Notes (2031, ~$535M)",
-src: "8-K (Oct 17, 2025 — Seventh Amendment); 10-Q Q3 FY2025",
+src: "8-K (Oct 17, 2025 -- Seventh Amendment); 10-Q Q3 FY2025",
 },
 BEUSA: {
 facilityName: "Private — not publicly available",
@@ -2515,18 +2738,119 @@ return (
                 ))}
               </div>
 
-              {/* Borrowing Base & Pricing */}
+              {/* Borrowing Base Formula */}
+              <div style={{ padding: 12, background: "#0a0e1a", borderRadius: 6, marginBottom: 16 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: "#a78bfa", textTransform: "uppercase", marginBottom: 6 }}>Borrowing Base Formula</div>
+                <div style={{ fontSize: 11, color: "#94a3b8", lineHeight: 1.6, marginBottom: 8 }}>{ca.bbFormula}</div>
+                <div style={{ fontSize: 10, color: "#64748b", lineHeight: 1.5, marginBottom: 10 }}>{ca.borrowingBase}</div>
+
+                {/* BB Components Table */}
+                {ca.bbComponents && ca.bbComponents.length > 0 && (
+                  <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch", marginTop: 8 }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", minWidth: mob ? 480 : "auto" }}>
+                      <thead>
+                        <tr>
+                          {["Component", "Advance Rate", "Description", "Source"].map((h) => (
+                            <th key={h} style={{ padding: "6px 8px", fontSize: 9, color: "#64748b", borderBottom: "1px solid #1e293b", textTransform: "uppercase", textAlign: "left" }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {ca.bbComponents.map((comp, i) => (
+                          <tr key={i} style={{ borderBottom: "1px solid #1e293b" }}>
+                            <td style={{ padding: "6px 8px", fontSize: 11, fontWeight: 600, color: comp.advanceRate === "N/A (deducted)" ? "#ef4444" : "#e2e8f0", whiteSpace: "nowrap" }}>{comp.category}</td>
+                            <td style={{ padding: "6px 8px", fontSize: 11, fontWeight: 700, color: comp.advanceRate === "N/A (deducted)" ? "#ef4444" : "#22c55e", whiteSpace: "nowrap" }}>{comp.advanceRate}</td>
+                            <td style={{ padding: "6px 8px", fontSize: 10, color: "#94a3b8", lineHeight: 1.5 }}>{comp.description}</td>
+                            <td style={{ padding: "6px 8px", fontSize: 9, color: "#64748b", whiteSpace: "nowrap" }}>{comp.source}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {/* BB Availability Calculation */}
+                {ca.bbAvailCalc && (
+                  <div style={{ display: "grid", gridTemplateColumns: mob ? "1fr 1fr" : "repeat(4, 1fr)", gap: 8, marginTop: 12 }}>
+                    {[
+                      { l: "Gross BB", v: ca.bbAvailCalc.grossBB, c: "#94a3b8" },
+                      { l: "Less Reserves", v: ca.bbAvailCalc.lessReserves, c: "#ef4444" },
+                      { l: "Net Availability", v: ca.bbAvailCalc.netAvailability, c: "#22c55e" },
+                      { l: "Excess Availability", v: ca.bbAvailCalc.excessAvailability, c: "#3b82f6" },
+                    ].map((k, i) => (
+                      <div key={i} style={{ padding: "6px 8px", background: "#111827", borderRadius: 4 }}>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: k.c }}>{k.v}</div>
+                        <div style={{ fontSize: 8, color: "#64748b", textTransform: "uppercase", marginTop: 2 }}>{k.l}</div>
+                      </div>
+                    ))}
+                    {ca.bbAvailCalc.trigger && <div style={{ gridColumn: "1 / -1", fontSize: 9, color: "#eab308", fontStyle: "italic", marginTop: 4 }}>{"\u26A0"} {ca.bbAvailCalc.trigger}</div>}
+                  </div>
+                )}
+              </div>
+
+              {/* Pricing Grid */}
               <div style={{ display: "grid", gridTemplateColumns: sectionGrid, gap: mob ? 12 : 16, marginBottom: 16, minWidth: 0 }}>
                 <div style={{ padding: 12, background: "#0a0e1a", borderRadius: 6 }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: "#a78bfa", textTransform: "uppercase", marginBottom: 6 }}>Borrowing Base Formula</div>
-                  <div style={{ fontSize: 11, color: "#94a3b8", lineHeight: 1.6 }}>{ca.bbFormula}</div>
-                  <div style={{ fontSize: 10, color: "#64748b", marginTop: 8, lineHeight: 1.5 }}>{ca.borrowingBase}</div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: "#a78bfa", textTransform: "uppercase", marginBottom: 6 }}>Pricing</div>
+                  <div style={{ fontSize: 11, color: "#94a3b8", lineHeight: 1.6, marginBottom: 8 }}>{ca.pricing}</div>
+
+                  {ca.pricingGrid && ca.pricingGrid.length > 0 && (
+                    <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+                      <table style={{ width: "100%", borderCollapse: "collapse", minWidth: mob ? 380 : "auto" }}>
+                        <thead>
+                          <tr>
+                            {["Level", "Condition", "SOFR+", "Base Rate+", "Unused Fee"].map((h) => (
+                              <th key={h} style={{ padding: "5px 6px", fontSize: 9, color: "#64748b", borderBottom: "1px solid #1e293b", textTransform: "uppercase", textAlign: "left" }}>{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {ca.pricingGrid.map((pg, i) => (
+                            <tr key={i} style={{ borderBottom: "1px solid #1e293b" }}>
+                              <td style={{ padding: "5px 6px", fontSize: 10, fontWeight: 600, color: "#e2e8f0" }}>{pg.level}</td>
+                              <td style={{ padding: "5px 6px", fontSize: 9, color: "#94a3b8" }}>{pg.condition}</td>
+                              <td style={{ padding: "5px 6px", fontSize: 11, fontWeight: 700, color: "#22c55e" }}>{pg.sofrSpread}</td>
+                              <td style={{ padding: "5px 6px", fontSize: 11, fontWeight: 700, color: "#60a5fa" }}>{pg.baseRateSpread}</td>
+                              <td style={{ padding: "5px 6px", fontSize: 10, color: "#94a3b8" }}>{pg.unusedFee}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                  {ca.pricingNotes && <div style={{ fontSize: 9, color: "#64748b", marginTop: 8, lineHeight: 1.5, fontStyle: "italic" }}>{ca.pricingNotes}</div>}
                 </div>
+
+                {/* Security Detail */}
                 <div style={{ padding: 12, background: "#0a0e1a", borderRadius: 6 }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: "#a78bfa", textTransform: "uppercase", marginBottom: 6 }}>Pricing & Security</div>
-                  <div style={{ fontSize: 11, color: "#94a3b8", lineHeight: 1.6, marginBottom: 6 }}>{ca.pricing}</div>
-                  <div style={{ fontSize: 10, color: "#64748b", lineHeight: 1.5 }}><b>Security:</b> {ca.security}</div>
-                  {ca.lcSublimit > 0 && <div style={{ fontSize: 10, color: "#64748b", marginTop: 4 }}>LC Sublimit: ${ca.lcSublimit}M {ca.swinglineSublimit > 0 ? `| Swingline: $${ca.swinglineSublimit}M` : ""}</div>}
+                  <div style={{ fontSize: 10, fontWeight: 700, color: "#a78bfa", textTransform: "uppercase", marginBottom: 6 }}>Security & Collateral</div>
+                  <div style={{ fontSize: 11, color: "#94a3b8", lineHeight: 1.6, marginBottom: 6 }}>{ca.security}</div>
+                  {ca.lcSublimit > 0 && <div style={{ fontSize: 10, color: "#64748b", marginBottom: 8 }}>LC Sublimit: ${ca.lcSublimit}M {ca.swinglineSublimit > 0 ? `| Swingline: $${ca.swinglineSublimit}M` : ""}</div>}
+
+                  {ca.securityDetail && (
+                    <>
+                      <div style={{ fontSize: 9, fontWeight: 700, color: "#22c55e", textTransform: "uppercase", marginBottom: 4, marginTop: 8 }}>Pledged Assets</div>
+                      {ca.securityDetail.pledgedAssets.map((a, i) => (
+                        <div key={i} style={{ fontSize: 10, color: "#94a3b8", lineHeight: 1.6, paddingLeft: 8, borderLeft: "2px solid #22c55e", marginBottom: 3 }}>{a}</div>
+                      ))}
+
+                      <div style={{ fontSize: 9, fontWeight: 700, color: "#ef4444", textTransform: "uppercase", marginBottom: 4, marginTop: 10 }}>Excluded Assets</div>
+                      {ca.securityDetail.excludedAssets.map((a, i) => (
+                        <div key={i} style={{ fontSize: 10, color: "#94a3b8", lineHeight: 1.6, paddingLeft: 8, borderLeft: "2px solid #ef4444", marginBottom: 3 }}>{a}</div>
+                      ))}
+
+                      {ca.securityDetail.intercreditorNotes && (
+                        <>
+                          <div style={{ fontSize: 9, fontWeight: 700, color: "#eab308", textTransform: "uppercase", marginBottom: 4, marginTop: 10 }}>Intercreditor / Lien Priority</div>
+                          <div style={{ fontSize: 10, color: "#94a3b8", lineHeight: 1.6 }}>{ca.securityDetail.intercreditorNotes}</div>
+                        </>
+                      )}
+
+                      {ca.securityDetail.controlAgreements && (
+                        <div style={{ fontSize: 9, color: "#64748b", marginTop: 8, lineHeight: 1.5 }}><b>Control Agreements:</b> {ca.securityDetail.controlAgreements}</div>
+                      )}
+                    </>
+                  )}
                 </div>
               </div>
 
