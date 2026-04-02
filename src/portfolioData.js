@@ -24,11 +24,12 @@ mktCap: 3.26,
 ltDebt: 2000,
 totalDebt: 2740,
 cash: 4600,
-ebitda: -3100,
+ebitda: -2790,
 intExp: 145,
 revenue: 1354,
 netIncome: -2700,
 totalAssets: 8400,
+
 totalEquity: 3000,
 fcf: -3800,
 currentAssets: 3300,
@@ -47,8 +48,8 @@ liquidityRunway: "~5-6 qtrs at current burn",
 // Adjusted Cash Burn Components (FY2025, $M)
 // Source: Q4 FY2025 Earnings Release, 10-K, Earnings Presentation
 adjBurn: {
-adjEBITDA: -2130,         // Company-reported Non-GAAP Adj. EBITDA FY2025
-adjEBITDA_src: "Q4 2025 Earnings Release — GAAP-to-Non-GAAP reconciliation",
+adjEBITDA: -2790,         // Company-reported Non-GAAP Adj. EBITDA FY2025
+adjEBITDA_src: "FY2025 Earnings Release (Feb 24, 2026); Non-GAAP Adjusted EBITDA ~-$2.79B",
 incomeTaxes: 5,            // Recurring income taxes (minimal — pre-profit, NOL carryforwards)
 incomeTaxes_src: "10-K FY2025; near-zero cash taxes due to NOLs",
 prefDividends: 0,          // No cash preferred dividends (PIF converts accrue, non-cash)
@@ -152,7 +153,7 @@ ratingHistory: [
 { date: "2024-06", sp: "NR", moodys: "NR", fitch: "NR", event: "1.25% convertible notes issued (2026 maturity)" },
 ],
 financials: [
-{ period: "FY2025", rev: 1354, ebitda: -3100, ni: -2700, debt: 2740, cash: 4600 },
+{ period: "FY2025", rev: 1354, ebitda: -2790, ni: -2700, debt: 2740, cash: 4600 },
 { period: "FY2024", rev: 875, ebitda: -3050, ni: -3420, debt: 2000, cash: 4500 },
 { period: "FY2023", rev: 595, ebitda: -3290, ni: -2828, debt: 2050, cash: 4850 },
 { period: "FY2022", rev: 608, ebitda: -3050, ni: -1304, debt: 2000, cash: 6260 },
@@ -184,7 +185,7 @@ mktCap: 19.3,
 ltDebt: 4967,
 totalDebt: 4400,
 cash: 6082,
-ebitda: -2800,
+ebitda: -2000,
 intExp: 320,
 revenue: 5387,
 netIncome: -3626,
@@ -206,8 +207,8 @@ cashBurnQtr: -530,
 liquidityRunway: "~8-10 qtrs (incl. DOE loan)",
 // Adjusted Cash Burn Components (FY2025, $M)
 adjBurn: {
-adjEBITDA: -2800,         // FY2025 EBITDA per annual results
-adjEBITDA_src: "FY2025 Annual Results; EBITDA -$2.8B",
+adjEBITDA: -2000,         // FY2025 Adjusted EBITDA per annual results
+adjEBITDA_src: "FY2025 Earnings Release (Feb 12, 2026); adjusted EBITDA at favorable end of -$2.0B to -$2.25B guidance",
 incomeTaxes: 8,            // Recurring income taxes (minimal — pre-profit)
 incomeTaxes_src: "10-K FY2025; nominal cash taxes; substantial NOL carryforwards",
 prefDividends: 0,          // No preferred dividends
@@ -307,7 +308,7 @@ ratingHistory: [
 { date: "2024-06", sp: "NR", moodys: "NR", fitch: "NR", event: "VW invests $5B; joint venture announced" },
 ],
 financials: [
-{ period: "FY2025", rev: 5387, ebitda: -2800, ni: -3626, debt: 4400, cash: 6082 },
+{ period: "FY2025", rev: 5387, ebitda: -2000, ni: -3626, debt: 4400, cash: 6082 },
 { period: "FY2024", rev: 4970, ebitda: -3200, ni: -4746, debt: 5400, cash: 7700 },
 { period: "FY2023", rev: 4434, ebitda: -4760, ni: -5432, debt: 4430, cash: 9410 },
 { period: "FY2022", rev: 1658, ebitda: -6340, ni: -6752, debt: 1500, cash: 11570 },
