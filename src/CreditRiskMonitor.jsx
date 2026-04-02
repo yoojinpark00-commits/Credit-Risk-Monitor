@@ -79,28 +79,38 @@ const capex = ab.maintCapex !== null ? ab.maintCapex : ab.totalCapex;
 return ab.adjEBITDA - ab.incomeTaxes - ab.prefDividends - capex - ab.currentLTD - ab.intExpCash;
 };
 
+// ─── SKELETON LOADER ────────────────────────────────────────────────────────
+const Skeleton = ({ w = "100%", h = 16, r = 4 }) => (
+<div className="skeleton" style={{ width: w, height: h, borderRadius: r }} />
+);
+
 // ─── SPARKLINE ──────────────────────────────────────────────────────────────
-const Sparkline = ({ data, color = "#60a5fa", w = 80, h = 24 }) => {
+const Sparkline = ({ data, color = "#60a5fa", w = 80, h = 24, label }) => {
 if (!data || data.length < 2) return null;
 const mn = Math.min(...data);
 const mx = Math.max(...data);
 const range = mx - mn || 1;
 const pts = data.map((v, i) => `${(i / (data.length - 1)) * w},${h - ((v - mn) / range) * h}`).join(" ");
+const latest = data[data.length - 1];
+const first = data[0];
+const trendPct = ((latest - first) / Math.abs(first || 1) * 100).toFixed(0);
 return (
-<svg width={w} height={h} style={{ display: "block" }}>
+<svg width={w} height={h} style={{ display: "block" }} aria-label={label ? `${label}: ${trendPct > 0 ? "+" : ""}${trendPct}% trend` : undefined} role="img">
+{label && <title>{label}: {trendPct > 0 ? "+" : ""}{trendPct}% trend</title>}
 <polyline points={pts} fill="none" stroke={color} strokeWidth="1.5" strokeLinejoin="round" />
+<circle cx={w} cy={h - ((latest - mn) / range) * h} r="2" fill={color} />
 </svg>
 );
 };
 
 // ─── BAR CHART ──────────────────────────────────────────────────────────────
-const MiniBar = ({ data, labels, color = "#60a5fa", w = 200, h = 80 }) => {
+const MiniBar = ({ data, labels, color = "#60a5fa", w = 200, h = 80, ariaLabel }) => {
 if (!data || data.length === 0) return null;
 const mx = Math.max(...data.map(Math.abs));
 const barW = w / data.length - 4;
 const zeroY = h * 0.5;
 return (
-<svg width={w} height={h + 18} style={{ display: "block" }}>
+<svg width={w} height={h + 18} style={{ display: "block" }} role="img" aria-label={ariaLabel || "Bar chart"}>
 <line x1={0} y1={zeroY} x2={w} y2={zeroY} stroke="#334155" strokeWidth="0.5" />
 {data.map((v, i) => {
 const bh = (Math.abs(v) / (mx || 1)) * (h * 0.45);
@@ -451,7 +461,7 @@ const sectionGrid = mob ? "1fr" : "1fr 1fr";
 // ─── RENDER: DETAIL VIEW ──────────────────────────────────────────────────
 if (detail) {
 return (
-<div style={root}>
+<div style={{ ...root, animation: "fadeIn 0.25s ease forwards" }}>
 <div style={headerBar}>
 <div style={{ display: "flex", alignItems: "center", gap: mob ? 8 : 10, flexWrap: "wrap", flex: 1, minWidth: 0 }}>
 <div style={{ display: "flex", gap: 3, flexShrink: 0 }}>
@@ -467,10 +477,13 @@ return (
 {!getWatchlistStatus(detail).active && <span style={{ background: "rgba(5,46,22,0.5)", color: "#86efac", fontSize: 10, fontWeight: 700, padding: "4px 10px", borderRadius: 20, textTransform: "uppercase", letterSpacing: "0.5px", flexShrink: 0, border: "1px solid rgba(34,197,94,0.2)" }}>{"\u2713"} ACTIVE</span>}
 {isPubliclyRated(detail) ? <span style={{ background: "rgba(234,179,8,0.15)", color: "#fcd34d", fontSize: 10, fontWeight: 700, padding: "4px 10px", borderRadius: 20, textTransform: "uppercase", letterSpacing: "0.5px", flexShrink: 0, border: "1px solid rgba(234,179,8,0.2)" }}>RATED</span> : <span style={{ background: "rgba(100,116,139,0.15)", color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "4px 10px", borderRadius: 20, textTransform: "uppercase", letterSpacing: "0.5px", flexShrink: 0, border: "1px solid rgba(100,116,139,0.2)" }}>NOT RATED</span>}
 </div>
-<div style={{ display: "flex", gap: mob ? 4 : 6, overflowX: "auto", WebkitOverflowScrolling: "touch", width: mob ? "100%" : "auto", marginTop: mob ? 2 : 0, paddingBottom: mob ? 2 : 0 }}>
+<div style={{ position: "relative", width: mob ? "100%" : "auto", marginTop: mob ? 2 : 0 }}>
+{mob && <div style={{ position: "absolute", right: 0, top: 0, bottom: 0, width: 24, background: "linear-gradient(to right, transparent, rgba(15,22,41,0.85))", zIndex: 1, pointerEvents: "none" }} />}
+<div style={{ display: "flex", gap: mob ? 4 : 6, overflowX: "auto", WebkitOverflowScrolling: "touch", paddingBottom: mob ? 2 : 0, scrollbarWidth: "none" }}>
 {["financials", "ratings", "filings", "news", "research", "earnings"].map((t) => (
 <button key={t} onClick={() => setDetailTab(t)} style={pill(detailTab === t)}>{t === "filings" ? "SEC" : t}</button>
 ))}
+</div>
 </div>
 </div>
 
@@ -544,7 +557,7 @@ return (
                 <div style={{ marginTop: 12, background: "#1e293b", borderRadius: 6, height: 10, overflow: "hidden" }}>
                   <div style={{ height: "100%", borderRadius: 6, width: `${isNetCashGenerator ? 100 : Math.min(ltmCovMonths / 36, 1) * 100}%`, background: `linear-gradient(90deg, ${runwayColor}, ${meets18mo ? "#86efac" : ltmCovMonths >= 12 ? "#fde047" : "#fca5a5"})`, transition: "width 0.5s" }} />
                 </div>
-                <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4, fontSize: 9, color: "#475569" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4, fontSize: 9, color: "#64748b" }}>
                   <span>0</span><span>12 mo</span><span style={{ color: "#22c55e", fontWeight: 700 }}>18 mo</span><span>36 mo</span>
                 </div>
                 <div style={{ fontSize: 10, color: "#64748b", marginTop: 8 }}>{isNetCashGenerator ? "\u2713 Net cash generator \u2014 coverage test automatically satisfied" : meets18mo ? "\u2713 LTM coverage exceeds 18-month threshold" : ltmCovMonths >= 12 ? "\u26A0 Below 18-month threshold \u2014 Special Mention territory" : "\u26A0 Below 12-month threshold \u2014 Substandard / Doubtful territory"}</div>
@@ -599,7 +612,7 @@ return (
             </div>
             <div style={{ display: "flex", gap: 2 }}>
               {["Opening\nCash", "Revenue", "OpEx &\nCOGS", "CapEx &\nOther", "Debt\nProceeds", "Ending\nCash"].map((l, i) => (
-                <div key={i} style={{ flex: 1, textAlign: "center", fontSize: 8, color: "#475569", lineHeight: 1.3, whiteSpace: "pre-line" }}>{l}</div>
+                <div key={i} style={{ flex: 1, textAlign: "center", fontSize: 8, color: "#64748b", lineHeight: 1.3, whiteSpace: "pre-line" }}>{l}</div>
               ))}
             </div>
           </div>
@@ -651,7 +664,7 @@ return (
                           {tradBurnAbs >= maxBurn * 0.15 ? `${tradBurn >= 0 ? "+" : "-"}$${(tradBurnAbs / 1000).toFixed(1)}B` : ""}
                         </div>
                       </div>
-                      <div style={{ fontSize: 9, color: "#475569", marginTop: 2 }}>{tradBurn >= 0 ? "Positive operating cash flow after CapEx" : "Operating Cash Flow minus Total CapEx"}</div>
+                      <div style={{ fontSize: 9, color: "#64748b", marginTop: 2 }}>{tradBurn >= 0 ? "Positive operating cash flow after CapEx" : "Operating Cash Flow minus Total CapEx"}</div>
                     </div>
                     {/* Adjusted */}
                     <div>
@@ -664,7 +677,7 @@ return (
                           {adjBurnAbs >= maxBurn * 0.15 ? `${adjBurnTotal >= 0 ? "+" : "-"}$${(adjBurnAbs / 1000).toFixed(1)}B` : ""}
                         </div>
                       </div>
-                      <div style={{ fontSize: 9, color: "#475569", marginTop: 2 }}>Adj. EBITDA less taxes, dividends, {ab.maintCapex !== null ? "maintenance" : "total"} capex, current LTD, and cash interest</div>
+                      <div style={{ fontSize: 9, color: "#64748b", marginTop: 2 }}>Adj. EBITDA less taxes, dividends, {ab.maintCapex !== null ? "maintenance" : "total"} capex, current LTD, and cash interest</div>
                     </div>
                   </div>
                   {/* Differential */}
@@ -684,12 +697,12 @@ return (
                     <div style={{ padding: 10, background: "#0a0e1a", borderRadius: 6, textAlign: "center" }}>
                       <div style={{ fontSize: 9, color: "#64748b", textTransform: "uppercase" }}>{tradBurn >= 0 ? "Traditional: Cash Flow Positive" : "Traditional Runway"}</div>
                       <div style={{ fontSize: 20, fontWeight: 800, color: tradBurn >= 0 ? "#22c55e" : (detail.cash / (tradBurnAbs / 4)) >= 6 ? "#eab308" : "#ef4444" }}>{tradBurn >= 0 ? "\u2713 Positive" : `${(detail.cash / (tradBurnAbs / 4)).toFixed(1)} qtrs`}</div>
-                      <div style={{ fontSize: 9, color: "#475569" }}>{tradBurn >= 0 ? `+${fmt(tradBurn * 1e6)} FCF generated` : "Cash \u00F7 Quarterly FCF Burn"}</div>
+                      <div style={{ fontSize: 9, color: "#64748b" }}>{tradBurn >= 0 ? `+${fmt(tradBurn * 1e6)} FCF generated` : "Cash \u00F7 Quarterly FCF Burn"}</div>
                     </div>
                     <div style={{ padding: 10, background: "#0a0e1a", borderRadius: 6, textAlign: "center" }}>
                       <div style={{ fontSize: 9, color: "#64748b", textTransform: "uppercase" }}>{adjBurnTotal >= 0 ? "Adjusted: Cash Flow Positive" : "Adjusted Runway"}</div>
                       <div style={{ fontSize: 20, fontWeight: 800, color: adjBurnTotal >= 0 ? "#22c55e" : (detail.cash / (adjBurnAbs / 4)) >= 6 ? "#eab308" : "#ef4444" }}>{adjBurnTotal >= 0 ? "\u2713 Positive" : `${(detail.cash / (adjBurnAbs / 4)).toFixed(1)} qtrs`}</div>
-                      <div style={{ fontSize: 9, color: "#475569" }}>{adjBurnTotal >= 0 ? `+${fmt(adjBurnTotal * 1e6)} adj. cash flow` : "Cash \u00F7 Quarterly Adj. Burn"}</div>
+                      <div style={{ fontSize: 9, color: "#64748b" }}>{adjBurnTotal >= 0 ? `+${fmt(adjBurnTotal * 1e6)} adj. cash flow` : "Cash \u00F7 Quarterly Adj. Burn"}</div>
                     </div>
                   </div>
                 </div>
@@ -839,7 +852,7 @@ return (
                 <div style={{ textAlign: "center", padding: mob ? "8px 12px" : "8px 20px", background: ratingBg[compositeRating], border: `2px solid ${ratingColors[compositeRating]}`, borderRadius: 6, flexShrink: 0 }}>
                   <div style={{ fontSize: 9, color: "#64748b", textTransform: "uppercase", marginBottom: 2 }}>Composite Rating</div>
                   <div style={{ fontSize: 22, fontWeight: 900, color: ratingColors[compositeRating] }}>{compositeRating}</div>
-                  <div style={{ fontSize: 8, color: "#475569", marginTop: 2 }}>Driven by 18-mo. liquidity test</div>
+                  <div style={{ fontSize: 8, color: "#64748b", marginTop: 2 }}>Driven by 18-mo. liquidity test</div>
                 </div>
               </div>
 
@@ -855,7 +868,7 @@ return (
                       <div style={{ position: "absolute", left: `${(18 / Math.max(histBurnMonths, 24)) * 100}%`, top: -2, bottom: -2, width: 2, background: "#f1f5f9", zIndex: 2 }} />
                       <div style={{ height: "100%", width: `${Math.min(histBurnMonths / Math.max(histBurnMonths, 24), 1) * 100}%`, background: meetsHistorical18 ? "linear-gradient(90deg, #22c55e, #16a34a)" : "linear-gradient(90deg, #ef4444, #dc2626)", borderRadius: 4 }} />
                     </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 8, color: "#475569", marginTop: 2 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 8, color: "#64748b", marginTop: 2 }}>
                       <span>0</span>
                       <span style={{ color: "#f1f5f9", fontWeight: 700 }}>{"\u2190"} 18 mo. threshold</span>
                       <span>{Math.max(Math.ceil(histBurnMonths), 24)} mo.</span>
@@ -872,7 +885,7 @@ return (
                       <div style={{ position: "absolute", left: `${(18 / Math.max(fwdBurnMonths, 24)) * 100}%`, top: -2, bottom: -2, width: 2, background: "#f1f5f9", zIndex: 2 }} />
                       <div style={{ height: "100%", width: `${Math.min(fwdBurnMonths / Math.max(fwdBurnMonths, 24), 1) * 100}%`, background: meetsForward18 ? "linear-gradient(90deg, #22c55e, #16a34a)" : "linear-gradient(90deg, #ef4444, #dc2626)", borderRadius: 4 }} />
                     </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 8, color: "#475569", marginTop: 2 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 8, color: "#64748b", marginTop: 2 }}>
                       <span>0</span>
                       <span style={{ color: "#f1f5f9", fontWeight: 700 }}>{"\u2190"} 18 mo. threshold</span>
                       <span>{Math.max(Math.ceil(fwdBurnMonths), 24)} mo.</span>
@@ -957,7 +970,7 @@ return (
                       <div style={{ width: 10, height: 10, borderRadius: 2, background: leg.color, flexShrink: 0 }} />
                       <span style={{ color: "#94a3b8" }}>{leg.label}:</span>
                       <span style={{ color: "#f1f5f9", fontWeight: 700 }}>{fmt(comp.amount * 1e6)}</span>
-                      <span style={{ color: "#475569" }}>({(comp.amount / detail.liquidityBreakdown.totalLiquidity * 100).toFixed(1)}%)</span>
+                      <span style={{ color: "#64748b" }}>({(comp.amount / detail.liquidityBreakdown.totalLiquidity * 100).toFixed(1)}%)</span>
                     </div>
                   ) : null;
                 })}
@@ -1054,7 +1067,7 @@ return (
                     {(fac.committed - fac.drawn - fac.available) > 0 && (
                       <span style={{ color: "#64748b" }}>{"\u25A8"} Unavailable: ${fac.committed - fac.drawn - fac.available >= 1000 ? `${((fac.committed - fac.drawn - fac.available)/1000).toFixed(1)}B` : `${fac.committed - fac.drawn - fac.available}M`} (conditional / collateral limited)</span>
                     )}
-                    <span style={{ color: "#475569", marginLeft: "auto" }}>Committed: {fac.committed >= 1000 ? `$${(fac.committed/1000).toFixed(1)}B` : `$${fac.committed}M`}</span>
+                    <span style={{ color: "#64748b", marginLeft: "auto" }}>Committed: {fac.committed >= 1000 ? `$${(fac.committed/1000).toFixed(1)}B` : `$${fac.committed}M`}</span>
                   </div>
 
                   {/* Notes */}
@@ -1079,7 +1092,7 @@ return (
                       <td style={{ padding: "6px 8px", fontSize: 11, color: "#e2e8f0", fontWeight: 600 }}>{fac.name}</td>
                       <td style={{ padding: "6px 8px", fontSize: 11, textAlign: "right", color: "#94a3b8" }}>{fac.committed >= 1000 ? `$${(fac.committed/1000).toFixed(1)}B` : `$${fac.committed}M`}</td>
                       <td style={{ padding: "6px 8px", fontSize: 11, textAlign: "right", color: fac.drawn > 0 ? "#ef4444" : "#334155", fontWeight: fac.drawn > 0 ? 700 : 400 }}>{fac.drawn > 0 ? `$${fac.drawn}M` : "\u2014"}</td>
-                      <td style={{ padding: "6px 8px", fontSize: 11, textAlign: "right", color: fac.available > 0 ? "#22c55e" : "#475569", fontWeight: 700 }}>{fac.available > 0 ? (fac.available >= 1000 ? `$${(fac.available/1000).toFixed(1)}B` : `$${fac.available}M`) : "$0"}</td>
+                      <td style={{ padding: "6px 8px", fontSize: 11, textAlign: "right", color: fac.available > 0 ? "#22c55e" : "#64748b", fontWeight: 700 }}>{fac.available > 0 ? (fac.available >= 1000 ? `$${(fac.available/1000).toFixed(1)}B` : `$${fac.available}M`) : "$0"}</td>
                       <td style={{ padding: "6px 8px", fontSize: 11, textAlign: "right", color: "#64748b" }}>{(fac.committed - fac.drawn - fac.available) > 0 ? (fac.committed - fac.drawn - fac.available >= 1000 ? `$${((fac.committed - fac.drawn - fac.available)/1000).toFixed(1)}B` : `$${fac.committed - fac.drawn - fac.available}M`) : "\u2014"}</td>
                     </tr>
                   ))}
@@ -1121,7 +1134,7 @@ return (
               <div style={{ fontSize: mob ? 11 : 13, fontWeight: 800, color: "#c4b5fd", marginBottom: 4, textTransform: "uppercase", letterSpacing: mob ? "0.5px" : "1px" }}>
                 {"\u25C6"} Credit Agreement Summary
               </div>
-              <div style={{ fontSize: 10, color: "#475569", marginBottom: 16 }}>{ca.facilityName} {"\u2014"} Agent: {ca.agent}</div>
+              <div style={{ fontSize: 10, color: "#64748b", marginBottom: 16 }}>{ca.facilityName} {"\u2014"} Agent: {ca.agent}</div>
 
               {/* Key Terms Grid */}
               <div style={{ display: "grid", gridTemplateColumns: mob ? "1fr 1fr" : "repeat(4, 1fr)", gap: 8, marginBottom: 16, minWidth: 0 }}>
@@ -1293,7 +1306,7 @@ return (
                 </div>
               )}
 
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, fontSize: 9, color: "#475569" }}>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, fontSize: 9, color: "#64748b" }}>
                 <span><b>Compliance:</b> {ca.covenantCompliance}</span>
                 <span>{"\u00B7"} <b>Syndicate:</b> {ca.syndicate}</span>
                 <span>{"\u00B7"} <b>Source:</b> {ca.src}</span>
@@ -1521,7 +1534,7 @@ return (
                   <tr key={i} style={{ borderBottom: "1px solid #1e293b" }}>
                     <td style={{ padding: "7px 0", color: "#94a3b8", fontSize: 11 }}>{l}</td>
                     <td style={{ padding: "7px 0", textAlign: "right", fontWeight: 700, fontSize: 12, color: warn ? "#ef4444" : "#e2e8f0" }}>{v}</td>
-                    <td style={{ padding: "7px 0 7px 8px", fontSize: 9, color: "#475569", maxWidth: 120 }}>{note}</td>
+                    <td style={{ padding: "7px 0 7px 8px", fontSize: 9, color: "#64748b", maxWidth: 120 }}>{note}</td>
                   </tr>
                 ))}
               </tbody>
@@ -1690,7 +1703,7 @@ return (
                         <button
                           onClick={() => overrideReason.trim() && toggleOverride(detail.id, !ws.active, overrideReason.trim())}
                           disabled={!overrideReason.trim()}
-                          style={{ padding: "6px 16px", borderRadius: 4, fontSize: 11, fontWeight: 700, border: "none", background: overrideReason.trim() ? (ws.active ? "#052e16" : "#7f1d1d") : "#1e293b", color: overrideReason.trim() ? "#fff" : "#475569", cursor: overrideReason.trim() ? "pointer" : "not-allowed" }}
+                          style={{ padding: "6px 16px", borderRadius: 4, fontSize: 11, fontWeight: 700, border: "none", background: overrideReason.trim() ? (ws.active ? "#052e16" : "#7f1d1d") : "#1e293b", color: overrideReason.trim() ? "#fff" : "#64748b", cursor: overrideReason.trim() ? "pointer" : "not-allowed" }}
                         >
                           {ws.active ? "Remove from Watchlist" : "Add to Watchlist"}
                         </button>
@@ -1733,7 +1746,7 @@ return (
           <div style={{ display: "flex", flexDirection: mob ? "column" : "row", justifyContent: "space-between", alignItems: mob ? "flex-start" : "center", gap: 8, marginBottom: 16 }}>
             <div>
               <div style={{ fontSize: 12, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.5px" }}>SEC Filings {"\u2014"} {detail.name}</div>
-              <div style={{ fontSize: 10, color: "#475569", marginTop: 2 }}>CIK: {{"LCID":"0001811210","RIVN":"0001874178","CENT":"0000887733","IHRT":"0001400891","SMC":"0002024218","UPBD":"0000933036","WSC":"0001647088"}[detail.id] || "Private"}</div>
+              <div style={{ fontSize: 10, color: "#64748b", marginTop: 2 }}>CIK: {{"LCID":"0001811210","RIVN":"0001874178","CENT":"0000887733","IHRT":"0001400891","SMC":"0002024218","UPBD":"0000933036","WSC":"0001647088"}[detail.id] || "Private"}</div>
             </div>
             <button onClick={fetchSecFilings} disabled={dataLoading.sec} style={{ padding: "6px 14px", borderRadius: 4, fontSize: 10, fontWeight: 700, border: "1px solid #334155", background: "transparent", color: "#94a3b8", cursor: "pointer" }}>
               {dataLoading.sec ? "Loading..." : "\u21BB Refresh from EDGAR"}
@@ -1829,7 +1842,7 @@ return (
               <div style={{ fontSize: 12, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.5px" }}>Earnings Call Summary</div>
               <div style={{ fontSize: 11, color: "#64748b" }}>{detail.earningsCallSummary.quarter} {"\u00B7"} {detail.earningsCallSummary.date}</div>
             </div>
-            <div style={{ fontSize: 10, color: "#475569", marginBottom: 16, fontStyle: "italic" }}>Source: {detail.earningsCallSummary.source}</div>
+            <div style={{ fontSize: 10, color: "#64748b", marginBottom: 16, fontStyle: "italic" }}>Source: {detail.earningsCallSummary.source}</div>
 
             {/* Key Financials */}
             <div style={{ marginBottom: 16 }}>
@@ -1899,7 +1912,7 @@ return (
 
 // ─── RENDER: PORTFOLIO VIEW ─────────────────────────────────────────────
 return (
-<div style={root}>
+<div style={{ ...root, animation: "fadeIn 0.25s ease forwards" }}>
 <div style={headerBar}>
 <div style={{ display: "flex", alignItems: "center", gap: mob ? 6 : 16, flex: 1, minWidth: 0 }}>
 <div style={{ display: "flex", gap: 3, flexShrink: 0 }}>
@@ -1914,10 +1927,13 @@ return (
 {now.toLocaleDateString("en-US", { weekday: "short", year: "numeric", month: "short", day: "numeric" })} {"\u00B7"} {now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
 </div>}
 </div>
-<div style={{ display: "flex", gap: mob ? 4 : 6, overflowX: "auto", WebkitOverflowScrolling: "touch", width: mob ? "100%" : "auto", marginTop: mob ? 2 : 0, paddingBottom: mob ? 2 : 0 }}>
+<div style={{ position: "relative", width: mob ? "100%" : "auto", marginTop: mob ? 2 : 0 }}>
+{mob && <div style={{ position: "absolute", right: 0, top: 0, bottom: 0, width: 24, background: "linear-gradient(to right, transparent, rgba(15,22,41,0.85))", zIndex: 1, pointerEvents: "none" }} />}
+<div style={{ display: "flex", gap: mob ? 4 : 6, overflowX: "auto", WebkitOverflowScrolling: "touch", paddingBottom: mob ? 2 : 0, scrollbarWidth: "none" }}>
 {["overview", "filings", "news", "analytics", "calendar"].map((t) => (
 <button key={t} onClick={() => setTab(t)} style={pill(tab === t)}>{t === "filings" ? "SEC Filings" : t}</button>
 ))}
+</div>
 </div>
 </div>
 
@@ -1956,7 +1972,14 @@ return (
         {searchQuery && <button onClick={() => setSearchQuery("")} style={{ padding: "6px 12px", borderRadius: 4, border: "1px solid rgba(148,163,184,0.15)", background: "transparent", color: "#94a3b8", fontSize: 11, cursor: "pointer", fontFamily: "inherit" }}>Clear</button>}
         {searchQuery && <span style={{ fontSize: 11, color: "#64748b" }}>{filteredPortfolio.length} of {enrichedPortfolio.length} credits</span>}
       </div>
-      {mob ? (
+      {filteredPortfolio.length === 0 ? (
+        <div style={{ ...card, textAlign: "center", padding: 40 }}>
+          <div style={{ fontSize: 32, marginBottom: 12, opacity: 0.3 }}>{"\u{1F50D}"}</div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: "#94a3b8", marginBottom: 6 }}>No credits match "{searchQuery}"</div>
+          <div style={{ fontSize: 12, color: "#64748b", marginBottom: 16 }}>Try searching by ticker, company name, sector, or rating</div>
+          <button onClick={() => setSearchQuery("")} style={{ padding: "6px 16px", borderRadius: 4, fontSize: 11, fontWeight: 600, border: "1px solid rgba(59,130,246,0.3)", background: "rgba(59,130,246,0.1)", color: "#60a5fa", cursor: "pointer" }}>Clear Search</button>
+        </div>
+      ) : mob ? (
         /* ─── MOBILE: Card layout ─── */
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {filteredPortfolio.map((c) => (
@@ -1965,7 +1988,7 @@ return (
                 <div>
                   <span style={{ fontWeight: 700, fontSize: 16 }}>{c.id}</span>
                   {getWatchlistStatus(c).active && <span style={{ color: "#ef4444", fontSize: 11, marginLeft: 6 }}>{"\u26A0"}</span>}
-                  {isPubliclyRated(c) ? <span style={{ fontSize: 8, fontWeight: 700, color: "#eab308", background: "rgba(234,179,8,0.1)", border: "1px solid rgba(234,179,8,0.2)", padding: "1px 5px", borderRadius: 3, marginLeft: 6, textTransform: "uppercase", letterSpacing: "0.5px" }}>RATED</span> : <span style={{ fontSize: 8, color: "#475569", marginLeft: 6 }}>NR</span>}
+                  {isPubliclyRated(c) ? <span style={{ fontSize: 8, fontWeight: 700, color: "#eab308", background: "rgba(234,179,8,0.1)", border: "1px solid rgba(234,179,8,0.2)", padding: "1px 5px", borderRadius: 3, marginLeft: 6, textTransform: "uppercase", letterSpacing: "0.5px" }}>RATED</span> : <span style={{ fontSize: 8, color: "#64748b", marginLeft: 6 }}>NR</span>}
                   <div style={{ fontSize: 10, color: "#64748b" }}>{c.sector}</div>
                 </div>
                 <div style={{ textAlign: "right" }}>
@@ -1975,7 +1998,7 @@ return (
                     <div style={{ fontSize: 9, color: "#eab308" }}>agency</div>
                   </>) : (<>
                     <span style={{ fontWeight: 700, fontSize: 14, color: ratingColor(c.impliedRating) }}>{c.impliedRating}</span>
-                    <div style={{ fontSize: 9, color: "#475569" }}>implied</div>
+                    <div style={{ fontSize: 9, color: "#64748b" }}>implied</div>
                   </>)}
                 </div>
               </div>
@@ -2023,7 +2046,7 @@ return (
                 onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
               >
                 <td style={{ padding: "10px 8px" }}>
-                  <div style={{ fontWeight: 700, fontSize: 13 }}>{c.id} {getWatchlistStatus(c).active && <span style={{ color: "#ef4444", fontSize: 11 }}>{"\u26A0"}</span>}{isPubliclyRated(c) ? <span style={{ fontSize: 8, fontWeight: 700, color: "#eab308", background: "rgba(234,179,8,0.1)", border: "1px solid rgba(234,179,8,0.2)", padding: "1px 5px", borderRadius: 3, marginLeft: 6, textTransform: "uppercase", letterSpacing: "0.5px" }}>RATED</span> : <span style={{ fontSize: 8, color: "#475569", marginLeft: 6 }}>NR</span>}</div>
+                  <div style={{ fontWeight: 700, fontSize: 13 }}>{c.id} {getWatchlistStatus(c).active && <span style={{ color: "#ef4444", fontSize: 11 }}>{"\u26A0"}</span>}{isPubliclyRated(c) ? <span style={{ fontSize: 8, fontWeight: 700, color: "#eab308", background: "rgba(234,179,8,0.1)", border: "1px solid rgba(234,179,8,0.2)", padding: "1px 5px", borderRadius: 3, marginLeft: 6, textTransform: "uppercase", letterSpacing: "0.5px" }}>RATED</span> : <span style={{ fontSize: 8, color: "#64748b", marginLeft: 6 }}>NR</span>}</div>
                   <div style={{ fontSize: 10, color: "#64748b" }}>{c.sector}</div>
                 </td>
                 <td style={{ padding: "10px 8px" }}>
@@ -2033,7 +2056,7 @@ return (
                     <div style={{ fontSize: 9, color: "#eab308" }}>agency</div>
                   </>) : (<>
                     <span style={{ fontWeight: 700, fontSize: 12, color: ratingColor(c.impliedRating) }}>{c.impliedRating}</span>
-                    <div style={{ fontSize: 9, color: "#475569" }}>implied</div>
+                    <div style={{ fontSize: 9, color: "#64748b" }}>implied</div>
                   </>)}
                 </td>
                 <td style={{ padding: "10px 8px", fontSize: 12 }}>
@@ -2050,7 +2073,7 @@ return (
                 <td style={{ padding: "10px 8px", fontSize: 12 }}>
                   {c.eqPrice != null ? `$${c.eqPrice}` : "Private"}{c.eqChg != null && <span style={{ color: c.eqChg >= 0 ? "#22c55e" : "#ef4444", marginLeft: 4, fontSize: 10 }}>{pct(c.eqChg)}</span>}
                 </td>
-                <td style={{ padding: "10px 8px" }}><Sparkline data={[...c.financials].reverse().map((f) => f.rev)} color="#3b82f6" /></td>
+                <td style={{ padding: "10px 8px" }}><Sparkline data={[...c.financials].reverse().map((f) => f.rev)} color="#3b82f6" label={`${c.id} Revenue`} /></td>
                 <td style={{ padding: "10px 8px", fontSize: 11, color: "#3b82f6" }}>{"\u2192"}</td>
               </tr>
             ))}
@@ -2067,12 +2090,26 @@ return (
         <div style={{ display: "flex", flexDirection: mob ? "column" : "row", justifyContent: "space-between", alignItems: mob ? "flex-start" : "center", gap: 8, marginBottom: 16 }}>
           <div>
             <div style={{ fontSize: 12, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.5px" }}>SEC Filing Alerts (Last 30 Days)</div>
-            <div style={{ fontSize: 10, color: "#475569", marginTop: 2 }}>Auto-monitored via EDGAR — 8-K, S-3, Form 4, 13D/G, 10-K, 10-Q</div>
+            <div style={{ fontSize: 10, color: "#64748b", marginTop: 2 }}>Auto-monitored via EDGAR — 8-K, S-3, Form 4, 13D/G, 10-K, 10-Q</div>
           </div>
-          <button onClick={fetchSecFilings} disabled={dataLoading.sec} style={{ padding: "6px 14px", borderRadius: 4, fontSize: 10, fontWeight: 700, border: "1px solid #334155", background: dataLoading.sec ? "#1e293b" : "transparent", color: "#94a3b8", cursor: "pointer" }}>
-            {dataLoading.sec ? "Loading..." : "\u21BB Refresh"}
+          <button onClick={fetchSecFilings} disabled={dataLoading.sec} style={{ padding: "6px 14px", borderRadius: 4, fontSize: 10, fontWeight: 700, border: "1px solid #334155", background: dataLoading.sec ? "#1e293b" : "transparent", color: "#94a3b8", cursor: "pointer", transition: "all .15s ease" }}>
+            {dataLoading.sec ? "\u21BB Loading..." : "\u21BB Refresh"}
           </button>
         </div>
+
+        {dataLoading.sec && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 16 }}>
+            {[1,2,3].map(i => (
+              <div key={i} style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                <Skeleton w={60} h={20} />
+                <div style={{ flex: 1 }}>
+                  <Skeleton w="70%" h={12} />
+                  <div style={{ marginTop: 6 }}><Skeleton w="40%" h={10} /></div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Severity summary */}
         <div style={{ display: "flex", gap: mob ? 8 : 16, marginBottom: 16, flexWrap: "wrap" }}>

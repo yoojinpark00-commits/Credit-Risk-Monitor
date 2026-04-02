@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>Credit Risk Monitor</title>
@@ -27,6 +27,10 @@
       }
       button:focus-visible { outline: 2px solid #3b82f6; outline-offset: 2px; border-radius: 4px; }
       @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+      @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+      @keyframes slideIn { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: translateX(0); } }
+      .skeleton { background: linear-gradient(90deg, rgba(30,41,59,0.4) 25%, rgba(51,65,85,0.4) 50%, rgba(30,41,59,0.4) 75%); background-size: 200% 100%; animation: shimmer 1.5s ease infinite; border-radius: 4px; }
+      input:focus { border-color: rgba(59,130,246,0.5) !important; box-shadow: 0 0 0 2px rgba(59,130,246,0.15); }
     </style>
   </head>
   <body>
