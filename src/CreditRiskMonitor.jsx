@@ -126,6 +126,9 @@ const [winW, setWinW] = useState(typeof window !== "undefined" ? window.innerWid
 const [watchlistOverrides, setWatchlistOverrides] = useState({});
 const [showOverrideModal, setShowOverrideModal] = useState(null);
 const [overrideReason, setOverrideReason] = useState("");
+const [searchQuery, setSearchQuery] = useState("");
+const [sortCol, setSortCol] = useState(null);
+const [sortDir, setSortDir] = useState("asc");
 
 // ─── NAVIGATION HISTORY ───────────────────────────────────────────────
 const [navHistory, setNavHistory] = useState([{ selected: null, tab: "overview", detailTab: "financials" }]);
@@ -359,6 +362,46 @@ const enrichedPortfolio = useMemo(() => {
     };
   });
 }, [marketData]);
+
+// ─── SEARCH & SORT ──────────────────────────────────────────────────
+const filteredPortfolio = useMemo(() => {
+  let list = enrichedPortfolio;
+  if (searchQuery.trim()) {
+    const q = searchQuery.trim().toLowerCase();
+    list = list.filter(c => c.id.toLowerCase().includes(q) || c.name.toLowerCase().includes(q) || c.sector.toLowerCase().includes(q) || (c.sp !== "NR" && c.sp.toLowerCase().includes(q)) || c.impliedRating.toLowerCase().includes(q));
+  }
+  if (sortCol) {
+    const getSortVal = (c) => {
+      switch (sortCol) {
+        case "company": return c.id;
+        case "rating": return isPubliclyRated(c) ? ratingScore(c.sp) : ratingScore(c.impliedRating);
+        case "outlook": return c.outlook;
+        case "cds": return c.cds5y ?? 99999;
+        case "spread": return c.bondSpread ?? 99999;
+        case "cashflow": return ltmAdjCashFlow(c);
+        case "liquidity": return c.cash;
+        case "equity": return c.eqPrice ?? -99999;
+        case "rev": return c.revenue;
+        default: return 0;
+      }
+    };
+    list = [...list].sort((a, b) => {
+      const va = getSortVal(a), vb = getSortVal(b);
+      if (typeof va === "string") return sortDir === "asc" ? va.localeCompare(vb) : vb.localeCompare(va);
+      return sortDir === "asc" ? va - vb : vb - va;
+    });
+  }
+  return list;
+}, [enrichedPortfolio, searchQuery, sortCol, sortDir]);
+
+const handleSort = useCallback((col) => {
+  if (sortCol === col) {
+    setSortDir(d => d === "asc" ? "desc" : "asc");
+  } else {
+    setSortCol(col);
+    setSortDir("asc");
+  }
+}, [sortCol]);
 
 const negFcfCount = enrichedPortfolio.filter((c) => c.fcf < 0).length;
 const watchCount = enrichedPortfolio.filter((c) => getWatchlistStatus(c).active).length;
@@ -1904,10 +1947,19 @@ return (
 
   {tab === "overview" && (
     <div style={{ padding: `0 ${px}px 24px`, minWidth: 0, maxWidth: "100%" }}>
+      {/* Search bar */}
+      <div style={{ marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ position: "relative", flex: 1, maxWidth: 360 }}>
+          <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "#64748b", fontSize: 13, pointerEvents: "none" }}>{"\u{1F50D}"}</span>
+          <input type="text" placeholder="Search by ticker, name, sector, or rating..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} style={{ width: "100%", padding: "8px 10px 8px 32px", borderRadius: 6, border: "1px solid rgba(148,163,184,0.15)", background: "rgba(15,22,41,0.8)", color: "#e2e8f0", fontSize: 12, outline: "none", fontFamily: "inherit" }} />
+        </div>
+        {searchQuery && <button onClick={() => setSearchQuery("")} style={{ padding: "6px 12px", borderRadius: 4, border: "1px solid rgba(148,163,184,0.15)", background: "transparent", color: "#94a3b8", fontSize: 11, cursor: "pointer", fontFamily: "inherit" }}>Clear</button>}
+        {searchQuery && <span style={{ fontSize: 11, color: "#64748b" }}>{filteredPortfolio.length} of {enrichedPortfolio.length} credits</span>}
+      </div>
       {mob ? (
         /* ─── MOBILE: Card layout ─── */
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {enrichedPortfolio.map((c) => (
+          {filteredPortfolio.map((c) => (
             <div key={c.id} onClick={() => { navigate(c.id, tab, "financials"); }} style={{ ...card, cursor: "pointer", padding: 16, transition: "border-color .2s ease", borderColor: getWatchlistStatus(c).active ? "rgba(239,68,68,0.15)" : "rgba(148,163,184,0.08)" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
                 <div>
@@ -1959,16 +2011,16 @@ return (
         <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}><table style={{ width: "100%", borderCollapse: "collapse", minWidth: mob ? 380 : "auto" }}>
           <thead>
             <tr>
-              {[["Company","18%"],["Rating","10%"],["Outlook","10%"],["CDS 5Y","11%"],["Spread","10%"],["LTM Cash Flow","10%"],["Liquidity","10%"],["Equity","10%"],["Rev","8%"],["","3%"]].map(([h,w],i) => (
-                <th key={i} style={{ width: w, padding: "12px 10px", fontSize: 10, color: "#64748b", borderBottom: "1px solid rgba(148,163,184,0.08)", textTransform: "uppercase", fontWeight: 600, letterSpacing: "0.8px", textAlign: "left", background: "rgba(6,10,20,0.5)" }}>{h}</th>
+              {[["Company","18%","company"],["Rating","10%","rating"],["Outlook","10%","outlook"],["CDS 5Y","11%","cds"],["Spread","10%","spread"],["LTM Cash Flow","10%","cashflow"],["Liquidity","10%","liquidity"],["Equity","10%","equity"],["Rev","8%","rev"],["","3%",null]].map(([h,w,col],i) => (
+                <th key={i} onClick={col ? () => handleSort(col) : undefined} style={{ width: w, padding: "12px 10px", fontSize: 10, color: sortCol === col ? "#e2e8f0" : "#64748b", borderBottom: "1px solid rgba(148,163,184,0.08)", textTransform: "uppercase", fontWeight: 600, letterSpacing: "0.8px", textAlign: "left", background: "rgba(6,10,20,0.95)", position: "sticky", top: 0, zIndex: 2, cursor: col ? "pointer" : "default", userSelect: "none", transition: "color .15s ease" }}>{h}{sortCol === col ? (sortDir === "asc" ? " \u25B2" : " \u25BC") : ""}</th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {enrichedPortfolio.map((c) => (
-              <tr key={c.id} onClick={() => { navigate(c.id, tab, "financials"); }} style={{ cursor: "pointer", borderBottom: "1px solid rgba(148,163,184,0.06)", transition: "all .15s ease" }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(30,41,59,0.5)"; e.currentTarget.style.transform = "scale(1.002)"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.transform = "scale(1)"; }}
+            {filteredPortfolio.map((c) => (
+              <tr key={c.id} onClick={() => { navigate(c.id, tab, "financials"); }} style={{ cursor: "pointer", borderBottom: "1px solid rgba(148,163,184,0.06)", transition: "background .15s ease" }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(30,41,59,0.5)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
               >
                 <td style={{ padding: "10px 8px" }}>
                   <div style={{ fontWeight: 700, fontSize: 13 }}>{c.id} {getWatchlistStatus(c).active && <span style={{ color: "#ef4444", fontSize: 11 }}>{"\u26A0"}</span>}{isPubliclyRated(c) ? <span style={{ fontSize: 8, fontWeight: 700, color: "#eab308", background: "rgba(234,179,8,0.1)", border: "1px solid rgba(234,179,8,0.2)", padding: "1px 5px", borderRadius: 3, marginLeft: 6, textTransform: "uppercase", letterSpacing: "0.5px" }}>RATED</span> : <span style={{ fontSize: 8, color: "#475569", marginLeft: 6 }}>NR</span>}</div>
