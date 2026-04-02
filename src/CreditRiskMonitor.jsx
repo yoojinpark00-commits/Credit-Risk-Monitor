@@ -434,8 +434,8 @@ return (
     {/* KPI strip */}
     <div style={{ display: "grid", gridTemplateColumns: mob ? "repeat(2, 1fr)" : tablet ? "repeat(4, 1fr)" : "repeat(8, 1fr)", gap: mob ? 8 : 12, padding: `16px ${px}px` }}>
       {[
-        { l: "Implied Rating", v: detail.impliedRating, c: ratingColor(detail.impliedRating) },
-        { l: "Agency Rating", v: detail.sp !== "NR" ? `${detail.sp} / ${detail.moodys}` : "Not Rated", c: detail.sp !== "NR" ? ratingColor(detail.sp) : "#64748b" },
+        { l: isPubliclyRated(detail) ? "Agency Rating" : "Implied Rating", v: isPubliclyRated(detail) ? `${detail.sp}${detail.moodys !== "NR" ? ` / ${detail.moodys}` : ""}` : detail.impliedRating, c: isPubliclyRated(detail) ? ratingColor(detail.sp) : ratingColor(detail.impliedRating) },
+        { l: isPubliclyRated(detail) ? "Implied Rating" : "Agency Rating", v: isPubliclyRated(detail) ? detail.impliedRating : "Not Rated", c: isPubliclyRated(detail) ? ratingColor(detail.impliedRating) : "#64748b" },
         { l: "Outlook", v: `${outlookIcon(detail.outlook)} ${detail.outlook}`, c: outlookColor(detail.outlook) },
         { l: "CDS 5Y", v: detail.cds5y != null ? `${detail.cds5y} bps` : "N/A", sub: detail.cds5yChg != null ? `${bps(detail.cds5yChg)} bps` : "", c: detail.cds5yChg != null ? (detail.cds5yChg <= 0 ? "#22c55e" : "#ef4444") : "#64748b" },
         { l: "Bond Spread", v: detail.bondSpread != null ? `${detail.bondSpread} bps` : "N/A", sub: detail.bondSpreadChg != null ? `${bps(detail.bondSpreadChg)} bps` : "", c: detail.bondSpreadChg != null ? (detail.bondSpreadChg <= 0 ? "#22c55e" : "#ef4444") : "#64748b" },
@@ -1917,8 +1917,14 @@ return (
                   <div style={{ fontSize: 10, color: "#64748b" }}>{c.sector}</div>
                 </div>
                 <div style={{ textAlign: "right" }}>
-                  <span style={{ fontWeight: 700, fontSize: 14, color: ratingColor(c.impliedRating) }}>{c.impliedRating}</span>
-                  <div style={{ fontSize: 9, color: "#475569" }}>implied</div>
+                  {isPubliclyRated(c) ? (<>
+                    <span style={{ fontWeight: 700, fontSize: 14, color: ratingColor(c.sp) }}>{c.sp}</span>
+                    {c.moodys !== "NR" && <span style={{ fontWeight: 600, fontSize: 11, color: ratingColor(c.moodys), marginLeft: 3 }}>/ {c.moodys}</span>}
+                    <div style={{ fontSize: 9, color: "#eab308" }}>agency</div>
+                  </>) : (<>
+                    <span style={{ fontWeight: 700, fontSize: 14, color: ratingColor(c.impliedRating) }}>{c.impliedRating}</span>
+                    <div style={{ fontSize: 9, color: "#475569" }}>implied</div>
+                  </>)}
                 </div>
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6, fontSize: 11, minWidth: 0 }}>
@@ -1953,7 +1959,7 @@ return (
         <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}><table style={{ width: "100%", borderCollapse: "collapse", minWidth: mob ? 380 : "auto" }}>
           <thead>
             <tr>
-              {[["Company","18%"],["Implied Rtg","10%"],["Outlook","10%"],["CDS 5Y","11%"],["Spread","10%"],["LTM Cash Flow","10%"],["Liquidity","10%"],["Equity","10%"],["Rev","8%"],["","3%"]].map(([h,w],i) => (
+              {[["Company","18%"],["Rating","10%"],["Outlook","10%"],["CDS 5Y","11%"],["Spread","10%"],["LTM Cash Flow","10%"],["Liquidity","10%"],["Equity","10%"],["Rev","8%"],["","3%"]].map(([h,w],i) => (
                 <th key={i} style={{ width: w, padding: "12px 10px", fontSize: 10, color: "#64748b", borderBottom: "1px solid rgba(148,163,184,0.08)", textTransform: "uppercase", fontWeight: 600, letterSpacing: "0.8px", textAlign: "left", background: "rgba(6,10,20,0.5)" }}>{h}</th>
               ))}
             </tr>
@@ -1969,8 +1975,14 @@ return (
                   <div style={{ fontSize: 10, color: "#64748b" }}>{c.sector}</div>
                 </td>
                 <td style={{ padding: "10px 8px" }}>
-                  <span style={{ fontWeight: 700, fontSize: 12, color: ratingColor(c.impliedRating) }}>{c.impliedRating}</span>
-                  <div style={{ fontSize: 9, color: "#475569" }}>implied</div>
+                  {isPubliclyRated(c) ? (<>
+                    <span style={{ fontWeight: 700, fontSize: 12, color: ratingColor(c.sp) }}>{c.sp}</span>
+                    {c.moodys !== "NR" && <span style={{ fontWeight: 600, fontSize: 10, color: ratingColor(c.moodys), marginLeft: 4 }}>/ {c.moodys}</span>}
+                    <div style={{ fontSize: 9, color: "#eab308" }}>agency</div>
+                  </>) : (<>
+                    <span style={{ fontWeight: 700, fontSize: 12, color: ratingColor(c.impliedRating) }}>{c.impliedRating}</span>
+                    <div style={{ fontSize: 9, color: "#475569" }}>implied</div>
+                  </>)}
                 </td>
                 <td style={{ padding: "10px 8px", fontSize: 12 }}>
                   <span style={{ color: outlookColor(c.outlook) }}>{outlookIcon(c.outlook)} {c.outlook}</span>
