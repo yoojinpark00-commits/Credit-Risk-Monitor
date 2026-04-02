@@ -63,6 +63,8 @@ if (o === "Developing") return "#f97316";
 return "#94a3b8";
 };
 
+const isPubliclyRated = (c) => c.sp !== "NR" || c.moodys !== "NR" || c.fitch !== "NR";
+
 const sentimentColor = (s) => {
 if (s === "positive") return "#22c55e";
 if (s === "negative") return "#ef4444";
@@ -358,7 +360,6 @@ const enrichedPortfolio = useMemo(() => {
   });
 }, [marketData]);
 
-const totalExposure = enrichedPortfolio.reduce((s, c) => s + c.exposure, 0);
 const negFcfCount = enrichedPortfolio.filter((c) => c.fcf < 0).length;
 const watchCount = enrichedPortfolio.filter((c) => getWatchlistStatus(c).active).length;
 const negOutlook = enrichedPortfolio.filter((c) => c.outlook === "Negative" || c.outlook === "Developing").length;
@@ -421,6 +422,7 @@ return (
 </div>
 {getWatchlistStatus(detail).active && <span style={{ background: "rgba(127,29,29,0.5)", color: "#fca5a5", fontSize: 10, fontWeight: 700, padding: "4px 10px", borderRadius: 20, textTransform: "uppercase", letterSpacing: "0.5px", flexShrink: 0, border: "1px solid rgba(220,38,38,0.2)" }}>{"\u26A0"} WATCHLIST</span>}
 {!getWatchlistStatus(detail).active && <span style={{ background: "rgba(5,46,22,0.5)", color: "#86efac", fontSize: 10, fontWeight: 700, padding: "4px 10px", borderRadius: 20, textTransform: "uppercase", letterSpacing: "0.5px", flexShrink: 0, border: "1px solid rgba(34,197,94,0.2)" }}>{"\u2713"} ACTIVE</span>}
+{isPubliclyRated(detail) ? <span style={{ background: "rgba(234,179,8,0.15)", color: "#fcd34d", fontSize: 10, fontWeight: 700, padding: "4px 10px", borderRadius: 20, textTransform: "uppercase", letterSpacing: "0.5px", flexShrink: 0, border: "1px solid rgba(234,179,8,0.2)" }}>RATED</span> : <span style={{ background: "rgba(100,116,139,0.15)", color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "4px 10px", borderRadius: 20, textTransform: "uppercase", letterSpacing: "0.5px", flexShrink: 0, border: "1px solid rgba(100,116,139,0.2)" }}>NOT RATED</span>}
 </div>
 <div style={{ display: "flex", gap: mob ? 4 : 6, overflowX: "auto", WebkitOverflowScrolling: "touch", width: mob ? "100%" : "auto", marginTop: mob ? 2 : 0, paddingBottom: mob ? 2 : 0 }}>
 {["financials", "ratings", "filings", "news", "research", "earnings"].map((t) => (
@@ -1504,7 +1506,6 @@ return (
                   { l: "FCF", v: fmt(detail.fcf * 1e6), c: detail.fcf < 0 ? "#ef4444" : "#22c55e" },
                 ]),
                 { l: "Mkt Cap", v: detail.mktCap ? `$${detail.mktCap}B` : "Private" },
-                { l: "Portfolio Exposure", v: fmt(detail.exposure) },
               ].map((m, i) => (
                 <div key={i} style={{ padding: "8px 10px", background: "#0a0e1a", borderRadius: 4 }}>
                   <div style={{ fontSize: 14, fontWeight: 700, color: m.c || "#f1f5f9" }}>{m.v}</div>
@@ -1524,7 +1525,7 @@ return (
             <div style={{ fontSize: 12, fontWeight: 700, color: "#94a3b8", marginBottom: 16, textTransform: "uppercase", letterSpacing: "0.5px" }}>Rating Status</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: mob ? 8 : 16 }}>
               {[{ agency: "S&P", rating: detail.sp }, { agency: "Moody's", rating: detail.moodys }, { agency: "Fitch", rating: detail.fitch }].map((r) => (
-                <div key={r.agency} style={{ textAlign: "center", padding: mob ? 10 : 16, background: "#0a0e1a", borderRadius: 6 }}>
+                <div key={r.agency} style={{ textAlign: "center", padding: mob ? 10 : 16, background: r.rating !== "NR" ? "rgba(234,179,8,0.05)" : "#0a0e1a", borderRadius: 6, border: r.rating !== "NR" ? "1px solid rgba(234,179,8,0.15)" : "1px solid transparent" }}>
                   <div style={{ fontSize: mob ? 18 : 22, fontWeight: 800, color: ratingColor(r.rating) }}>{r.rating}</div>
                   <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>{r.agency}</div>
                 </div>
@@ -1886,9 +1887,8 @@ return (
   </div>
 
   {/* KPIs */}
-  <div style={{ display: "grid", gridTemplateColumns: mob ? "repeat(2, 1fr)" : tablet ? "repeat(3, 1fr)" : "repeat(5, 1fr)", gap: mob ? 8 : 12, padding: `0 ${px}px 20px` }}>
+  <div style={{ display: "grid", gridTemplateColumns: mob ? "repeat(2, 1fr)" : tablet ? "repeat(2, 1fr)" : "repeat(4, 1fr)", gap: mob ? 8 : 12, padding: `0 ${px}px 20px` }}>
     {[
-      { l: "Total Exposure", v: fmt(totalExposure), accent: "#3b82f6" },
       { l: "Credits Tracked", v: enrichedPortfolio.length, accent: "#8b5cf6" },
       { l: "Agency Rated", v: `${enrichedPortfolio.filter(c => c.sp !== "NR").length} / ${enrichedPortfolio.length}`, c: enrichedPortfolio.filter(c => c.sp !== "NR").length === enrichedPortfolio.length ? "#22c55e" : "#eab308", accent: "#eab308" },
       { l: "Neg. / Developing Outlook", v: negOutlook, c: "#ef4444", accent: "#ef4444" },
@@ -1913,6 +1913,7 @@ return (
                 <div>
                   <span style={{ fontWeight: 700, fontSize: 16 }}>{c.id}</span>
                   {getWatchlistStatus(c).active && <span style={{ color: "#ef4444", fontSize: 11, marginLeft: 6 }}>{"\u26A0"}</span>}
+                  {isPubliclyRated(c) ? <span style={{ fontSize: 8, fontWeight: 700, color: "#eab308", background: "rgba(234,179,8,0.1)", border: "1px solid rgba(234,179,8,0.2)", padding: "1px 5px", borderRadius: 3, marginLeft: 6, textTransform: "uppercase", letterSpacing: "0.5px" }}>RATED</span> : <span style={{ fontSize: 8, color: "#475569", marginLeft: 6 }}>NR</span>}
                   <div style={{ fontSize: 10, color: "#64748b" }}>{c.sector}</div>
                 </div>
                 <div style={{ textAlign: "right" }}>
@@ -1921,10 +1922,6 @@ return (
                 </div>
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6, fontSize: 11, minWidth: 0 }}>
-                <div style={{ minWidth: 0, overflow: "hidden" }}>
-                  <div style={{ color: "#64748b", fontSize: 9, textTransform: "uppercase" }}>Exposure</div>
-                  <div style={{ fontWeight: 600 }}>{fmt(c.exposure)}</div>
-                </div>
                 <div>
                   <div style={{ color: "#64748b", fontSize: 9, textTransform: "uppercase" }}>LTM Cash Flow</div>
                   <div style={{ fontWeight: 600, color: ltmAdjCashFlow(c) >= 0 ? "#22c55e" : "#ef4444" }}>{ltmAdjCashFlow(c) >= 0 ? "+" : ""}{fmt(ltmAdjCashFlow(c) * 1e6)}</div>
@@ -1956,7 +1953,7 @@ return (
         <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}><table style={{ width: "100%", borderCollapse: "collapse", minWidth: mob ? 380 : "auto" }}>
           <thead>
             <tr>
-              {[["Company","16%"],["Exposure","10%"],["Implied Rtg","9%"],["Outlook","9%"],["CDS 5Y","10%"],["Spread","9%"],["LTM Cash Flow","9%"],["Liquidity","9%"],["Equity","9%"],["Rev","7%"],["","3%"]].map(([h,w],i) => (
+              {[["Company","18%"],["Implied Rtg","10%"],["Outlook","10%"],["CDS 5Y","11%"],["Spread","10%"],["LTM Cash Flow","10%"],["Liquidity","10%"],["Equity","10%"],["Rev","8%"],["","3%"]].map(([h,w],i) => (
                 <th key={i} style={{ width: w, padding: "12px 10px", fontSize: 10, color: "#64748b", borderBottom: "1px solid rgba(148,163,184,0.08)", textTransform: "uppercase", fontWeight: 600, letterSpacing: "0.8px", textAlign: "left", background: "rgba(6,10,20,0.5)" }}>{h}</th>
               ))}
             </tr>
@@ -1968,10 +1965,9 @@ return (
                 onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.transform = "scale(1)"; }}
               >
                 <td style={{ padding: "10px 8px" }}>
-                  <div style={{ fontWeight: 700, fontSize: 13 }}>{c.id} {getWatchlistStatus(c).active && <span style={{ color: "#ef4444", fontSize: 11 }}>{"\u26A0"}</span>}</div>
+                  <div style={{ fontWeight: 700, fontSize: 13 }}>{c.id} {getWatchlistStatus(c).active && <span style={{ color: "#ef4444", fontSize: 11 }}>{"\u26A0"}</span>}{isPubliclyRated(c) ? <span style={{ fontSize: 8, fontWeight: 700, color: "#eab308", background: "rgba(234,179,8,0.1)", border: "1px solid rgba(234,179,8,0.2)", padding: "1px 5px", borderRadius: 3, marginLeft: 6, textTransform: "uppercase", letterSpacing: "0.5px" }}>RATED</span> : <span style={{ fontSize: 8, color: "#475569", marginLeft: 6 }}>NR</span>}</div>
                   <div style={{ fontSize: 10, color: "#64748b" }}>{c.sector}</div>
                 </td>
-                <td style={{ padding: "10px 8px", fontWeight: 600, fontSize: 12 }}>{fmt(c.exposure)}</td>
                 <td style={{ padding: "10px 8px" }}>
                   <span style={{ fontWeight: 700, fontSize: 12, color: ratingColor(c.impliedRating) }}>{c.impliedRating}</span>
                   <div style={{ fontSize: 9, color: "#475569" }}>implied</div>
