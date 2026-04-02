@@ -617,6 +617,79 @@ return (
             </div>
           </div>
 
+          {/* ═══ EBITDA RECONCILIATION: GAAP → ADJUSTED ═══ */}
+          {detail.adjBurn && detail.adjBurn.gaapEbitda != null && (() => {
+            const ab = detail.adjBurn;
+            const totalAdj = ab.sbc + ab.restructuring + ab.otherNonCash;
+            const reconItems = [
+              { label: "GAAP EBITDA", amount: ab.gaapEbitda, isSubtotal: true, color: "#60a5fa" },
+              { label: "Stock-Based Compensation", amount: ab.sbc, color: "#a78bfa" },
+              ...(ab.restructuring ? [{ label: "Restructuring & Impairments", amount: ab.restructuring, color: "#f97316" }] : []),
+              ...(ab.otherNonCash ? [{ label: "Other Non-Cash Items", amount: ab.otherNonCash, color: ab.otherNonCash >= 0 ? "#94a3b8" : "#64748b" }] : []),
+              { label: "Adjusted EBITDA", amount: ab.adjEBITDA, isSubtotal: true, color: ab.adjEBITDA >= 0 ? "#22c55e" : "#ef4444" },
+            ];
+            const maxRecon = Math.max(...reconItems.map(r => Math.abs(r.amount)));
+
+            return (
+            <div style={{ ...card, gridColumn: "1 / -1" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                <div style={{ fontSize: mob ? 11 : 13, fontWeight: 800, color: "#94a3b8", textTransform: "uppercase", letterSpacing: mob ? "0.5px" : "1px" }}>
+                  EBITDA Reconciliation {"\u2014"} GAAP to Adjusted
+                </div>
+                <div style={{ fontSize: 9, color: "#64748b", textAlign: "right" }}>
+                  Total Adjustments: <span style={{ color: totalAdj >= 0 ? "#22c55e" : "#ef4444", fontWeight: 700 }}>{totalAdj >= 0 ? "+" : ""}{totalAdj.toLocaleString()}M</span>
+                </div>
+              </div>
+              <div style={{ fontSize: mob ? 9 : 10, color: "#64748b", marginBottom: 16 }}>
+                Reconciles reported GAAP EBITDA to company-reported Non-GAAP Adjusted EBITDA by adding back non-cash and non-recurring items.
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: sectionGrid, gap: mob ? 16 : 24, minWidth: 0 }}>
+                {/* Waterfall bars */}
+                <div>
+                  {reconItems.map((r, ri) => {
+                    const barPct = maxRecon > 0 ? (Math.abs(r.amount) / maxRecon * 100) : 0;
+                    return (
+                      <div key={ri} style={{ marginBottom: ri < reconItems.length - 1 ? 8 : 0 }}>
+                        {r.isSubtotal && ri > 0 && <div style={{ borderTop: "2px dashed rgba(148,163,184,0.2)", margin: "10px 0" }} />}
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <div style={{ width: mob ? 80 : 110, fontSize: mob ? 9 : 10, color: r.isSubtotal ? "#e2e8f0" : "#94a3b8", fontWeight: r.isSubtotal ? 700 : 400, textAlign: "right", flexShrink: 0, lineHeight: 1.2 }}>{r.label}</div>
+                          <div style={{ flex: 1, height: 22, background: "#1e293b", borderRadius: 3, overflow: "hidden" }}>
+                            <div style={{ height: "100%", width: `${Math.max(barPct, 2)}%`, background: r.isSubtotal ? (r.amount >= 0 ? "linear-gradient(90deg, #22c55e, #15803d)" : "linear-gradient(90deg, #ef4444, #dc2626)") : r.color, borderRadius: 3, opacity: r.isSubtotal ? 1 : 0.7 }} />
+                          </div>
+                          <div style={{ width: mob ? 65 : 80, fontSize: mob ? 11 : 12, fontWeight: r.isSubtotal ? 800 : 600, color: r.isSubtotal ? r.color : "#e2e8f0", textAlign: "right", flexShrink: 0, fontFamily: "'JetBrains Mono', monospace" }}>
+                            {r.amount === 0 ? "\u2014" : r.amount < 0 ? `(${Math.abs(r.amount).toLocaleString()})` : r.isSubtotal ? `${r.amount > 0 ? "" : ""}${r.amount.toLocaleString()}` : `+${r.amount.toLocaleString()}`}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                {/* Summary table */}
+                <div style={{ background: "#0a0e1a", borderRadius: 8, padding: mob ? 12 : 16 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.5px" }}>Reconciliation Summary ($M)</div>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: mob ? 11 : 12 }}>
+                    <tbody>
+                      {reconItems.map((r, ri) => (
+                        <tr key={ri} style={{ borderTop: r.isSubtotal && ri > 0 ? "2px solid rgba(148,163,184,0.15)" : "none" }}>
+                          <td style={{ padding: "6px 0", color: r.isSubtotal ? "#e2e8f0" : "#94a3b8", fontWeight: r.isSubtotal ? 700 : 400 }}>{r.isSubtotal && ri > 0 ? "= " : ri > 0 && !r.isSubtotal ? "+ " : ""}{r.label}</td>
+                          <td style={{ padding: "6px 0", textAlign: "right", fontWeight: r.isSubtotal ? 800 : 600, color: r.isSubtotal ? r.color : "#e2e8f0", fontFamily: "'JetBrains Mono', monospace" }}>
+                            {r.amount === 0 ? "\u2014" : r.amount < 0 ? `(${Math.abs(r.amount).toLocaleString()})` : `${r.amount.toLocaleString()}`}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <div style={{ marginTop: 12, padding: 8, background: "rgba(96,165,250,0.05)", borderRadius: 4, border: "1px solid rgba(96,165,250,0.1)", fontSize: 9, color: "#64748b", lineHeight: 1.5 }}>
+                    {ab.sbc > 0 && <div><b>SBC:</b> Stock-based compensation is the largest non-cash add-back ({((ab.sbc / Math.abs(ab.gaapEbitda)) * 100).toFixed(0)}% of GAAP EBITDA).</div>}
+                    {ab.restructuring > 0 && <div><b>Restructuring:</b> ${ab.restructuring}M in non-recurring charges added back.</div>}
+                    {totalAdj > 0 && <div style={{ marginTop: 4 }}>Total adjustments of <b>${totalAdj.toLocaleString()}M</b> improve EBITDA by {((totalAdj / Math.abs(ab.gaapEbitda)) * 100).toFixed(0)}%.</div>}
+                  </div>
+                </div>
+              </div>
+            </div>
+            );
+          })()}
+
           {/* ═══ TRADITIONAL vs. ADJUSTED CASH BURN ═══ */}
           {detail.adjBurn && (() => {
             const ab = detail.adjBurn;
