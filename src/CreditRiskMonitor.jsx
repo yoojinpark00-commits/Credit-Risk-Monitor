@@ -375,6 +375,36 @@ const mob = winW < 768;
 const tablet = winW >= 768 && winW < 1024;
 const px = mob ? 12 : 24; // responsive padding
 
+// ─── NORMALIZE DB DATA TO MATCH STATIC SHAPE ────────────────────────
+// The credit_data_fetcher returns snake_case keys with SourcedValue wrappers
+// and raw dollar amounts. This maps them to the camelCase primitives in $M
+// that the UI expects.
+const normalizeDbEntry = (db) => {
+  if (!db) return null;
+  const sv = (key) => { const v = db[key]; return v && typeof v === "object" && "value" in v ? v.value : v; };
+  const toM = (val) => val != null ? +(val / 1e6).toFixed(0) : null;
+  const kf = db.key_financials || db;
+  const bs = db.balance_sheet || db;
+  const mapped = {};
+  // Map fetcher fields → static field names (snake_case → camelCase, raw$ → $M)
+  const pairs = [
+    ["revenue", () => toM(sv("gaap_revenue") ?? sv("revenue"))],
+    ["ebitda", () => toM(sv("adj_ebitda") ?? sv("ebitda_gaap"))],
+    ["netIncome", () => toM(sv("gaap_net_income") ?? sv("net_income"))],
+    ["totalDebt", () => toM(sv("total_debt"))],
+    ["cash", () => toM(sv("cash_and_equivalents"))],
+    ["totalAssets", () => toM(sv("total_assets"))],
+    ["totalEquity", () => toM(sv("stockholders_equity"))],
+    ["fcf", () => toM(sv("free_cash_flow"))],
+    ["intExp", () => toM(sv("cash_interest_paid") ?? sv("interest_expense"))],
+  ];
+  for (const [key, getter] of pairs) {
+    const val = getter();
+    if (val != null) mapped[key] = val;
+  }
+  return Object.keys(mapped).length > 0 ? mapped : null;
+};
+
 // ─── APPLY LIVE MARKET DATA TO PORTFOLIO ─────────────────────────────
 // Overlay live equity prices from API onto portfolio entries so all views
 // (KPIs, detail headers, tables) reflect current market data.
@@ -383,8 +413,10 @@ const basePortfolio = useMemo(() => {
   return PORTFOLIO.map((staticEntry) => {
     const dbEntry = dbPortfolio[staticEntry.id];
     if (!dbEntry) return staticEntry;
-    // Deep merge: DB values override static, but keep static fields that DB doesn't have
-    return { ...staticEntry, ...dbEntry, _dbSource: true };
+    // Normalize DB shape → static shape, then overlay only non-null values
+    const normalized = normalizeDbEntry(dbEntry);
+    if (!normalized) return staticEntry;
+    return { ...staticEntry, ...normalized, _dbSource: true };
   });
 }, [dbPortfolio]);
 
