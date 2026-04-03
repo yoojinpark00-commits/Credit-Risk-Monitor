@@ -1560,32 +1560,75 @@ return (
             </div>
           </div>
 
-          {/* ═══ BURN COVERAGE SCENARIO ANALYSIS ═══ */}
+          {/* ═══ BURN COVERAGE SCENARIO ANALYSIS (LTM BASIS) ═══ */}
           <div style={card}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: "#94a3b8", marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.5px" }}>{isNetCashGenerator ? "Cash Flow Scenario Analysis" : "Burn Coverage Scenario Analysis"}</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#94a3b8", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.5px" }}>{isNetCashGenerator ? "Cash Flow Scenario Analysis" : "Burn Coverage Scenario Analysis"} — LTM Basis</div>
+            <div style={{ fontSize: 10, color: "#64748b", marginBottom: 16 }}>All scenarios use LTM adjusted cash burn of <b style={{ color: isNetCashGenerator ? "#22c55e" : "#ef4444" }}>{isNetCashGenerator ? "+" : "-"}{fmt(annBurn * 1e6)}</b> as the baseline.</div>
+
+            {/* Trailing 4-Quarter Trend */}
+            {detail.quarterlyBurns && detail.quarterlyBurns.length > 0 && (
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.5px" }}>Trailing 4-Quarter {isNetCashGenerator ? "Cash Flow" : "Cash Burn"} Trend ($M)</div>
+                <div style={{ display: "grid", gridTemplateColumns: `repeat(${detail.quarterlyBurns.length}, 1fr)`, gap: mob ? 6 : 10 }}>
+                  {(() => {
+                    const burns = detail.quarterlyBurns;
+                    const maxB = Math.max(...burns.map(b => Math.abs(b.burn)));
+                    const ltmTotal = burns.reduce((s, b) => s + b.burn, 0);
+                    return burns.map((b, i) => {
+                      const pct = maxB > 0 ? (Math.abs(b.burn) / maxB * 100) : 0;
+                      const isPos = b.burn >= 0;
+                      const prev = i > 0 ? burns[i - 1].burn : null;
+                      const delta = prev != null ? b.burn - prev : null;
+                      return (
+                        <div key={i} style={{ background: "#0a0e1a", borderRadius: 6, padding: mob ? 8 : 10, textAlign: "center" }}>
+                          <div style={{ fontSize: 9, color: "#64748b", fontWeight: 600, marginBottom: 6 }}>{b.q}</div>
+                          <div style={{ fontSize: mob ? 16 : 20, fontWeight: 800, color: isPos ? "#22c55e" : "#ef4444" }}>{isPos ? "+" : ""}{b.burn}</div>
+                          <div style={{ margin: "6px auto", height: 4, background: "#1e293b", borderRadius: 2, width: "80%" }}>
+                            <div style={{ height: "100%", borderRadius: 2, width: `${Math.max(pct, 5)}%`, background: isPos ? "#22c55e" : "#ef4444", opacity: 0.7 }} />
+                          </div>
+                          {delta != null && <div style={{ fontSize: 9, color: delta > 0 ? (isNetCashGenerator ? "#22c55e" : "#ef4444") : (isNetCashGenerator ? "#ef4444" : "#22c55e"), fontWeight: 600 }}>{delta > 0 ? "\u25B2" : "\u25BC"} {Math.abs(delta)}M QoQ</div>}
+                          <div style={{ fontSize: 8, color: "#64748b", marginTop: 2 }}>{b.note}</div>
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, padding: "6px 10px", background: "#0a0e1a", borderRadius: 4 }}>
+                  <span style={{ fontSize: 10, color: "#64748b" }}>LTM Total (sum of 4Q):</span>
+                  <span style={{ fontSize: 11, fontWeight: 800, color: detail.quarterlyBurns.reduce((s, b) => s + b.burn, 0) >= 0 ? "#22c55e" : "#ef4444" }}>
+                    {detail.quarterlyBurns.reduce((s, b) => s + b.burn, 0) >= 0 ? "+" : ""}{fmt(Math.abs(detail.quarterlyBurns.reduce((s, b) => s + b.burn, 0)) * 1e6)} ({isNetCashGenerator ? "generated" : "consumed"})
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Scenario Table (LTM basis) */}
             <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}><table style={{ width: "100%", borderCollapse: "collapse", minWidth: mob ? 380 : "auto" }}>
               <thead>
                 <tr>
-                  {["Scenario", "Qtr Burn", "Runway", "Flag"].map(h => (
+                  {["Scenario", "LTM Burn", "Qtr Avg", "Runway", "Flag"].map(h => (
                     <th key={h} style={{ padding: "8px 4px", fontSize: 10, color: "#64748b", textAlign: "left", borderBottom: "1px solid #1e293b", textTransform: "uppercase" }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {[
-                  { sc: "Current Run-Rate", burn: qBurn, note: "Based on LTM adjusted burn" },
-                  { sc: "Burn +25% (Stress)", burn: qBurn * 1.25, note: "Operational deterioration / cost overruns" },
-                  { sc: "Burn +50% (Severe)", burn: qBurn * 1.5, note: "Major operational disruption" },
-                  { sc: "Burn -25% (Improved)", burn: qBurn * 0.75, note: "Margin improvement / cost cuts" },
-                  { sc: "Burn -50% (Optimistic)", burn: qBurn * 0.5, note: "Significant cost reduction + volume" },
+                  { sc: "LTM Run-Rate", mult: 1.0, note: "Trailing 12-month adjusted burn" },
+                  { sc: "Burn +25% (Stress)", mult: 1.25, note: "Operational deterioration" },
+                  { sc: "Burn +50% (Severe)", mult: 1.5, note: "Major disruption" },
+                  { sc: "Burn -25% (Improved)", mult: 0.75, note: "Cost cuts / margin gains" },
+                  { sc: "Burn -50% (Optimistic)", mult: 0.5, note: "Significant improvement" },
                 ].map((s, i) => {
-                  const rw = s.burn > 0 ? detail.cash / s.burn : 999;
+                  const scenarioBurnAnn = annBurn * s.mult;
+                  const scenarioBurnQtr = scenarioBurnAnn / 4;
+                  const rw = scenarioBurnQtr > 0 ? detail.cash / scenarioBurnQtr : 999;
                   const rwDisplay = rw >= 99 ? "\u221E" : fmtNum(rw);
                   const rwColor = isNetCashGenerator ? "#22c55e" : rw >= 8 ? "#22c55e" : rw >= 5 ? "#eab308" : "#ef4444";
                   return (
                     <tr key={i} style={{ borderBottom: "1px solid #1e293b" }}>
                       <td style={{ padding: "8px 4px", fontSize: 12, fontWeight: i === 0 ? 700 : 400, color: i === 0 ? "#f1f5f9" : "#94a3b8" }}>{s.sc}</td>
-                      <td style={{ padding: "8px 4px", fontSize: 12, color: "#ef4444", fontWeight: 600 }}>{fmt(s.burn * 1e6)}</td>
+                      <td style={{ padding: "8px 4px", fontSize: 12, color: "#ef4444", fontWeight: 600 }}>{isNetCashGenerator ? "+" : "-"}{fmt(scenarioBurnAnn * 1e6)}</td>
+                      <td style={{ padding: "8px 4px", fontSize: 11, color: "#64748b" }}>{fmt(scenarioBurnQtr * 1e6)}/qtr</td>
                       <td style={{ padding: "8px 4px" }}>
                         <span style={{ fontSize: 13, fontWeight: 800, color: rwColor }}>{rwDisplay} qtrs</span>
                         <div style={{ marginTop: 2, background: "#1e293b", borderRadius: 3, height: 4, width: 80 }}>
@@ -1601,7 +1644,7 @@ return (
               </tbody>
             </table></div>
             <div style={{ marginTop: 12, padding: "8px 10px", background: "#0a0e1a", borderRadius: 4, fontSize: 10, color: "#64748b", lineHeight: 1.6 }}>
-              <b style={{ color: "#94a3b8" }}>Methodology:</b> Cash runway = Total Liquidity ({fmt(detail.cash * 1e6)}) / Scenario Quarterly Burn. Does not account for potential capital raises, asset sales, or credit facility draws. Stress scenarios model operational deterioration; improvement scenarios assume delivery ramp traction.
+              <b style={{ color: "#94a3b8" }}>Methodology:</b> Scenarios apply multipliers to LTM adjusted cash burn ({isNetCashGenerator ? "+" : "-"}{fmt(annBurn * 1e6)}). Runway = Total Liquidity ({fmt(detail.cash * 1e6)}) / Scenario Quarterly Burn. Trailing 4Q trend shows quarter-by-quarter progression of adjusted cash flow.
             </div>
           </div>
 
