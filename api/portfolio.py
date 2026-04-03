@@ -61,7 +61,10 @@ def get_cached_data(ticker, fy):
             )
             if resp.ok and resp.json():
                 row = resp.json()[0]
-                data = json.loads(row['data_json']) if isinstance(row['data_json'], str) else row['data_json']
+                raw = row.get('data_json')
+                if raw is None:
+                    raise ValueError("data_json is null")
+                data = json.loads(raw) if isinstance(raw, str) else raw
                 data['_source'] = 'supabase'
                 data['_fetched_at'] = row.get('fetched_at')
                 _cache[key] = {'data': data, 'fetched_at': datetime.now()}
@@ -92,6 +95,8 @@ def fetch_fresh_data(ticker, fy):
         from credit_data_fetcher import CreditDataFetcher
         fetcher = CreditDataFetcher(fmp_key=FMP_API_KEY)
         data = fetcher.fetch(ticker, fy)
+        if data is None:
+            return None
         data['_source'] = 'fresh_fetch'
         data['_fetched_at'] = datetime.now().isoformat()
 
@@ -135,21 +140,40 @@ def get_all_portfolio(fy, fresh=False):
         data = None
         if not fresh:
             data = get_cached_data(ticker, fy)
-        if data is None and fresh:
+        if data is None:
             data = fetch_fresh_data(ticker, fy)
         if data is not None:
             results[ticker] = data
     return results
 
 
+def _cors_headers(handler_self):
+    handler_self.send_header('Access-Control-Allow-Origin', '*')
+    handler_self.send_header('Access-Control-Allow-Methods', 'GET, OPTIONS')
+    handler_self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+
+
 class handler(BaseHTTPRequestHandler):
+    def do_OPTIONS(self):
+        self.send_response(204)
+        _cors_headers(self)
+        self.end_headers()
+
     def do_GET(self):
         parsed = urlparse(self.path)
         params = parse_qs(parsed.query)
 
         all_mode = params.get('all', ['false'])[0].lower() == 'true'
         fresh = params.get('fresh', ['false'])[0].lower() == 'true'
-        fy = int(params.get('fy', [str(FISCAL_YEAR)])[0])
+        try:
+            fy = int(params.get('fy', [str(FISCAL_YEAR)])[0])
+        except (ValueError, TypeError):
+            self.send_response(400)
+            self.send_header('Content-Type', 'application/json')
+            _cors_headers(self)
+            self.end_headers()
+            self.wfile.write(json.dumps({"error": "Invalid fiscal year parameter"}).encode())
+            return
 
         if all_mode:
             # Return all tickers
@@ -174,6 +198,7 @@ class handler(BaseHTTPRequestHandler):
         if ticker not in set(TICKERS):
             self.send_response(400)
             self.send_header('Content-Type', 'application/json')
+            _cors_headers(self)
             self.end_headers()
             self.wfile.write(json.dumps({
                 "error": f"Ticker must be one of: {', '.join(TICKERS)}"
@@ -189,6 +214,7 @@ class handler(BaseHTTPRequestHandler):
         if data is None:
             self.send_response(503)
             self.send_header('Content-Type', 'application/json')
+            _cors_headers(self)
             self.end_headers()
             self.wfile.write(json.dumps({
                 "error": "Unable to fetch data from any source"
