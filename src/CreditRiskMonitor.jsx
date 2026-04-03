@@ -2067,7 +2067,7 @@ return (
       { l: "Neg. / Developing Outlook", v: negOutlook, c: "#ef4444", accent: "#ef4444" },
       { l: "Negative FCF", v: `${negFcfCount} / ${enrichedPortfolio.length}`, c: "#ef4444", accent: "#ef4444" },
     ].map((k, i) => (
-      <div key={i} style={{ ...card, position: "relative", overflow: "hidden", transition: "border-color .2s ease, transform .2s ease" }}>
+      <div key={i} style={{ ...card, position: "relative", overflow: "hidden", transition: "border-color .2s ease, transform .2s ease", animation: dataLoading.portfolio ? "shimmer 1.5s ease infinite" : "none", backgroundImage: dataLoading.portfolio ? "linear-gradient(90deg, transparent 25%, rgba(59,130,246,0.04) 50%, transparent 75%)" : "none", backgroundSize: "200% 100%" }}>
         <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: k.accent || "#3b82f6", opacity: 0.6 }} />
         <div style={{ ...kpiVal, color: k.c || "#f1f5f9", marginTop: 4 }}>{k.v}</div>
         <div style={kpiLabel}>{k.l}</div>
