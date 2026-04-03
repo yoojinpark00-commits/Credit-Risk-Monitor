@@ -152,12 +152,12 @@ analystQA: [
 analystRating: "Hold",
 targetPrice: 12.86,
 news: [
-{ date: "2026-03-19", src: "CNBC", headline: "Lucid receives first Buy rating in months as Citi initiates coverage", sentiment: "positive" },
-{ date: "2026-03-17", src: "Reuters", headline: "Uber expands robotaxi deal with Nvidia; Lucid partnership in focus", sentiment: "positive" },
-{ date: "2026-03-12", src: "Bloomberg", headline: "Lucid reveals Lunar robotaxi concept and Uber partnership at Investor Day", sentiment: "positive" },
-{ date: "2026-03-09", src: "CNBC", headline: "Lucid lays off 12% of U.S. workforce to cut costs and improve gross margin", sentiment: "negative" },
-{ date: "2026-02-25", src: "CNBC", headline: "Lucid widely misses earnings expectations, forecasts slowing EV growth in 2026", sentiment: "negative" },
-{ date: "2026-02-24", src: "Bloomberg", headline: "Lucid files prospectus to register 69M shares for resale by PIF and Uber affiliates", sentiment: "negative" },
+{ date: "2026-03-19", src: "CNBC", headline: "Lucid receives first Buy rating in months as Citi initiates coverage", sentiment: "positive", summary: "Citi initiates with Buy ($16 PT), citing Gravity SUV ramp and Uber robotaxi partnership as key optionality drivers. First bullish initiation since Q4 2025 earnings miss." },
+{ date: "2026-03-17", src: "Reuters", headline: "Uber expands robotaxi deal with Nvidia; Lucid partnership in focus", sentiment: "positive", summary: "Uber's expanded autonomous vehicle program puts Lucid's partnership in the spotlight alongside Nvidia. Deal validates Lucid's technology platform for commercial AV deployment." },
+{ date: "2026-03-12", src: "Bloomberg", headline: "Lucid reveals Lunar robotaxi concept and Uber partnership at Investor Day", sentiment: "positive", summary: "Investor Day showcased the Lunar robotaxi concept and formalized partnership with Uber for autonomous ride-hailing. Management outlined path to FCF positive by 2028." },
+{ date: "2026-03-09", src: "CNBC", headline: "Lucid lays off 12% of U.S. workforce to cut costs and improve gross margin", sentiment: "negative", summary: "Restructuring targets $500M in cost savings over three years, incurring $40-42M in charges. Workforce reduction excludes hourly production roles at AMP-1 and AMP-2 plants." },
+{ date: "2026-02-25", src: "CNBC", headline: "Lucid widely misses earnings expectations, forecasts slowing EV growth in 2026", sentiment: "negative", summary: "Q4 FY2025 revenue of $522.7M missed consensus by 8%. FY2025 adjusted EBITDA loss of -$2.79B worse than guided. 2026 delivery guidance of 25-27K vehicles below expectations." },
+{ date: "2026-02-24", src: "Bloomberg", headline: "Lucid files prospectus to register 69M shares for resale by PIF and Uber affiliates", sentiment: "negative", summary: "Registration of 69M shares for PIF and Uber affiliates creates overhang risk. Secondary offering potential could pressure stock price in near term." },
 ],
 ratingHistory: [
 { date: "2025-11", sp: "NR", moodys: "NR", fitch: "NR", event: "$975M convertible notes issued (2031 maturity)" },
@@ -317,12 +317,12 @@ analystQA: [
 analystRating: "Buy",
 targetPrice: 17.74,
 news: [
-{ date: "2026-03-20", src: "Bloomberg", headline: "Rivian shares fall 6.8% as Middle East tensions weigh on cyclical stocks", sentiment: "negative" },
-{ date: "2026-03-19", src: "Reuters", headline: "Uber invests $1.25B in Rivian for 10,000 autonomous R2 robotaxis", sentiment: "positive" },
-{ date: "2026-03-19", src: "CNBC", headline: "Rivian no longer expects to be adjusted EBITDA positive in 2027", sentiment: "negative" },
-{ date: "2026-03-12", src: "CNBC", headline: "Rivian launches R2 SUV at $57,990; deliveries begin spring 2026", sentiment: "positive" },
-{ date: "2026-03-10", src: "Bloomberg", headline: "TD Cowen upgrades Rivian to Buy on R2 demand potential", sentiment: "positive" },
-{ date: "2026-02-13", src: "Reuters", headline: "Deutsche Bank and UBS both upgrade Rivian on improving fundamentals", sentiment: "positive" },
+{ date: "2026-03-20", src: "Bloomberg", headline: "Rivian shares fall 6.8% as Middle East tensions weigh on cyclical stocks", sentiment: "negative", summary: "Broad risk-off move hit EV names disproportionately as oil price spike raised input cost concerns. Rivian's high-beta profile amplified the sell-off despite no company-specific catalyst." },
+{ date: "2026-03-19", src: "Reuters", headline: "Uber invests $1.25B in Rivian for 10,000 autonomous R2 robotaxis", sentiment: "positive", summary: "Partnership deploys R2 platform for Uber's autonomous ride-hailing fleet. $1.25B investment commitment de-risks 2027-2028 production ramp." },
+{ date: "2026-03-19", src: "CNBC", headline: "Rivian no longer expects to be adjusted EBITDA positive in 2027", sentiment: "negative", summary: "Management pushed adjusted EBITDA breakeven beyond 2027 due to R2 development costs and Georgia plant ramp investments. 2026 EBITDA loss guided at -$1.8B to -$2.1B." },
+{ date: "2026-03-12", src: "CNBC", headline: "Rivian launches R2 SUV at $57,990; deliveries begin spring 2026", sentiment: "positive", summary: "R2 reservations exceed 100,000 within first week of opening. $45K starting price positions Rivian for mass-market segment entry in 2027." },
+{ date: "2026-03-10", src: "Bloomberg", headline: "TD Cowen upgrades Rivian to Buy on R2 demand potential", sentiment: "positive", summary: "TD Cowen sees R2 as a margin inflection catalyst with stronger unit economics than R1. Upgrade reflects confidence in mass-market EV demand at sub-$60K price point." },
+{ date: "2026-02-13", src: "Reuters", headline: "Deutsche Bank and UBS both upgrade Rivian on improving fundamentals", sentiment: "positive", summary: "Dual upgrades cite first full year of positive gross profit and narrowing EBITDA losses. VW JV software revenue provides diversification away from vehicle-only economics." },
 ],
 ratingHistory: [
 { date: "2025-06", sp: "NR", moodys: "NR", fitch: "NR", event: "$1.25B green notes issued (2031), redeemed 2026 floating-rate notes" },
@@ -467,9 +467,9 @@ analystQA: [
 analystRating: "Hold",
 targetPrice: 42.00,
 news: [
-{ date: "2026-02-04", src: "Business Wire", headline: "Central Garden & Pet Q1 FY2026 earnings beat on margins despite 6% revenue decline", sentiment: "positive" },
-{ date: "2026-01-15", src: "Reuters", headline: "Central Garden completes Champion USA tuck-in acquisition for livestock segment", sentiment: "positive" },
-{ date: "2025-11-24", src: "Zacks", headline: "Central Garden delivers record FY2025 bottom-line results and cash position", sentiment: "positive" },
+{ date: "2026-02-04", src: "Business Wire", headline: "Central Garden & Pet Q1 FY2026 earnings beat on margins despite 6% revenue decline", sentiment: "positive", summary: "Q1 FY2026 revenue of $617M missed by 3% on shipment timing shift to Q2. EBITDA margins expanded 120bps YoY on cost optimization. Cash position remains at record levels." },
+{ date: "2026-01-15", src: "Reuters", headline: "Central Garden completes Champion USA tuck-in acquisition for livestock segment", sentiment: "positive", summary: "Acquisition expands pet segment portfolio in premium natural products. Deal funded from balance sheet; no incremental debt needed given $883M cash position." },
+{ date: "2025-11-24", src: "Zacks", headline: "Central Garden delivers record FY2025 bottom-line results and cash position", sentiment: "positive", summary: "FY2025 non-GAAP EPS and cash generation hit all-time highs driven by Cost & Simplicity program. Record $883M cash position strengthens balance sheet and supports M&A optionality." },
 ],
 ratingHistory: [
 { date: "2025-06", sp: "BB", moodys: "B1", fitch: "BB", event: "Stable outlook reaffirmed; Cost & Simplicity driving margin improvement" },
@@ -615,9 +615,9 @@ analystQA: [
 analystRating: "Sell",
 targetPrice: 2.50,
 news: [
-{ date: "2026-03-02", src: "Business Wire", headline: "iHeartMedia reports Q4/FY2025 results; adj EBITDA declines 10.5%", sentiment: "negative" },
-{ date: "2025-12-22", src: "Reuters", headline: "iHeartMedia completes $4.8B debt restructuring, reduces debt by $440M", sentiment: "positive" },
-{ date: "2025-11-10", src: "CNBC", headline: "iHeartMedia Q3 revenue flat as traditional radio ad spend stagnates", sentiment: "negative" },
+{ date: "2026-03-02", src: "Business Wire", headline: "iHeartMedia reports Q4/FY2025 results; adj EBITDA declines 10.5%", sentiment: "negative", summary: "FY2025 adjusted EBITDA of $686M declined 10.5% YoY. Podcast revenue grew 24.5% but traditional radio ad spend remains under pressure. Net leverage at 6.6x." },
+{ date: "2025-12-22", src: "Reuters", headline: "iHeartMedia completes $4.8B debt restructuring, reduces debt by $440M", sentiment: "positive", summary: "Comprehensive debt exchange reduces total debt by $440M and extends maturities to 2029-2031. New structure replaces 6.375% notes with first and second lien instruments." },
+{ date: "2025-11-10", src: "CNBC", headline: "iHeartMedia Q3 revenue flat as traditional radio ad spend stagnates", sentiment: "negative", summary: "Total revenue essentially flat as digital audio growth offsets traditional broadcast decline. Management reaffirmed FY2025 EBITDA guidance of $686M." },
 ],
 ratingHistory: [
 { date: "2025-12", sp: "CCC+", moodys: "Caa2", fitch: "NR", event: "Completed $4.8B comprehensive debt exchange" },
@@ -755,7 +755,7 @@ analystQA: [],
 analystRating: "NR",
 targetPrice: null,
 news: [
-{ date: "2025-11-25", src: "Company", headline: "Beusa Energy rebrands, highlighting integrated energy solutions beyond oil & gas", sentiment: "positive" },
+{ date: "2025-11-25", src: "Company", headline: "Beusa Energy rebrands, highlighting integrated energy solutions beyond oil & gas", sentiment: "positive", summary: "Rebrand signals strategic pivot toward electric frac and data center power via Evolution Well Services and Dynamis Power subsidiaries. Diversification reduces pure-play oilfield services commodity risk." },
 ],
 ratingHistory: [],
 financials: [
@@ -887,8 +887,8 @@ analystQA: [
 analystRating: "Hold",
 targetPrice: 32.00,
 news: [
-{ date: "2026-03-16", src: "PR Newswire", headline: "Summit Midstream reports Q4/FY2025; signs new 10-year Double E contracts", sentiment: "positive" },
-{ date: "2025-08-12", src: "SEC", headline: "Summit Midstream Q2 adj EBITDA $61.1M; expects FY near low end of guidance", sentiment: "negative" },
+{ date: "2026-03-16", src: "PR Newswire", headline: "Summit Midstream reports Q4/FY2025; signs new 10-year Double E contracts", sentiment: "positive", summary: "FY2025 adjusted EBITDA of $243M at midpoint of guidance. New 10-year firm take-or-pay contracts on Double E pipeline de-risk Permian segment growth trajectory through 2029." },
+{ date: "2025-08-12", src: "SEC", headline: "Summit Midstream Q2 adj EBITDA $61.1M; expects FY near low end of guidance", sentiment: "negative", summary: "Q2 EBITDA of $61.1M disappointed as customer development schedules slipped. Management guided FY2025 toward low end of $225-$265M range, raising execution concerns." },
 ],
 ratingHistory: [
 { date: "2025-01", sp: "NR", moodys: "NR", fitch: "NR", event: "$250M Second Lien add-on executed" },
@@ -1034,9 +1034,9 @@ analystQA: [
 analystRating: "Buy",
 targetPrice: 22.00,
 news: [
-{ date: "2026-02-20", src: "Business Wire", headline: "Upbound posts strong FY2025 results; sets 2026 outlook for revenue growth and EBITDA expansion", sentiment: "positive" },
-{ date: "2025-10-30", src: "Seeking Alpha", headline: "Upbound Q3: Acima LCO rates rising but non-GAAP EPS beats; EBITDA guidance lowered modestly", sentiment: "negative" },
-{ date: "2025-05-01", src: "Business Wire", headline: "Upbound Q1 2025 revenue up 7.3% YoY; Brigit acquisition adding segment diversification", sentiment: "positive" },
+{ date: "2026-02-20", src: "Business Wire", headline: "Upbound posts strong FY2025 results; sets 2026 outlook for revenue growth and EBITDA expansion", sentiment: "positive", summary: "FY2025 adjusted EBITDA of $500M met guidance; 2026 outlook of $500-$535M EBITDA implies continued margin expansion. Net leverage at 3.4x remains manageable for BB- credit profile." },
+{ date: "2025-10-30", src: "Seeking Alpha", headline: "Upbound Q3: Acima LCO rates rising but non-GAAP EPS beats; EBITDA guidance lowered modestly", sentiment: "negative", summary: "Acima lease charge-off rates rose to 9.7% in Q3, signaling credit deterioration in non-prime consumer base. EBITDA guidance trimmed to $500-$510M from $510-$520M." },
+{ date: "2025-05-01", src: "Business Wire", headline: "Upbound Q1 2025 revenue up 7.3% YoY; Brigit acquisition adding segment diversification", sentiment: "positive", summary: "Brigit fintech acquisition ($460M) adds subscription-based financial tools for underserved consumers. Revenue growth driven by Acima GMV expansion and new retail partner signings." },
 ],
 ratingHistory: [
 { date: "2025-01", sp: "BB-", moodys: "Ba3", fitch: "NR", event: "Brigit fintech acquisition completed ($460M)" },
@@ -1184,9 +1184,9 @@ analystQA: [
 analystRating: "Buy",
 targetPrice: 38.00,
 news: [
-{ date: "2026-02-19", src: "Globe Newswire", headline: "WillScot reports Q4/FY2025 results; adj EBITDA margins resilient at 44%", sentiment: "positive" },
-{ date: "2025-10-16", src: "Business Wire", headline: "WillScot amends ABL facility — extends maturity to 2030, reduces borrowing costs", sentiment: "positive" },
-{ date: "2025-05-01", src: "Reuters", headline: "WillScot Q1 results in-line; reaffirms FY2025 outlook; pending order book up 7%", sentiment: "positive" },
+{ date: "2026-02-19", src: "Globe Newswire", headline: "WillScot reports Q4/FY2025 results; adj EBITDA margins resilient at 44%", sentiment: "positive", summary: "FY2025 adjusted EBITDA of $971M with 42.5% margin demonstrates pricing power despite 5% revenue decline. Net leverage at 3.5x within target range; next maturity not until 2028." },
+{ date: "2025-10-16", src: "Business Wire", headline: "WillScot amends ABL facility — extends maturity to 2030, reduces borrowing costs", sentiment: "positive", summary: "ABL maturity extended from 2027 to October 2030, saving ~$5M annually in interest costs. $1.6B availability provides substantial liquidity cushion against cyclical downturns." },
+{ date: "2025-05-01", src: "Reuters", headline: "WillScot Q1 results in-line; reaffirms FY2025 outlook; pending order book up 7%", sentiment: "positive", summary: "Pending order book growth of 7% YoY supports forward lease activation visibility. Management reaffirmed FY2025 EBITDA guidance, maintaining confidence in rate expansion from VAPS penetration." },
 ],
 ratingHistory: [
 { date: "2025-10", sp: "BB+", moodys: "Ba2", fitch: "NR", event: "ABL maturity extended to 2030; stable outlook maintained" },
@@ -1329,8 +1329,8 @@ analystQA: [],
 analystRating: "NR",
 targetPrice: null,
 news: [
-{ date: "2025-05-05", src: "Recycling Today", headline: "JSW Steel USA plans $119M+ investment in Ohio EAF mill for renewable energy steel", sentiment: "positive" },
-{ date: "2025-03-15", src: "JSW Group", headline: "Parent JSW Steel FY25: net debt declined; healthy domestic demand in India supports operations", sentiment: "positive" },
+{ date: "2025-05-05", src: "Recycling Today", headline: "JSW Steel USA plans $119M+ investment in Ohio EAF mill for renewable energy steel", sentiment: "positive", summary: "Capital investment in Mingo Junction EAF modernization positions JSW USA for renewable energy and infrastructure steel demand. Expansion funded by parent JSW Group, limiting subsidiary debt burden." },
+{ date: "2025-03-15", src: "JSW Group", headline: "Parent JSW Steel FY25: net debt declined; healthy domestic demand in India supports operations", sentiment: "positive", summary: "Parent JSW Steel deleveraged in FY25 with declining net debt, reinforcing implicit credit support for US subsidiary. Healthy Indian steel demand underpins consolidated group cash generation." },
 ],
 ratingHistory: [],
 financials: [
