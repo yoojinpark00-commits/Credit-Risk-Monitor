@@ -139,6 +139,8 @@ const [overrideReason, setOverrideReason] = useState("");
 const [searchQuery, setSearchQuery] = useState("");
 const [sortCol, setSortCol] = useState(null);
 const [sortDir, setSortDir] = useState("asc");
+const [dbPortfolio, setDbPortfolio] = useState(null);
+const [portfolioSource, setPortfolioSource] = useState("static"); // "static" | "api" | "error"
 
 // ─── NAVIGATION HISTORY ───────────────────────────────────────────────
 const [navHistory, setNavHistory] = useState([{ selected: null, tab: "overview", detailTab: "financials" }]);
@@ -216,7 +218,7 @@ return () => window.removeEventListener("popstate", onPopState);
 const [secFilings, setSecFilings] = useState([]);
 const [liveNews, setLiveNews] = useState([]);
 const [marketData, setMarketData] = useState({});
-const [dataLoading, setDataLoading] = useState({ sec: false, news: false, market: false });
+const [dataLoading, setDataLoading] = useState({ sec: false, news: false, market: false, portfolio: false });
 const [dataError, setDataError] = useState({});
 const [lastRefresh, setLastRefresh] = useState(null);
 
@@ -252,6 +254,23 @@ setDataError(prev => ({ ...prev, news: e.message }));
 setDataLoading(prev => ({ ...prev, news: false }));
 }, []);
 
+const fetchPortfolio = useCallback(async () => {
+  setDataLoading(prev => ({ ...prev, portfolio: true }));
+  try {
+    const resp = await fetch("/api/portfolio?all=true");
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const data = await resp.json();
+    if (data.portfolio && Object.keys(data.portfolio).length > 0) {
+      setDbPortfolio(data.portfolio);
+      setPortfolioSource("api");
+    }
+  } catch (e) {
+    console.warn("Portfolio API unavailable, using static data:", e.message);
+    setPortfolioSource("error");
+  }
+  setDataLoading(prev => ({ ...prev, portfolio: false }));
+}, []);
+
 const fetchMarketData = useCallback(async () => {
 setDataLoading(prev => ({ ...prev, market: true }));
 try {
@@ -266,11 +285,12 @@ setDataLoading(prev => ({ ...prev, market: false }));
 }, []);
 
 const refreshAll = useCallback(() => {
+fetchPortfolio();
 fetchSecFilings();
 fetchLiveNews();
 fetchMarketData();
 setLastRefresh(new Date());
-}, [fetchSecFilings, fetchLiveNews, fetchMarketData]);
+}, [fetchPortfolio, fetchSecFilings, fetchLiveNews, fetchMarketData]);
 
 useEffect(() => { refreshAll(); }, []);
 
@@ -358,9 +378,19 @@ const px = mob ? 12 : 24; // responsive padding
 // ─── APPLY LIVE MARKET DATA TO PORTFOLIO ─────────────────────────────
 // Overlay live equity prices from API onto portfolio entries so all views
 // (KPIs, detail headers, tables) reflect current market data.
+const basePortfolio = useMemo(() => {
+  if (!dbPortfolio) return PORTFOLIO;
+  return PORTFOLIO.map((staticEntry) => {
+    const dbEntry = dbPortfolio[staticEntry.id];
+    if (!dbEntry) return staticEntry;
+    // Deep merge: DB values override static, but keep static fields that DB doesn't have
+    return { ...staticEntry, ...dbEntry, _dbSource: true };
+  });
+}, [dbPortfolio]);
+
 const enrichedPortfolio = useMemo(() => {
-  if (Object.keys(marketData).length === 0) return PORTFOLIO;
-  return PORTFOLIO.map((c) => {
+  if (Object.keys(marketData).length === 0) return basePortfolio;
+  return basePortfolio.map((c) => {
     const quote = marketData[c.id];
     if (!quote || quote.error) return c;
     return {
@@ -371,7 +401,7 @@ const enrichedPortfolio = useMemo(() => {
       _liveEquity: true,
     };
   });
-}, [marketData]);
+}, [basePortfolio, marketData]);
 
 // ─── SEARCH & SORT ──────────────────────────────────────────────────
 const filteredPortfolio = useMemo(() => {
@@ -2009,6 +2039,17 @@ return (
 </div>
 </div>
 </div>
+
+  {/* Data Source Indicator */}
+  <div style={{ padding: `8px ${px}px 0`, display: "flex", alignItems: "center", gap: 8 }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 10px", background: portfolioSource === "api" ? "rgba(34,197,94,0.1)" : "rgba(148,163,184,0.08)", borderRadius: 4, border: `1px solid ${portfolioSource === "api" ? "rgba(34,197,94,0.2)" : "rgba(148,163,184,0.1)"}` }}>
+      <div style={{ width: 6, height: 6, borderRadius: "50%", background: portfolioSource === "api" ? "#22c55e" : portfolioSource === "error" ? "#f97316" : "#64748b", boxShadow: portfolioSource === "api" ? "0 0 6px rgba(34,197,94,0.4)" : "none" }} />
+      <span style={{ fontSize: 9, color: portfolioSource === "api" ? "#86efac" : "#94a3b8", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+        {dataLoading.portfolio ? "Connecting..." : portfolioSource === "api" ? "Live Data" : portfolioSource === "error" ? "Static (API unavailable)" : "Static Data"}
+      </span>
+    </div>
+    {lastRefresh && <span style={{ fontSize: 9, color: "#64748b" }}>Last refresh: {lastRefresh.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}</span>}
+  </div>
 
   {/* ALERT */}
   <div style={{ padding: `16px ${px}px 0` }}>

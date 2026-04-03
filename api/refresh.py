@@ -11,7 +11,7 @@ from datetime import datetime
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'scripts'))
 
-TICKERS = ['LCID', 'RIVN', 'CENT', 'IHRT', 'SMC', 'UPBD', 'WSC']
+TICKERS = ['LCID', 'RIVN', 'CENT', 'IHRT', 'SMC', 'UPBD', 'WSC', 'BEUSA', 'JSWUSA']
 FISCAL_YEAR = 2025
 FMP_API_KEY = os.environ.get('FMP_API_KEY')
 SUPABASE_URL = os.environ.get('SUPABASE_URL')

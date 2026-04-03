@@ -62,3 +62,14 @@ CREATE POLICY "Allow anon read overrides" ON manual_overrides
 -- Allow anon read on audit log
 CREATE POLICY "Allow anon read audit" ON audit_log
     FOR SELECT USING (true);
+
+-- View: Latest portfolio data per ticker (most recent fetch)
+CREATE OR REPLACE VIEW latest_portfolio AS
+SELECT DISTINCT ON (ticker, fiscal_year)
+    id, ticker, fiscal_year, data_json, fetched_at, created_at
+FROM portfolio_data
+ORDER BY ticker, fiscal_year, fetched_at DESC;
+
+-- Prevent duplicate fetches within the same minute
+CREATE UNIQUE INDEX IF NOT EXISTS idx_portfolio_no_dupe
+    ON portfolio_data (ticker, fiscal_year, date_trunc('minute', fetched_at));
