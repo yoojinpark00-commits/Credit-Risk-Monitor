@@ -140,7 +140,8 @@ const [searchQuery, setSearchQuery] = useState("");
 const [sortCol, setSortCol] = useState(null);
 const [sortDir, setSortDir] = useState("asc");
 const [dbPortfolio, setDbPortfolio] = useState(null);
-const [portfolioSource, setPortfolioSource] = useState("static"); // "static" | "api" | "error"
+const [portfolioSource, setPortfolioSource] = useState("static");
+const [expandedNews, setExpandedNews] = useState({}); // "static" | "api" | "error"
 
 // ─── NAVIGATION HISTORY ───────────────────────────────────────────────
 const [navHistory, setNavHistory] = useState([{ selected: null, tab: "overview", detailTab: "financials" }]);
@@ -1959,16 +1960,32 @@ return (
       {detailTab === "news" && (
         <div style={card}>
           <div style={{ fontSize: 12, fontWeight: 700, color: "#94a3b8", marginBottom: 16, textTransform: "uppercase", letterSpacing: "0.5px" }}>Recent Headlines {"\u2014"} {detail.name}</div>
-          {detail.news.map((n, i) => (
-            <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "12px 0", borderBottom: i < detail.news.length - 1 ? "1px solid #1e293b" : "none" }}>
-              <div style={{ width: 8, height: 8, borderRadius: "50%", background: sentimentColor(n.sentiment), marginTop: 5, flexShrink: 0 }} />
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.5 }}>{n.headline}</div>
-                <div style={{ fontSize: 11, color: "#64748b", marginTop: 3 }}>{n.src} {"\u00B7"} {n.date}</div>
+          {detail.news.map((n, i) => {
+            const newsKey = `${detail.id}-${i}`;
+            const isOpen = expandedNews[newsKey];
+            return (
+            <div key={i} style={{ borderBottom: i < detail.news.length - 1 ? "1px solid #1e293b" : "none" }}>
+              <div onClick={() => n.summary && setExpandedNews(prev => ({ ...prev, [newsKey]: !prev[newsKey] }))} style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "12px 0", cursor: n.summary ? "pointer" : "default", transition: "background .15s ease", borderRadius: 4 }}>
+                <div style={{ width: 8, height: 8, borderRadius: "50%", background: sentimentColor(n.sentiment), marginTop: 5, flexShrink: 0 }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.5 }}>{n.headline}</div>
+                  <div style={{ fontSize: 11, color: "#64748b", marginTop: 3 }}>{n.src} {"\u00B7"} {n.date}</div>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                  <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", color: sentimentColor(n.sentiment), letterSpacing: "0.5px" }}>{n.sentiment}</span>
+                  {n.summary && <span style={{ fontSize: 10, color: "#64748b", transition: "transform .2s ease", transform: isOpen ? "rotate(180deg)" : "rotate(0deg)" }}>{"\u25BC"}</span>}
+                </div>
               </div>
-              <span style={{ marginLeft: "auto", fontSize: 10, fontWeight: 700, textTransform: "uppercase", color: sentimentColor(n.sentiment), letterSpacing: "0.5px", flexShrink: 0 }}>{n.sentiment}</span>
+              {isOpen && n.summary && (
+                <div style={{ padding: "0 0 12px 20px", animation: "fadeIn 0.2s ease forwards" }}>
+                  <div style={{ padding: "10px 14px", background: "#0a0e1a", borderRadius: 6, borderLeft: `3px solid ${sentimentColor(n.sentiment)}`, fontSize: 12, color: "#94a3b8", lineHeight: 1.7 }}>
+                    {n.summary}
+                  </div>
+                </div>
+              )}
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
