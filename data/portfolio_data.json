@@ -1,0 +1,277 @@
+{
+  "LCID": {
+    "id": "LCID",
+    "name": "Lucid Group Inc.",
+    "sector": "EV / Automotive",
+    "sp": "NR",
+    "moodys": "NR",
+    "fitch": "NR",
+    "impliedRating": "CCC+",
+    "outlook": "Negative",
+    "ebitda": -2790,
+    "revenue": 1354,
+    "netIncome": -2700,
+    "totalDebt": 2740,
+    "cash": 4600,
+    "totalAssets": 8400,
+    "totalEquity": 3000,
+    "fcf": -3800,
+    "adjBurn": {
+      "adjEBITDA": -2790,
+      "gaapEbitda": -3100,
+      "sbc": 285,
+      "restructuring": 40,
+      "otherNonCash": -15
+    },
+    "financials": [
+      { "period": "FY2025", "rev": 1354, "ebitda": -2790, "ni": -2700, "debt": 2740, "cash": 4600 },
+      { "period": "FY2024", "rev": 875, "ebitda": -3050, "ni": -3420, "debt": 2000, "cash": 4500 },
+      { "period": "FY2023", "rev": 595, "ebitda": -3290, "ni": -2828, "debt": 2050, "cash": 4850 },
+      { "period": "FY2022", "rev": 608, "ebitda": -3050, "ni": -1304, "debt": 2000, "cash": 6260 }
+    ]
+  },
+  "RIVN": {
+    "id": "RIVN",
+    "name": "Rivian Automotive Inc.",
+    "sector": "EV / Automotive",
+    "sp": "NR",
+    "moodys": "NR",
+    "fitch": "NR",
+    "impliedRating": "B-",
+    "outlook": "Developing",
+    "ebitda": -2063,
+    "revenue": 5387,
+    "netIncome": -3626,
+    "totalDebt": 4400,
+    "cash": 6082,
+    "totalAssets": 14900,
+    "totalEquity": 4600,
+    "fcf": -2500,
+    "adjBurn": {
+      "adjEBITDA": -2063,
+      "gaapEbitda": -2800,
+      "sbc": 700,
+      "restructuring": 0,
+      "otherNonCash": 37
+    },
+    "financials": [
+      { "period": "FY2025", "rev": 5387, "ebitda": -2063, "ni": -3626, "debt": 4400, "cash": 6082 },
+      { "period": "FY2024", "rev": 4970, "ebitda": -3200, "ni": -4746, "debt": 5400, "cash": 7700 },
+      { "period": "FY2023", "rev": 4434, "ebitda": -4760, "ni": -5432, "debt": 4430, "cash": 9410 },
+      { "period": "FY2022", "rev": 1658, "ebitda": -6340, "ni": -6752, "debt": 1500, "cash": 11570 }
+    ]
+  },
+  "CENT": {
+    "id": "CENT",
+    "name": "Central Garden & Pet Co.",
+    "sector": "Consumer Products",
+    "sp": "BB",
+    "moodys": "B1",
+    "fitch": "BB",
+    "impliedRating": "BB-",
+    "outlook": "Stable",
+    "ebitda": 335,
+    "revenue": 3100,
+    "netIncome": 163,
+    "totalDebt": 1200,
+    "cash": 883,
+    "totalAssets": 3630,
+    "totalEquity": 1580,
+    "fcf": 291,
+    "adjBurn": {
+      "adjEBITDA": 335,
+      "gaapEbitda": 320,
+      "sbc": 15,
+      "restructuring": 0,
+      "otherNonCash": 0
+    },
+    "financials": [
+      { "period": "FY2025", "rev": 3100, "ebitda": 335, "ni": 163, "debt": 1200, "cash": 883 },
+      { "period": "FY2024", "rev": 3280, "ebitda": 385, "ni": 118, "debt": 1200, "cash": 580 },
+      { "period": "FY2023", "rev": 3170, "ebitda": 340, "ni": 89, "debt": 1250, "cash": 510 },
+      { "period": "FY2022", "rev": 3640, "ebitda": 410, "ni": 156, "debt": 1300, "cash": 450 }
+    ]
+  },
+  "IHRT": {
+    "id": "IHRT",
+    "name": "iHeartMedia Inc.",
+    "sector": "Media / Broadcasting",
+    "sp": "CCC+",
+    "moodys": "Caa2",
+    "fitch": "NR",
+    "impliedRating": "CCC",
+    "outlook": "Negative",
+    "ebitda": 686,
+    "revenue": 3860,
+    "netIncome": -472,
+    "totalDebt": 5100,
+    "cash": 271,
+    "totalAssets": 5090,
+    "totalEquity": -1800,
+    "fcf": 11,
+    "adjBurn": {
+      "adjEBITDA": 686,
+      "gaapEbitda": 442,
+      "sbc": 30,
+      "restructuring": 214,
+      "otherNonCash": 0
+    },
+    "financials": [
+      { "period": "FY2025", "rev": 3860, "ebitda": 686, "ni": -472, "debt": 5100, "cash": 271 },
+      { "period": "FY2024", "rev": 3800, "ebitda": 820, "ni": -714, "debt": 5200, "cash": 315 },
+      { "period": "FY2023", "rev": 3820, "ebitda": 845, "ni": -175, "debt": 5400, "cash": 290 },
+      { "period": "FY2022", "rev": 3960, "ebitda": 880, "ni": -210, "debt": 5580, "cash": 380 }
+    ]
+  },
+  "BEUSA": {
+    "id": "BEUSA",
+    "name": "Beusa Investments LLC",
+    "sector": "Energy / Oilfield Services",
+    "sp": "NR",
+    "moodys": "NR",
+    "fitch": "NR",
+    "impliedRating": "B-",
+    "outlook": "Stable",
+    "ebitda": 55,
+    "revenue": 250,
+    "netIncome": 10,
+    "totalDebt": 200,
+    "cash": 45,
+    "totalAssets": 500,
+    "totalEquity": 150,
+    "fcf": 25,
+    "adjBurn": {
+      "adjEBITDA": 55,
+      "gaapEbitda": 52,
+      "sbc": 3,
+      "restructuring": 0,
+      "otherNonCash": 0
+    },
+    "financials": [
+      { "period": "FY2025E", "rev": 250, "ebitda": 55, "ni": 10, "debt": 200, "cash": 45 },
+      { "period": "FY2024E", "rev": 220, "ebitda": 48, "ni": 5, "debt": 210, "cash": 35 }
+    ]
+  },
+  "SMC": {
+    "id": "SMC",
+    "name": "Summit Midstream Corp.",
+    "sector": "Midstream / Energy",
+    "sp": "NR",
+    "moodys": "NR",
+    "fitch": "NR",
+    "impliedRating": "B",
+    "outlook": "Stable",
+    "ebitda": 243,
+    "revenue": 567,
+    "netIncome": -25,
+    "totalDebt": 930,
+    "cash": 21,
+    "totalAssets": 2423,
+    "totalEquity": 470,
+    "fcf": 17,
+    "adjBurn": {
+      "adjEBITDA": 243,
+      "gaapEbitda": 225,
+      "sbc": 18,
+      "restructuring": 0,
+      "otherNonCash": 0
+    },
+    "financials": [
+      { "period": "FY2025", "rev": 567, "ebitda": 243, "ni": -25, "debt": 930, "cash": 21 },
+      { "period": "FY2024", "rev": 430, "ebitda": 225, "ni": -122, "debt": 977, "cash": 23 },
+      { "period": "FY2023", "rev": 400, "ebitda": 210, "ni": -80, "debt": 1050, "cash": 18 }
+    ]
+  },
+  "UPBD": {
+    "id": "UPBD",
+    "name": "Upbound Group Inc.",
+    "sector": "Consumer Finance / RTO",
+    "sp": "BB-",
+    "moodys": "Ba3",
+    "fitch": "NR",
+    "impliedRating": "BB-",
+    "outlook": "Stable",
+    "ebitda": 500,
+    "revenue": 4700,
+    "netIncome": 73,
+    "totalDebt": 1833,
+    "cash": 120,
+    "totalAssets": 3300,
+    "totalEquity": 687,
+    "fcf": 239,
+    "adjBurn": {
+      "adjEBITDA": 500,
+      "gaapEbitda": 275,
+      "sbc": 75,
+      "restructuring": 150,
+      "otherNonCash": 0
+    },
+    "financials": [
+      { "period": "FY2025", "rev": 4700, "ebitda": 500, "ni": 73, "debt": 1833, "cash": 120 },
+      { "period": "FY2024", "rev": 4320, "ebitda": 455, "ni": 121, "debt": 1750, "cash": 105 },
+      { "period": "FY2023", "rev": 3990, "ebitda": 420, "ni": 95, "debt": 1650, "cash": 90 },
+      { "period": "FY2022", "rev": 4300, "ebitda": 475, "ni": 185, "debt": 1500, "cash": 115 }
+    ]
+  },
+  "WSC": {
+    "id": "WSC",
+    "name": "WillScot Holdings Corp.",
+    "sector": "Industrial Services / Modular Space",
+    "sp": "BB+",
+    "moodys": "Ba2",
+    "fitch": "NR",
+    "impliedRating": "BB+",
+    "outlook": "Stable",
+    "ebitda": 971,
+    "revenue": 2282,
+    "netIncome": 134,
+    "totalDebt": 3588,
+    "cash": 14,
+    "totalAssets": 6100,
+    "totalEquity": 1060,
+    "fcf": 489,
+    "adjBurn": {
+      "adjEBITDA": 971,
+      "gaapEbitda": 900,
+      "sbc": 50,
+      "restructuring": 21,
+      "otherNonCash": 0
+    },
+    "financials": [
+      { "period": "FY2025", "rev": 2282, "ebitda": 971, "ni": 134, "debt": 3588, "cash": 14 },
+      { "period": "FY2024", "rev": 2396, "ebitda": 1063, "ni": 28, "debt": 3500, "cash": 40 },
+      { "period": "FY2023", "rev": 2365, "ebitda": 1061, "ni": 342, "debt": 3400, "cash": 45 },
+      { "period": "FY2022", "rev": 2140, "ebitda": 930, "ni": 290, "debt": 3200, "cash": 50 }
+    ]
+  },
+  "JSWUSA": {
+    "id": "JSWUSA",
+    "name": "JSW Steel USA Inc.",
+    "sector": "Steel / Metals",
+    "sp": "NR",
+    "moodys": "NR",
+    "fitch": "NR",
+    "impliedRating": "BB-",
+    "outlook": "Stable",
+    "ebitda": 85,
+    "revenue": 1200,
+    "netIncome": 25,
+    "totalDebt": 350,
+    "cash": 60,
+    "totalAssets": 1100,
+    "totalEquity": 400,
+    "fcf": 30,
+    "adjBurn": {
+      "adjEBITDA": 85,
+      "gaapEbitda": 80,
+      "sbc": 5,
+      "restructuring": 0,
+      "otherNonCash": 0
+    },
+    "financials": [
+      { "period": "FY2025E", "rev": 1200, "ebitda": 85, "ni": 25, "debt": 350, "cash": 60 },
+      { "period": "FY2024E", "rev": 1100, "ebitda": 72, "ni": 15, "debt": 320, "cash": 50 },
+      { "period": "FY2023E", "rev": 950, "ebitda": 60, "ni": 8, "debt": 280, "cash": 40 }
+    ]
+  }
+}
