@@ -51,17 +51,28 @@ ALTER TABLE audit_log ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow anon read" ON portfolio_data
     FOR SELECT USING (true);
 
--- Allow service role to insert (for the cron job)
+-- Allow service role to insert (for the cron job) — restricts to service_role only
 CREATE POLICY "Allow service insert" ON portfolio_data
-    FOR INSERT WITH CHECK (true);
+    FOR INSERT WITH CHECK (current_setting('request.jwt.claim.role', true) = 'service_role');
 
 -- Allow anon read on overrides
 CREATE POLICY "Allow anon read overrides" ON manual_overrides
     FOR SELECT USING (true);
 
--- Allow anon read on audit log
-CREATE POLICY "Allow anon read audit" ON audit_log
-    FOR SELECT USING (true);
+-- Restrict audit log to authenticated users only
+CREATE POLICY "Allow authenticated read audit" ON audit_log
+    FOR SELECT USING (current_setting('request.jwt.claim.role', true) != 'anon');
+
+-- Indexes for manual_overrides and audit_log
+CREATE INDEX IF NOT EXISTS idx_overrides_ticker_fy
+    ON manual_overrides (ticker, fiscal_year) WHERE is_active = TRUE;
+
+CREATE INDEX IF NOT EXISTS idx_audit_ticker
+    ON audit_log (ticker, created_at DESC);
+
+-- Prevent conflicting active overrides for the same field
+CREATE UNIQUE INDEX IF NOT EXISTS uq_active_override
+    ON manual_overrides (ticker, fiscal_year, field_name) WHERE is_active = TRUE;
 
 -- View: Latest portfolio data per ticker (most recent fetch)
 CREATE OR REPLACE VIEW latest_portfolio AS
