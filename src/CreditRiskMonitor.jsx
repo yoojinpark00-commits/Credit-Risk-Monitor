@@ -2839,6 +2839,27 @@ return (
                   </tr>
                 );
               })}
+              {/* Generated (ad-hoc) company row — shown when user has looked up a ticker not in the portfolio */}
+              {adHocCompany && (() => {
+                const c = adHocCompany;
+                const lev = c.ebitda > 0 ? (c.totalDebt / c.ebitda) : null;
+                const margin = c.revenue > 0 ? (c.ebitda / c.revenue * 100) : null;
+                const cf = c.fcf ?? 0;
+                return (
+                  <tr key={c.id} style={{ borderBottom: "1px solid #1e293b", cursor: "pointer", background: "rgba(59,130,246,0.04)", borderLeft: "3px solid rgba(59,130,246,0.4)" }} onClick={() => { navigate(c.id, tab, "financials"); }}>
+                    <td style={{ padding: "8px 6px", fontSize: 12, fontWeight: 700 }}>
+                      {c.id}
+                      <div style={{ fontSize: 8, color: "#60a5fa", textTransform: "uppercase", letterSpacing: "0.3px" }}>API generated</div>
+                    </td>
+                    <td style={{ padding: "8px 6px", fontSize: 11, textAlign: "right", color: lev === null ? "#64748b" : lev > peerBenchmarks.medianLeverage * 1.5 ? "#ef4444" : "#e2e8f0" }}>{lev !== null ? `${lev.toFixed(1)}x` : "N/M"}</td>
+                    <td style={{ padding: "8px 6px", fontSize: 11, textAlign: "right", color: (c.intCov ?? 0) < 2 ? "#ef4444" : "#e2e8f0" }}>{fmtNum(c.intCov ?? 0)}x</td>
+                    <td style={{ padding: "8px 6px", fontSize: 11, textAlign: "right", color: margin !== null && margin < 0 ? "#ef4444" : "#e2e8f0" }}>{margin !== null ? `${margin.toFixed(1)}%` : "N/M"}</td>
+                    <td style={{ padding: "8px 6px", fontSize: 11, textAlign: "right", color: (c.currentRatio ?? 0) < 1 ? "#ef4444" : "#e2e8f0" }}>{fmtNum(c.currentRatio ?? 0)}x</td>
+                    <td style={{ padding: "8px 6px", fontSize: 11, textAlign: "right", fontWeight: 700, color: cf >= 0 ? "#22c55e" : "#ef4444" }}>{cf >= 0 ? "+" : ""}{fmt(cf * 1e6)}</td>
+                    <td style={{ padding: "8px 6px", fontSize: 11, textAlign: "right", color: "#64748b" }}>{"\u2014"}</td>
+                  </tr>
+                );
+              })()}
               {/* Median row */}
               <tr style={{ borderTop: "2px solid #334155", background: "#0a0e1a" }}>
                 <td style={{ padding: "8px 6px", fontSize: 11, fontWeight: 800, color: "#3b82f6" }}>MEDIAN</td>
