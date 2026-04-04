@@ -75,8 +75,9 @@ return "#94a3b8";
 const ltmAdjCashFlow = (c) => {
 if (!c.adjBurn) return c.fcf || 0;
 const ab = c.adjBurn;
-const capex = ab.maintCapex !== null ? ab.maintCapex : ab.totalCapex;
-return ab.adjEBITDA - ab.incomeTaxes - ab.prefDividends - capex - ab.currentLTD - ab.intExpCash;
+const capex = ab.maintCapex != null ? ab.maintCapex : (ab.totalCapex || 0);
+const result = (ab.adjEBITDA || 0) - (ab.incomeTaxes || 0) - (ab.prefDividends || 0) - capex - (ab.currentLTD || 0) - (ab.intExpCash || 0);
+return isFinite(result) ? result : (c.fcf || 0);
 };
 
 // ─── SKELETON LOADER ────────────────────────────────────────────────────────
@@ -1339,8 +1340,36 @@ return (
           </div>}
 
           {/* ═══ CREDIT AGREEMENT SUMMARY ═══ */}
-          {CREDIT_AGREEMENTS[detail.id] && CREDIT_AGREEMENTS[detail.id].committed > 0 && (() => {
-            const ca = CREDIT_AGREEMENTS[detail.id];
+          {(() => {
+            const _caStatic = CREDIT_AGREEMENTS[detail.id];
+            const _cfEdgar = !_caStatic && detail.creditFacilities && detail.creditFacilities.length > 0
+              ? detail.creditFacilities[0] : null;
+            const ca = _caStatic || (_cfEdgar ? {
+              facilityName: _cfEdgar.name || "Revolving Credit Facility",
+              agent: "See SEC filings",
+              committed: _cfEdgar.committed,
+              accordion: 0,
+              maturity: "See SEC filings",
+              availCurrent: _cfEdgar.available,
+              bbFormula: "",
+              borrowingBase: "",
+              bbComponents: [],
+              bbAvailCalc: null,
+              pricing: "",
+              pricingGrid: [],
+              pricingNotes: null,
+              security: "",
+              lcSublimit: 0,
+              swinglineSublimit: 0,
+              securityDetail: null,
+              financialCovenants: [],
+              negativeCov: "",
+              otherFacilities: null,
+              covenantCompliance: "Not available (EDGAR XBRL data)",
+              syndicate: "See SEC filings",
+              src: _cfEdgar.source || "SEC EDGAR XBRL",
+            } : null);
+            if (!ca || ca.committed <= 0) return null;
             return (
             <div style={{ ...card, gridColumn: "1 / -1", border: "1px solid #8b5cf6" }}>
               <div style={{ fontSize: mob ? 11 : 13, fontWeight: 800, color: "#c4b5fd", marginBottom: 4, textTransform: "uppercase", letterSpacing: mob ? "0.5px" : "1px" }}>
@@ -1640,9 +1669,14 @@ return (
           {/* ═══ BURN COVERAGE SCENARIO ANALYSIS (LTM BASIS) ═══ */}
           <div style={card}>
             <div style={{ fontSize: 12, fontWeight: 700, color: "#94a3b8", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.5px" }}>{isNetCashGenerator ? "Cash Flow Scenario Analysis" : "Burn Coverage Scenario Analysis"} — LTM Basis</div>
-            <div style={{ fontSize: 10, color: "#64748b", marginBottom: 16 }}>All scenarios use LTM adjusted cash burn of <b style={{ color: isNetCashGenerator ? "#22c55e" : "#ef4444" }}>{isNetCashGenerator ? "+" : "-"}{fmt(annBurn * 1e6)}</b> as the baseline.</div>
+            <div style={{ fontSize: 10, color: "#64748b", marginBottom: 16 }}>All scenarios use LTM adjusted cash burn of <b style={{ color: isNetCashGenerator ? "#22c55e" : "#ef4444" }}>{annBurn > 0 ? `${isNetCashGenerator ? "+" : "-"}${fmt(annBurn * 1e6)}` : "N/A (insufficient data)"}</b> as the baseline.</div>
 
             {/* Trailing 4-Quarter Trend */}
+            {(!detail.quarterlyBurns || detail.quarterlyBurns.length === 0) && (
+              <div style={{ marginBottom: 16, padding: "10px 14px", background: "#0a0e1a", borderRadius: 6, border: "1px solid #1e293b", fontSize: 10, color: "#64748b", fontStyle: "italic" }}>
+                Quarterly trend data not available — showing annual estimates.
+              </div>
+            )}
             {detail.quarterlyBurns && detail.quarterlyBurns.length > 0 && (
               <div style={{ marginBottom: 16 }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.5px" }}>Trailing 4-Quarter {isNetCashGenerator ? "Cash Flow" : "Cash Burn"} Trend ($M)</div>

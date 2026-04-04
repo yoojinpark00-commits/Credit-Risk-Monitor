@@ -74,6 +74,33 @@ CONCEPT_MAP = {
 
 ANNUAL_FORMS = {"10-K", "10-K/A", "20-F", "20-F/A"}
 QUARTERLY_FORMS = {"10-Q", "10-Q/A"}
+FILING_FORMS_OF_INTEREST = {"8-K", "10-K", "10-K/A", "10-Q", "10-Q/A", "20-F", "20-F/A"}
+
+# 8-K item number -> human-readable description
+EIGHT_K_ITEMS = {
+    "1.01": "Entry into a Material Definitive Agreement",
+    "1.02": "Termination of a Material Definitive Agreement",
+    "1.03": "Bankruptcy or Receivership",
+    "2.01": "Completion of Acquisition or Disposition of Assets",
+    "2.02": "Results of Operations and Financial Condition",
+    "2.03": "Creation of a Direct Financial Obligation",
+    "2.04": "Triggering Events for Acceleration or Impairment",
+    "2.05": "Costs Associated with Exit or Disposal Activities",
+    "2.06": "Material Impairments",
+    "3.01": "Notice of Delisting or Failure to Satisfy Listing Rule",
+    "3.02": "Unregistered Sales of Equity Securities",
+    "3.03": "Material Modifications to Rights of Security Holders",
+    "4.01": "Changes in Registrant's Certifying Accountant",
+    "4.02": "Non-Reliance on Previously Issued Financial Statements",
+    "5.01": "Changes in Control of Registrant",
+    "5.02": "Departure or Election of Directors or Officers",
+    "5.03": "Amendments to Articles of Incorporation or Bylaws",
+    "5.07": "Submission of Matters to a Vote of Security Holders",
+    "5.08": "Shareholder Director Nominations",
+    "7.01": "Regulation FD Disclosure",
+    "8.01": "Other Events",
+    "9.01": "Financial Statements and Exhibits",
+}
 
 
 # ─── EDGAR helpers ───────────────────────────────────────────────────────
@@ -94,6 +121,80 @@ def ticker_to_cik(ticker):
         if t == ticker.upper():
             result = c
     return _cik_cache.get(ticker.upper())
+
+
+
+def _fetch_recent_filings(cik):
+    """Fetch recent 8-K, 10-K, and 10-Q filings from the EDGAR submissions endpoint.
+
+    Returns a list of filing dicts for filings in the last 12 months, with
+    8-K entries enriched with parsed item descriptions.
+    """
+    try:
+        data = _edgar_get(f"https://data.sec.gov/submissions/CIK{cik}.json")
+    except Exception:
+        return []
+
+    recent = data.get("filings", {}).get("recent", {})
+    forms = recent.get("form", [])
+    dates = recent.get("filingDate", [])
+    descriptions = recent.get("primaryDocDescription", [])
+    items_raw = recent.get("items", [])  # present for 8-Ks; empty string otherwise
+    accession_nums = recent.get("accessionNumber", [])
+
+    cutoff = datetime.now(timezone.utc).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
+    # 12-month lookback
+    cutoff_year = cutoff.year - 1 if cutoff.month > 1 else cutoff.year - 1
+    cutoff_str = f"{cutoff.year - 1}-{cutoff.month:02d}-{cutoff.day:02d}"
+
+    result = []
+    for i, form in enumerate(forms):
+        if form not in FILING_FORMS_OF_INTEREST:
+            continue
+        filing_date = dates[i] if i < len(dates) else ""
+        if filing_date < cutoff_str:
+            # submissions are newest-first; once we pass the cutoff we can stop
+            break
+        description = descriptions[i] if i < len(descriptions) else ""
+        accession = accession_nums[i] if i < len(accession_nums) else ""
+
+        entry = {
+            "type": form,
+            "date": filing_date,
+            "description": description or form,
+            "accession": accession.replace("-", "") if accession else "",
+        }
+
+        # For 8-Ks, parse and expand the item numbers field
+        if form == "8-K":
+            raw_items = items_raw[i] if i < len(items_raw) else ""
+            parsed_items = _parse_8k_items(raw_items)
+            if parsed_items:
+                entry["items"] = parsed_items
+
+        result.append(entry)
+
+    return result
+
+
+def _parse_8k_items(raw_items_str):
+    """Parse the comma-separated item string from the submissions endpoint.
+
+    Example input:  "1.01,2.03,9.01"
+    Returns a list: [{"item": "1.01", "description": "..."}, ...]
+    """
+    if not raw_items_str:
+        return []
+    items = []
+    for token in str(raw_items_str).split(","):
+        token = token.strip()
+        if not token:
+            continue
+        desc = EIGHT_K_ITEMS.get(token, f"Item {token}")
+        items.append({"item": token, "description": desc})
+    return items
 
 
 def _extract_series(facts, tag, forms, n=4, quarterly=False):
@@ -275,11 +376,14 @@ def generate_company_profile(ticker):
     cik = None
     yp = {"price": 0, "prevClose": 0, "name": "", "exchange": "", "currency": "USD"}
 
-    with ThreadPoolExecutor(max_workers=2) as pool:
+    with ThreadPoolExecutor(max_workers=3) as pool:
         cik_future = pool.submit(ticker_to_cik, ticker)
         price_future = pool.submit(yahoo_price, ticker)
         cik = cik_future.result(timeout=8)
+        # Submit filings fetch now that CIK is resolved, runs in parallel with price
+        filings_future = pool.submit(_fetch_recent_filings, cik) if cik else None
         yp = price_future.result(timeout=8)
+        recent_filings = filings_future.result(timeout=12) if filings_future else []
 
     if not cik:
         return None
@@ -441,6 +545,85 @@ def generate_company_profile(ticker):
             "debt": to_m(ltd_s[i]["val"]) if i < len(ltd_s) else 0,
             "cash": to_m(cash_s[i]["val"]) if i < len(cash_s) else 0,
         })
+
+    # ── Trends: YoY changes across the 4-year financials array ─────────────
+    # financials[0] is the most recent year; financials[1] is one year prior, etc.
+    # YoY %: (current - prior) / abs(prior) * 100, rounded to 1 dp.
+    # debtChange / cashChange are absolute $M deltas (current - prior).
+
+    def _yoy_pct(cur, prev):
+        """Percent change from prev to cur; None when prior is zero."""
+        if prev == 0:
+            return None
+        return round((cur - prev) / abs(prev) * 100, 1)
+
+    revenue_growth, ebitda_growth, debt_change, cash_change, leverage_change, margin_trend = (
+        [], [], [], [], [], []
+    )
+
+    for i in range(len(financials) - 1):
+        cur = financials[i]        # more recent
+        prev = financials[i + 1]   # one year earlier
+        period = cur["period"]
+
+        revenue_growth.append({"period": period, "yoy": _yoy_pct(cur["rev"], prev["rev"])})
+        ebitda_growth.append({"period": period, "yoy": _yoy_pct(cur["ebitda"], prev["ebitda"])})
+        debt_change.append({"period": period, "change": cur["debt"] - prev["debt"]})
+        cash_change.append({"period": period, "change": cur["cash"] - prev["cash"]})
+
+        # Per-year leverage ratio = debt / ebitda (gross, no cash netting)
+        cur_lev = round(safe_div(cur["debt"], cur["ebitda"]), 2) if cur["ebitda"] != 0 else None
+        prev_lev = round(safe_div(prev["debt"], prev["ebitda"]), 2) if prev["ebitda"] != 0 else None
+        lev_delta = (
+            round(cur_lev - prev_lev, 2) if (cur_lev is not None and prev_lev is not None) else None
+        )
+        leverage_change.append({"period": period, "change": lev_delta})
+
+    # marginTrend: one entry per year (no prior period needed)
+    for row in financials:
+        margin = round(safe_div(row["ebitda"], row["rev"]), 4) if row["rev"] != 0 else None
+        margin_trend.append({"period": row["period"], "margin": margin})
+
+    trends = {
+        "revenueGrowth": revenue_growth,
+        "ebitdaGrowth": ebitda_growth,
+        "debtChange": debt_change,
+        "cashChange": cash_change,
+        "leverageChange": leverage_change,
+        "marginTrend": margin_trend,
+    }
+
+    # ── creditTrend: "Improving" / "Deteriorating" / "Stable" ────────────
+    # Compares the most-recent year (index 0) against the prior year (index 1).
+    #   Improving    : leverage declining  AND  coverage increasing
+    #   Deteriorating: leverage increasing AND  coverage declining
+    #   Stable       : everything else
+    credit_trend = "Stable"
+    if leverage_change and len(financials) >= 2:
+        latest_lev_chg = leverage_change[0]["change"]
+
+        # Per-year interest expense for coverage; fall back to latest if FY misaligns.
+        def _row_int_exp(idx):
+            if idx < len(ie_s):
+                fy_str = financials[idx]["period"][2:]   # "FY2024" -> "2024"
+                if str(ie_s[idx].get("fy", "")) == fy_str:
+                    return abs(to_m(ie_s[idx]["val"]))
+            return int_exp  # fallback: latest year's interest expense
+
+        cur_int = _row_int_exp(0)
+        prev_int = _row_int_exp(1)
+        cur_cov = safe_div(financials[0]["ebitda"], cur_int) if cur_int != 0 else None
+        prev_cov = safe_div(financials[1]["ebitda"], prev_int) if prev_int != 0 else None
+
+        lev_declining = (latest_lev_chg is not None and latest_lev_chg < 0)
+        lev_increasing = (latest_lev_chg is not None and latest_lev_chg > 0)
+        cov_increasing = (cur_cov is not None and prev_cov is not None and cur_cov > prev_cov)
+        cov_declining = (cur_cov is not None and prev_cov is not None and cur_cov < prev_cov)
+
+        if lev_declining and cov_increasing:
+            credit_trend = "Improving"
+        elif lev_increasing and cov_declining:
+            credit_trend = "Deteriorating"
 
     # Quarterly burns - de-cumulate YTD cash flow values from 10-Q filings.
     # EDGAR reports Q2 OCF as Jan-Jun cumulative and Q3 as Jan-Sep cumulative.
@@ -664,10 +847,92 @@ def generate_company_profile(ticker):
             "analystQA": [],
         }
 
-    # Research placeholder
-    research = [{"date": datetime.now().strftime("%Y-%m-%d"), "firm": "5-Factor Model",
-                 "action": implied_rating, "pt": 0,
-                 "summary": f"Implied {implied_rating}: Leverage {gross_leverage}x, Coverage {int_cov}x, FCF/Debt {fcf_to_debt:.0%}, Margin {ebitda_margin:.0%}"}]
+    # Research entries — 4 synthetic analyst-style assessments derived from financials
+    _today = datetime.now().strftime("%Y-%m-%d")
+
+    # 1. Credit Assessment
+    _credit_summary = (
+        f"5-factor credit model score {rating_score}: Leverage {gross_leverage}x, "
+        f"Coverage {int_cov}x, FCF/Debt {fcf_to_debt:.0%}, "
+        f"EBITDA margin {ebitda_margin:.0%}, Market cap ${mkt_cap_b}B. "
+        f"Altman Z-Score {z_score}."
+    )
+
+    # 2. Liquidity Analysis
+    _loc_cap = latest_val_m(loc_cap_s)
+    _loc_rem = latest_val_m(loc_rem_s)
+    _loc_drawn = latest_val_m(loc_drawn_s)
+    if _loc_rem == 0 and _loc_cap > 0 and _loc_drawn > 0:
+        _loc_rem = max(0, _loc_cap - _loc_drawn)
+    _avail_liq = (cash + st_investments) + _loc_rem
+    if current_ratio >= 1.5 and (cash + st_investments) > 0:
+        _liq_action = "Strong"
+    elif current_ratio >= 1.0 and (cash + st_investments) > 0:
+        _liq_action = "Adequate"
+    else:
+        _liq_action = "Weak"
+    _liq_summary = (
+        f"Cash ${cash:,}M"
+        + (f" + ST investments ${st_investments:,}M" if st_investments > 0 else "")
+        + (f" + undrawn revolver ${_loc_rem:,}M" if _loc_rem > 0 else
+           (f" + revolver capacity ${_loc_cap:,}M" if _loc_cap > 0 else ""))
+        + f" = available liquidity ${_avail_liq:,}M. "
+        f"Current ratio {current_ratio}x. Runway: {runway}."
+    )
+
+    # 3. Debt Structure
+    _near_y1 = latest_val_m(mat_y1_s)
+    _near_y2 = latest_val_m(mat_y2_s)
+    _near_2y = _near_y1 + _near_y2
+    if _near_2y > adj_ebitda or gross_leverage > 4.0:
+        _debt_action = "High Risk"
+    elif _near_2y > adj_ebitda * 0.5 or gross_leverage > 2.5:
+        _debt_action = "Medium Risk"
+    else:
+        _debt_action = "Low Risk"
+    _debt_summary = (
+        f"Total debt ${total_debt:,}M ({lt_debt:,}M LT + {current_debt:,}M current). "
+        + (f"Near-term maturities Y1 ${_near_y1:,}M, Y2 ${_near_y2:,}M. "
+           if _near_y1 > 0 or _near_y2 > 0 else "")
+        + f"Gross leverage {gross_leverage}x, net leverage {net_leverage}x, "
+        f"debt/equity {debt_to_equity}x."
+    )
+
+    # 4. Earnings Trend
+    _rev_cur = to_m(rev_s[0]["val"]) if len(rev_s) >= 1 else 0
+    _rev_prev = to_m(rev_s[1]["val"]) if len(rev_s) >= 2 else 0
+    _rev_chg = round(safe_div(_rev_cur - _rev_prev, abs(_rev_prev)) * 100, 1) if _rev_prev != 0 else 0
+    _ni_cur = to_m(ni_s[0]["val"]) if len(ni_s) >= 1 else 0
+    _ni_prev = to_m(ni_s[1]["val"]) if len(ni_s) >= 2 else 0
+    if _rev_chg > 5 and _ni_cur >= _ni_prev:
+        _trend_action = "Improving"
+    elif _rev_chg < -5 or (_ni_cur < _ni_prev and _rev_chg < 0):
+        _trend_action = "Declining"
+    else:
+        _trend_action = "Stable"
+    _trend_summary = (
+        f"Revenue ${_rev_cur:,}M"
+        + (f" ({'+' if _rev_chg >= 0 else ''}{_rev_chg}% YoY)" if _rev_prev > 0 else "")
+        + f", Adj. EBITDA ${adj_ebitda:,}M (margin {ebitda_margin:.0%})"
+        + f", FCF ${fcf:,}M"
+        + (f", net income ${_ni_cur:,}M" if _ni_cur != 0 else "")
+        + f". ROIC {roic}%."
+    )
+
+    research = [
+        {"date": _today, "firm": "Credit Model",
+         "action": f"{implied_rating} (Implied)", "pt": 0,
+         "summary": _credit_summary},
+        {"date": _today, "firm": "Liquidity Model",
+         "action": _liq_action, "pt": 0,
+         "summary": _liq_summary},
+        {"date": _today, "firm": "Debt Analysis",
+         "action": _debt_action, "pt": 0,
+         "summary": _debt_summary},
+        {"date": _today, "firm": "Trend Analysis",
+         "action": _trend_action, "pt": 0,
+         "summary": _trend_summary},
+    ]
 
     # Debt maturities — derive base calendar year from the balance-sheet end date of
     # the most recently filed maturity entry (Year 1 = base_year + 1, etc.).
@@ -736,17 +1001,6 @@ def generate_company_profile(ticker):
             "available": loc_remaining,
         })
 
-    # Debt maturity schedule from XBRL
-    current_year = datetime.now().year
-    mat_fields = [mat_y1_s, mat_y2_s, mat_y3_s, mat_y4_s, mat_y5_s]
-    for offset_yr, mat_s in enumerate(mat_fields, start=0):
-        amt = latest_val_m(mat_s)
-        if amt > 0:
-            liquidity_breakdown["debtMaturities"].append({
-                "year": str(current_year + offset_yr),
-                "amount": amt,
-                "type": "scheduled",
-            })
 
     # Runway
     qtr_burn = quarterly_burns[-1]["burn"] if quarterly_burns else (round(fcf / 4) if fcf != 0 else 0)
@@ -799,10 +1053,12 @@ def generate_company_profile(ticker):
         "lastEarnings": _compute_last_earnings(rev_s, ni_s), "earningsCallSummary": earnings_call_summary,
         "news": [], "ratingHistory": rating_history,
         "research": research, "financials": financials,
+        "trends": trends, "creditTrend": credit_trend,
         "_generated": True, "_source": "sec_edgar",
         "_generatedAt": datetime.now(timezone.utc).isoformat(),
         "_zScore": z_score, "_ratingScore": rating_score,
         "_cik": cik,
+        "_recentFilings": recent_filings,
     }
 
 
