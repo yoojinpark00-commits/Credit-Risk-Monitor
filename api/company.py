@@ -38,6 +38,12 @@ CONCEPT_MAP = {
     ],
     "sbc": ["ShareBasedCompensation", "AllocatedShareBasedCompensationExpense"],
     "restructuring": ["RestructuringCharges", "RestructuringSettlementAndImpairmentProvisions"],
+    "gross_profit": ["GrossProfit"],
+    "cogs": ["CostOfGoodsAndServicesSold", "CostOfRevenue", "CostOfGoodsSold"],
+    "rd_expense": ["ResearchAndDevelopmentExpense"],
+    "sga_expense": ["SellingGeneralAndAdministrativeExpense"],
+    "dividends_common": ["DividendsCommonStockCash", "PaymentsOfDividendsCommonStock"],
+    "buybacks": ["StockRepurchasedAndRetiredDuringPeriodValue", "PaymentsForRepurchaseOfCommonStock"],
     "total_debt_lt": ["LongTermDebtNoncurrent", "LongTermDebt", "LongTermDebtAndCapitalLeaseObligations"],
     "current_debt": ["DebtCurrent", "ShortTermBorrowings", "LongTermDebtCurrent"],
     "cash": ["CashAndCashEquivalentsAtCarryingValue", "CashCashEquivalentsAndShortTermInvestments", "Cash"],
@@ -50,6 +56,20 @@ CONCEPT_MAP = {
     "capex": ["PaymentsToAcquirePropertyPlantAndEquipment", "PaymentsToAcquireProductiveAssets"],
     "dividends_paid": ["PaymentsOfDividends", "PaymentsOfDividendsCommonStock"],
     "shares_outstanding": ["CommonStockSharesOutstanding", "EntityCommonStockSharesOutstanding"],
+    # Credit facility / line-of-credit concepts
+    "loc_capacity": [
+        "LineOfCreditFacilityMaximumBorrowingCapacity",
+        "LineOfCredit",
+    ],
+    "loc_remaining": ["LineOfCreditFacilityRemainingBorrowingCapacity"],
+    "loc_drawn": ["LongTermLineOfCredit", "LineOfCreditFacilityAmountOutstanding"],
+    # Debt maturity schedule
+    "debt_mat_y1": ["LongTermDebtMaturitiesRepaymentsOfPrincipalInNextTwelveMonths"],
+    "debt_mat_y2": ["LongTermDebtMaturitiesRepaymentsOfPrincipalInYearTwo"],
+    "debt_mat_y3": ["LongTermDebtMaturitiesRepaymentsOfPrincipalInYearThree"],
+    "debt_mat_y4": ["LongTermDebtMaturitiesRepaymentsOfPrincipalInYearFour"],
+    "debt_mat_y5": ["LongTermDebtMaturitiesRepaymentsOfPrincipalInYearFive"],
+    "debt_mat_after5": ["LongTermDebtMaturitiesRepaymentsOfPrincipalAfterYearFive"],
 }
 
 ANNUAL_FORMS = {"10-K", "10-K/A", "20-F", "20-F/A"}
@@ -224,6 +244,29 @@ def ratio_to_rating(leverage, coverage, fcf_to_debt, ebitda_margin, mkt_cap_b):
     return "CCC", round(composite, 2)
 
 
+# ─── Last earnings string from YoY comparison ───────────────────────────
+def _compute_last_earnings(rev_s, ni_s):
+    """Generate a lastEarnings summary string from YoY revenue/NI comparison."""
+    if len(rev_s) < 2:
+        return ""
+    rev_cur = to_m(rev_s[0]["val"])
+    rev_prev = to_m(rev_s[1]["val"])
+    if rev_prev == 0:
+        return ""
+    rev_chg_pct = round((rev_cur - rev_prev) / abs(rev_prev) * 100, 1)
+    ni_cur = to_m(ni_s[0]["val"]) if len(ni_s) >= 1 else None
+    ni_prev = to_m(ni_s[1]["val"]) if len(ni_s) >= 2 else None
+    ni_grew = (ni_cur is not None and ni_prev is not None and ni_cur > ni_prev)
+    if rev_chg_pct >= 0:
+        sign = "+" if rev_chg_pct > 0 else ""
+        if ni_grew:
+            return f"Beat \u2014 Revenue ${rev_cur:,}M ({sign}{rev_chg_pct}% YoY), EPS growth"
+        else:
+            return f"Mixed \u2014 Revenue ${rev_cur:,}M ({sign}{rev_chg_pct}% YoY), earnings pressure"
+    else:
+        return f"Miss \u2014 Revenue ${rev_cur:,}M ({rev_chg_pct}% YoY decline)"
+
+
 # ─── Main profile generator ─────────────────────────────────────────────
 def generate_company_profile(ticker):
     ticker = ticker.upper()
@@ -268,10 +311,29 @@ def generate_company_profile(ticker):
     cl_s = _get_field(facts, "current_liab")
     ocf_s = _get_field(facts, "ocf")
     capex_s = _get_field(facts, "capex")
+    gp_s = _get_field(facts, "gross_profit")
+    cogs_s = _get_field(facts, "cogs")
+    rd_s = _get_field(facts, "rd_expense")
+    sga_s = _get_field(facts, "sga_expense")
+    div_common_s = _get_field(facts, "dividends_common")
+    buybacks_s = _get_field(facts, "buybacks")
 
-    # Quarterly data for burns
-    q_ocf = _get_field(facts, "ocf", forms=QUARTERLY_FORMS, n=4, quarterly=True)
-    q_capex = _get_field(facts, "capex", forms=QUARTERLY_FORMS, n=4, quarterly=True)
+    # Credit facility data
+    loc_cap_s = _get_field(facts, "loc_capacity")
+    loc_rem_s = _get_field(facts, "loc_remaining")
+    loc_drawn_s = _get_field(facts, "loc_drawn")
+
+    # Debt maturity schedule
+    mat_y1_s = _get_field(facts, "debt_mat_y1")
+    mat_y2_s = _get_field(facts, "debt_mat_y2")
+    mat_y3_s = _get_field(facts, "debt_mat_y3")
+    mat_y4_s = _get_field(facts, "debt_mat_y4")
+    mat_y5_s = _get_field(facts, "debt_mat_y5")
+    mat_after5_s = _get_field(facts, "debt_mat_after5")
+
+    # Quarterly data for burns (fetch extra entries to support YTD de-cumulation)
+    q_ocf = _get_field(facts, "ocf", forms=QUARTERLY_FORMS, n=8, quarterly=True)
+    q_capex = _get_field(facts, "capex", forms=QUARTERLY_FORMS, n=8, quarterly=True)
     q_rev = _get_field(facts, "revenue", forms=QUARTERLY_FORMS, n=4, quarterly=True)
 
     # Latest annual values (in $M)
@@ -295,6 +357,12 @@ def generate_company_profile(ticker):
     ocf = latest_val_m(ocf_s)
     capex = abs(latest_val_m(capex_s))
     fcf = ocf - capex
+    gross_profit = latest_val_m(gp_s)
+    cogs = latest_val_m(cogs_s)
+    rd_expense = latest_val_m(rd_s)
+    sga_expense = latest_val_m(sga_s)
+    dividends_common = abs(latest_val_m(div_common_s))
+    buybacks = abs(latest_val_m(buybacks_s))
 
     # EBITDA
     gaap_ebitda = oper_income + da if (oper_income and da) else net_income + int_exp + tax_exp + da
@@ -309,6 +377,13 @@ def generate_company_profile(ticker):
     roic = round(safe_div(net_income, total_debt + total_equity) * 100, 1) if (total_debt + total_equity) > 0 else 0
     ebitda_margin = safe_div(adj_ebitda, revenue) if revenue > 0 else 0
     fcf_to_debt = safe_div(fcf, total_debt) if total_debt > 0 else 1.0
+    # Operating metrics / margin ratios
+    # Gross profit may come directly from XBRL; if absent, derive from revenue - COGS
+    if gross_profit == 0 and cogs > 0 and revenue > 0:
+        gross_profit = revenue - cogs
+    gross_margin = round(safe_div(gross_profit, revenue), 4) if revenue > 0 else None
+    ebitda_margin_pct = round(ebitda_margin, 4) if revenue > 0 else None
+    rd_intensity = round(safe_div(rd_expense, revenue), 4) if revenue > 0 and rd_expense > 0 else None
 
     # Price
     price = yp["price"]
@@ -343,31 +418,116 @@ def generate_company_profile(ticker):
     financials = []
     for i in range(min(len(rev_s), 4)):
         fy = rev_s[i].get("fy", 2025 - i)
+        # Determine per-year EBITDA, guarding against:
+        #   1. operator-precedence: wrap addition in parens before the ternary
+        #   2. fiscal-year misalignment: verify oi_s and da_s entries share the same FY
+        #   3. missing oi_s: fall back to NI + interest + tax + D&A
+        oi_aligned = (i < len(oi_s) and oi_s[i].get("fy") == fy)
+        da_aligned = (i < len(da_s) and da_s[i].get("fy") == fy)
+        if oi_aligned and da_aligned:
+            row_ebitda = (to_m(oi_s[i]["val"]) + to_m(da_s[i]["val"]))
+        elif da_aligned and (i < len(ni_s) and ni_s[i].get("fy") == fy
+                             and i < len(ie_s) and ie_s[i].get("fy") == fy
+                             and i < len(tx_s) and tx_s[i].get("fy") == fy):
+            row_ebitda = (to_m(ni_s[i]["val"]) + to_m(ie_s[i]["val"])
+                          + to_m(tx_s[i]["val"]) + to_m(da_s[i]["val"]))
+        else:
+            row_ebitda = 0
         financials.append({
             "period": f"FY{fy}",
             "rev": to_m(rev_s[i]["val"]) if i < len(rev_s) else 0,
-            "ebitda": to_m(oi_s[i]["val"]) + to_m(da_s[i]["val"]) if i < len(oi_s) and i < len(da_s) else 0,
+            "ebitda": row_ebitda,
             "ni": to_m(ni_s[i]["val"]) if i < len(ni_s) else 0,
             "debt": to_m(ltd_s[i]["val"]) if i < len(ltd_s) else 0,
             "cash": to_m(cash_s[i]["val"]) if i < len(cash_s) else 0,
         })
 
-    # Quarterly burns
+    # Quarterly burns - de-cumulate YTD cash flow values from 10-Q filings.
+    # EDGAR reports Q2 OCF as Jan-Jun cumulative and Q3 as Jan-Sep cumulative.
+    # Subtract the prior quarter's cumulative to recover single-quarter values.
+    # Fall back to annual/4 if fewer than 2 individual quarters are available.
+    def _decumulate_quarterly(series):
+        """Convert raw XBRL quarterly entries (potentially YTD cumulative) into
+        single-quarter dicts. Returns a list sorted newest-first."""
+        # Build a lookup of (fy, qnum) -> entry so we can subtract prior cumulative.
+        by_fy_q = {}
+        for e in series:
+            end = e.get("end", "")
+            try:
+                d = datetime.strptime(end, "%Y-%m-%d")
+                qnum = ((d.month - 1) // 3) + 1  # 1-based quarter number
+            except Exception:
+                continue
+            fy = e.get("fy", 0)
+            # Keep the latest filing for a given (fy, qnum) key
+            existing = by_fy_q.get((fy, qnum))
+            if existing is None or e["end"] > existing["end"]:
+                by_fy_q[(fy, qnum)] = dict(e, qnum=qnum)
+
+        results = []
+        for (fy, qnum), e in by_fy_q.items():
+            ytd_val = e["val"]
+            if qnum == 1:
+                # Q1 is already a single quarter in EDGAR 10-Q filings
+                single_val = ytd_val
+            else:
+                # Subtract the prior quarter's YTD cumulative to isolate this quarter
+                prior = by_fy_q.get((fy, qnum - 1))
+                if prior is not None:
+                    single_val = ytd_val - prior["val"]
+                else:
+                    # Prior quarter not available; use the YTD value as-is
+                    single_val = ytd_val
+            results.append({
+                "fy": fy, "qnum": qnum, "end": e["end"],
+                "val": single_val, "tag": e.get("tag", ""),
+            })
+
+        results.sort(key=lambda x: x["end"], reverse=True)
+        return results
+
+    dq_ocf = _decumulate_quarterly(q_ocf)
+    dq_capex = _decumulate_quarterly(q_capex)
+
+    # Align OCF and CapEx on matching (fy, qnum) periods and build burn list
+    capex_by_period = {(e["fy"], e["qnum"]): e for e in dq_capex}
+
     quarterly_burns = []
-    for i in range(min(len(q_ocf), len(q_capex), 4)):
-        q_o = to_m(q_ocf[i]["val"])
-        q_c = abs(to_m(q_capex[i]["val"]))
-        end = q_ocf[i].get("end", "")
+    for e_ocf in dq_ocf:
+        period_key = (e_ocf["fy"], e_ocf["qnum"])
+        e_cap = capex_by_period.get(period_key)
+        if e_cap is None:
+            continue
+        q_o = to_m(e_ocf["val"])
+        q_c = abs(to_m(e_cap["val"]))
+        end = e_ocf["end"]
         try:
             d = datetime.strptime(end, "%Y-%m-%d")
-            q_label = f"Q{((d.month - 1) // 3) + 1} {d.year}"
+            q_label = f"Q{e_ocf['qnum']} {d.year}"
         except Exception:
-            q_label = f"Q{4-i}"
+            q_label = f"Q{e_ocf['qnum']} {e_ocf['fy']}"
         quarterly_burns.append({
             "q": q_label, "burn": q_o - q_c,
             "note": f"OCF {q_o}M, CapEx {q_c}M",
         })
+        if len(quarterly_burns) == 4:
+            break
+
+    # quarterly_burns is newest-first at this point; reverse to chronological order
     quarterly_burns.reverse()
+
+    # Sparse data fallback: approximate using latest annual OCF and CapEx divided by 4
+    if len(quarterly_burns) < 2 and ocf != 0:
+        approx_burn = round((ocf - capex) / 4)
+        fy_label_q = str(rev_s[0]["fy"]) if rev_s else "LTM"
+        quarterly_burns = [
+            {
+                "q": f"Q{q} {fy_label_q}",
+                "burn": approx_burn,
+                "note": f"Annual/4 estimate (OCF {ocf}M, CapEx {capex}M)",
+            }
+            for q in range(1, 5)
+        ]
 
     # adjBurn
     fy_label = str(rev_s[0]["fy"]) if rev_s else "LTM"
@@ -386,20 +546,207 @@ def generate_company_profile(ticker):
     rating_history = [{"date": f"FY{fy_label}", "sp": "NR", "moodys": "NR", "fitch": "NR",
                        "event": f"Implied: {implied_rating} (5-factor score: {rating_score})"}]
 
+    # ── Earnings call summary (generated from SEC financial data) ────────────
+    def _fmt_m(val_m):
+        """Format a $M integer as $XXM or $X.XB."""
+        abs_v = abs(val_m)
+        if abs_v >= 1000:
+            sign = "-" if val_m < 0 else ""
+            return f"{sign}${abs_v / 1000:.1f}B"
+        return f"${val_m:,.0f}M"
+
+    def _pct(val, decimals=1):
+        return f"{val * 100:.{decimals}f}%"
+
+    # Determine filing period label from the latest revenue data point
+    latest_fy = rev_s[0]["fy"] if rev_s else datetime.now().year
+    latest_end = rev_s[0]["end"] if rev_s else ""
+    try:
+        end_dt = datetime.strptime(latest_end, "%Y-%m-%d")
+        cal_q = ((end_dt.month - 1) // 3) + 1
+        ecs_quarter = f"Q{cal_q} FY{latest_fy}"
+        ecs_date = latest_end
+    except Exception:
+        ecs_quarter = f"FY{latest_fy}"
+        ecs_date = f"{latest_fy}-12-31"
+
+    # YoY revenue growth
+    rev_yoy_str = ""
+    if len(rev_s) >= 2 and rev_s[1]["val"]:
+        prior_rev = to_m(rev_s[1]["val"])
+        if prior_rev != 0:
+            rev_yoy = (revenue - prior_rev) / abs(prior_rev)
+            direction = "up" if rev_yoy >= 0 else "down"
+            rev_yoy_str = f", {direction} {abs(rev_yoy) * 100:.1f}% YoY"
+
+    # YoY net income growth
+    ni_yoy_str = ""
+    if len(ni_s) >= 2 and ni_s[1]["val"]:
+        prior_ni = to_m(ni_s[1]["val"])
+        if prior_ni != 0:
+            ni_yoy = (net_income - prior_ni) / abs(prior_ni)
+            direction = "up" if ni_yoy >= 0 else "down"
+            ni_yoy_str = f", {direction} {abs(ni_yoy) * 100:.1f}% YoY"
+
+    # keyFinancials -- top-line P&L metrics
+    ecs_key_financials = []
+    if revenue:
+        ecs_key_financials.append(f"Revenue of {_fmt_m(revenue)}{rev_yoy_str}")
+    if adj_ebitda:
+        margin_str = f", margin {_pct(ebitda_margin)}" if revenue else ""
+        ecs_key_financials.append(f"Adjusted EBITDA of {_fmt_m(adj_ebitda)}{margin_str}")
+    if net_income:
+        ecs_key_financials.append(f"Net income of {_fmt_m(net_income)}{ni_yoy_str}")
+    if oper_income:
+        op_margin = safe_div(oper_income, revenue)
+        ecs_key_financials.append(
+            f"Operating income of {_fmt_m(oper_income)}" +
+            (f", margin {_pct(op_margin)}" if revenue else "")
+        )
+
+    # production -- cash generation (UI section label: "Production & deliveries")
+    ecs_production = []
+    if ocf:
+        ecs_production.append(f"Operating cash flow of {_fmt_m(ocf)}")
+    if capex:
+        ecs_production.append(f"Capital expenditures of {_fmt_m(capex)}")
+    if fcf != 0:
+        ecs_production.append(f"Free cash flow of {_fmt_m(fcf)}")
+    if da:
+        ecs_production.append(f"Depreciation & amortization of {_fmt_m(da)}")
+
+    # creditRelevant -- debt, coverage, and leverage
+    ecs_credit = []
+    if total_debt:
+        ecs_credit.append(f"Total debt of {_fmt_m(total_debt)}, gross leverage {gross_leverage:.1f}x")
+    if int_exp:
+        ecs_credit.append(f"Interest expense of {_fmt_m(int_exp)}, coverage ratio {int_cov:.1f}x")
+    if total_debt and cash:
+        ecs_credit.append(
+            f"Net leverage {net_leverage:.1f}x (cash of {_fmt_m(cash)} netted against debt)"
+        )
+    if total_debt:
+        capacity_label = "strong" if fcf_to_debt > 0.15 else ("moderate" if fcf_to_debt > 0.05 else "limited")
+        ecs_credit.append(
+            f"FCF / total debt {_pct(fcf_to_debt)}, debt service capacity {capacity_label}"
+        )
+    if debt_to_equity:
+        ecs_credit.append(f"Debt-to-equity ratio {debt_to_equity:.2f}x")
+
+    # strategicItems -- liquidity and balance-sheet positioning
+    ecs_strategic = []
+    if cash:
+        cash_line = f"Cash & equivalents of {_fmt_m(cash)}"
+        if st_investments:
+            cash_line += f" plus {_fmt_m(st_investments)} short-term investments"
+        ecs_strategic.append(cash_line)
+    if current_ratio:
+        liq_label = "strong" if current_ratio > 1.5 else ("adequate" if current_ratio >= 1.0 else "tight")
+        ecs_strategic.append(f"Current ratio {current_ratio:.2f}x, near-term liquidity {liq_label}")
+    if roic:
+        ecs_strategic.append(f"Return on invested capital (ROIC) {roic:.1f}%")
+    if total_assets:
+        ecs_strategic.append(
+            f"Total assets of {_fmt_m(total_assets)}" +
+            (f", book equity of {_fmt_m(total_equity)}" if total_equity else "")
+        )
+
+    earnings_call_summary = None
+    if ecs_key_financials or ecs_production or ecs_credit or ecs_strategic:
+        earnings_call_summary = {
+            "quarter": ecs_quarter,
+            "date": ecs_date,
+            "source": "SEC 10-K/10-Q filing analysis",
+            "keyFinancials": ecs_key_financials,
+            "production": ecs_production,
+            "creditRelevant": ecs_credit,
+            "strategicItems": ecs_strategic,
+            "analystQA": [],
+        }
+
     # Research placeholder
     research = [{"date": datetime.now().strftime("%Y-%m-%d"), "firm": "5-Factor Model",
                  "action": implied_rating, "pt": 0,
                  "summary": f"Implied {implied_rating}: Leverage {gross_leverage}x, Coverage {int_cov}x, FCF/Debt {fcf_to_debt:.0%}, Margin {ebitda_margin:.0%}"}]
 
+    # Debt maturities — derive base calendar year from the balance-sheet end date of
+    # the most recently filed maturity entry (Year 1 = base_year + 1, etc.).
+    _mat_slots = [
+        (mat_y1_s,     "Year 1",      1),
+        (mat_y2_s,     "Year 2",      2),
+        (mat_y3_s,     "Year 3",      3),
+        (mat_y4_s,     "Year 4",      4),
+        (mat_y5_s,     "Year 5",      5),
+        (mat_after5_s, "After Year 5", 6),
+    ]
+    # Determine base year from the first non-empty maturity series
+    _base_year = None
+    for _s, _, _ in _mat_slots:
+        if _s and _s[0].get("end"):
+            try:
+                _base_year = int(_s[0]["end"][:4])
+            except (ValueError, TypeError):
+                pass
+            break
+    if _base_year is None and rev_s and rev_s[0].get("fy"):
+        _base_year = int(rev_s[0]["fy"])  # fallback: use latest fiscal year
+    debt_maturities = []
+    for _s, _label, _offset in _mat_slots:
+        _amt = latest_val_m(_s)
+        if _amt == 0:
+            continue
+        _year_str = str(_base_year + _offset) if _base_year else ""
+        debt_maturities.append({"year": _year_str, "amount": _amt, "label": _label})
+
     # Liquidity
     liquidity_breakdown = {
         "totalLiquidity": cash + st_investments,
         "components": [{"category": "Cash & Cash Equivalents", "amount": cash, "type": "cash", "sub": []}],
-        "facilities": [], "debtMaturities": [],
+        "facilities": [], "debtMaturities": debt_maturities,
     }
     if st_investments > 0:
         liquidity_breakdown["components"].append(
             {"category": "Short-Term Investments", "amount": st_investments, "type": "st_invest", "sub": []})
+
+    # Credit facilities from XBRL
+    loc_capacity = latest_val_m(loc_cap_s)
+    loc_remaining = latest_val_m(loc_rem_s)
+    loc_drawn = latest_val_m(loc_drawn_s)
+    # Derive missing fields where possible
+    if loc_capacity > 0 and loc_remaining == 0 and loc_drawn > 0:
+        loc_remaining = max(0, loc_capacity - loc_drawn)
+    elif loc_capacity > 0 and loc_drawn == 0 and loc_remaining > 0:
+        loc_drawn = max(0, loc_capacity - loc_remaining)
+
+    credit_facilities = []
+    if loc_capacity > 0:
+        facility = {
+            "name": "Revolving Credit Facility",
+            "type": "revolver",
+            "committed": loc_capacity,
+            "drawn": loc_drawn,
+            "available": loc_remaining,
+            "source": "SEC EDGAR XBRL",
+        }
+        credit_facilities.append(facility)
+        liquidity_breakdown["facilities"].append({
+            "name": "Revolving Credit Facility",
+            "committed": loc_capacity,
+            "drawn": loc_drawn,
+            "available": loc_remaining,
+        })
+
+    # Debt maturity schedule from XBRL
+    current_year = datetime.now().year
+    mat_fields = [mat_y1_s, mat_y2_s, mat_y3_s, mat_y4_s, mat_y5_s]
+    for offset_yr, mat_s in enumerate(mat_fields, start=0):
+        amt = latest_val_m(mat_s)
+        if amt > 0:
+            liquidity_breakdown["debtMaturities"].append({
+                "year": str(current_year + offset_yr),
+                "amount": amt,
+                "type": "scheduled",
+            })
 
     # Runway
     qtr_burn = quarterly_burns[-1]["burn"] if quarterly_burns else (round(fcf / 4) if fcf != 0 else 0)
@@ -429,15 +776,27 @@ def generate_company_profile(ticker):
         "ebitda": adj_ebitda, "intExp": int_exp, "revenue": revenue,
         "netIncome": net_income, "totalAssets": total_assets, "totalEquity": total_equity,
         "fcf": fcf, "currentAssets": current_assets, "currentLiab": current_liab,
+        # Operating metrics
+        "grossProfit": gross_profit or None,
+        "cogs": cogs or None,
+        "rdExpense": rd_expense or None,
+        "sgaExpense": sga_expense or None,
+        "dividendsPaid": dividends_common or None,
+        "buybacksPaid": buybacks or None,
+        # Derived margin ratios (0–1 fractions; None when revenue unavailable)
+        "grossMargin": gross_margin,
+        "ebitdaMargin": ebitda_margin_pct,
+        "rdIntensity": rd_intensity,
         "grossLeverage": gross_leverage, "netLeverage": net_leverage,
         "intCov": int_cov, "debtToEquity": debt_to_equity,
         "currentRatio": current_ratio, "roic": roic,
         "cashBurnQtr": qtr_burn, "liquidityRunway": runway,
         "quarterlyBurns": quarterly_burns, "adjBurn": adj_burn,
         "liquidityBreakdown": liquidity_breakdown,
+        "creditFacilities": credit_facilities,
         "analystRating": implied_rating, "targetPrice": 0,
         "earningsDate": None, "earningsTime": None,
-        "lastEarnings": "", "earningsCallSummary": None,
+        "lastEarnings": _compute_last_earnings(rev_s, ni_s), "earningsCallSummary": earnings_call_summary,
         "news": [], "ratingHistory": rating_history,
         "research": research, "financials": financials,
         "_generated": True, "_source": "sec_edgar",

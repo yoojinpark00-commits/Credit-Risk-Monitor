@@ -627,14 +627,14 @@ return (
     {/* KPI strip */}
     <div style={{ display: "grid", gridTemplateColumns: mob ? "repeat(2, 1fr)" : tablet ? "repeat(4, 1fr)" : "repeat(8, 1fr)", gap: mob ? 8 : 12, padding: `16px ${px}px` }}>
       {[
-        { l: isPubliclyRated(detail) ? "Agency Rating" : "Implied Rating", v: isPubliclyRated(detail) ? `${detail.sp}${detail.moodys !== "NR" ? ` / ${detail.moodys}` : ""}` : detail.impliedRating, c: isPubliclyRated(detail) ? ratingColor(detail.sp) : ratingColor(detail.impliedRating) },
-        { l: isPubliclyRated(detail) ? "Implied Rating" : "Agency Rating", v: isPubliclyRated(detail) ? detail.impliedRating : "Not Rated", c: isPubliclyRated(detail) ? ratingColor(detail.impliedRating) : "#64748b" },
-        { l: "Outlook", v: `${outlookIcon(detail.outlook)} ${detail.outlook}`, c: outlookColor(detail.outlook) },
+        { l: isPubliclyRated(detail) ? "Agency Rating" : "Implied Rating", v: isPubliclyRated(detail) ? `${detail.sp}${detail.moodys !== "NR" ? ` / ${detail.moodys}` : ""}` : (detail.impliedRating || "N/A"), c: isPubliclyRated(detail) ? ratingColor(detail.sp) : ratingColor(detail.impliedRating) },
+        { l: isPubliclyRated(detail) ? "Implied Rating" : "Agency Rating", v: isPubliclyRated(detail) ? (detail.impliedRating || "N/A") : "Not Rated", c: isPubliclyRated(detail) ? ratingColor(detail.impliedRating) : "#64748b" },
+        { l: "Outlook", v: detail.outlook ? `${outlookIcon(detail.outlook)} ${detail.outlook}` : "N/A", c: outlookColor(detail.outlook) },
         { l: "CDS 5Y", v: detail.cds5y != null ? `${detail.cds5y} bps` : "N/A", sub: detail.cds5yChg != null ? `${bps(detail.cds5yChg)} bps` : "", c: detail.cds5yChg != null ? (detail.cds5yChg <= 0 ? "#22c55e" : "#ef4444") : "#64748b" },
         { l: "Bond Spread", v: detail.bondSpread != null ? `${detail.bondSpread} bps` : "N/A", sub: detail.bondSpreadChg != null ? `${bps(detail.bondSpreadChg)} bps` : "", c: detail.bondSpreadChg != null ? (detail.bondSpreadChg <= 0 ? "#22c55e" : "#ef4444") : "#64748b" },
         { l: "Equity", v: detail.eqPrice != null ? `$${detail.eqPrice}` : "Private", sub: detail.eqChg != null ? pct(detail.eqChg) : "", c: detail.eqChg != null ? (detail.eqChg >= 0 ? "#22c55e" : "#ef4444") : "#64748b" },
-        { l: detail.fcf > 0 ? "Adj. Cash Flow / Qtr" : "Cash Burn / Qtr", v: detail.fcf > 0 ? `+${fmt(Math.abs(detail.cashBurnQtr) * 1e6)}` : fmt(detail.cashBurnQtr * 1e6), c: detail.fcf > 0 ? "#22c55e" : "#ef4444" },
-        { l: "Current Ratio", v: `${fmtNum(detail.currentRatio)}x`, c: detail.currentRatio >= 1.5 ? "#22c55e" : detail.currentRatio >= 1 ? "#eab308" : "#ef4444" },
+        { l: detail.fcf != null && detail.fcf > 0 ? "Adj. Cash Flow / Qtr" : "Cash Burn / Qtr", v: detail.cashBurnQtr != null ? (detail.fcf != null && detail.fcf > 0 ? `+${fmt(Math.abs(detail.cashBurnQtr) * 1e6)}` : fmt(detail.cashBurnQtr * 1e6)) : "N/A", c: detail.fcf != null && detail.fcf > 0 ? "#22c55e" : detail.cashBurnQtr != null ? "#ef4444" : "#64748b" },
+        { l: "Current Ratio", v: detail.currentRatio != null ? `${fmtNum(detail.currentRatio)}x` : "N/A", c: detail.currentRatio != null ? (detail.currentRatio >= 1.5 ? "#22c55e" : detail.currentRatio >= 1 ? "#eab308" : "#ef4444") : "#64748b" },
       ].map((k, i) => (
         <div key={i} style={{ ...card, position: "relative", overflow: "hidden", animation: "fadeIn 0.3s ease forwards", animationDelay: `${i * 30}ms`, opacity: 0 }}>
           <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: k.c || "#3b82f6", opacity: 0.5 }} />
@@ -784,7 +784,7 @@ return (
                 {/* Waterfall bars */}
                 <div>
                   {reconItems.map((r, ri) => {
-                    const barPct = maxRecon > 0 ? (Math.abs(r.amount) / maxRecon * 100) : 0;
+                    const barPct = (maxRecon > 0 && isFinite(r.amount)) ? (Math.abs(r.amount) / maxRecon * 100) : 0;
                     return (
                       <div key={ri} style={{ marginBottom: ri < reconItems.length - 1 ? 8 : 0 }}>
                         {r.isSubtotal && ri > 0 && <div style={{ borderTop: "2px dashed rgba(148,163,184,0.2)", margin: "10px 0" }} />}
@@ -817,9 +817,11 @@ return (
                     </tbody>
                   </table>
                   <div style={{ marginTop: 12, padding: 8, background: "rgba(96,165,250,0.05)", borderRadius: 4, border: "1px solid rgba(96,165,250,0.1)", fontSize: 9, color: "#64748b", lineHeight: 1.5 }}>
-                    {ab.sbc > 0 && <div><b>SBC:</b> Stock-based compensation is the largest non-cash add-back ({((ab.sbc / Math.abs(ab.gaapEbitda)) * 100).toFixed(0)}% of GAAP EBITDA).</div>}
+                    {ab.sbc > 0 && ab.gaapEbitda !== 0 && <div><b>SBC:</b> Stock-based compensation is the largest non-cash add-back ({((ab.sbc / Math.abs(ab.gaapEbitda)) * 100).toFixed(0)}% of GAAP EBITDA).</div>}
+                    {ab.sbc > 0 && ab.gaapEbitda === 0 && <div><b>SBC:</b> ${ab.sbc.toLocaleString()}M stock-based compensation added back (GAAP EBITDA is zero).</div>}
                     {ab.restructuring > 0 && <div><b>Restructuring:</b> ${ab.restructuring}M in non-recurring charges added back.</div>}
-                    {totalAdj > 0 && <div style={{ marginTop: 4 }}>Total adjustments of <b>${totalAdj.toLocaleString()}M</b> improve EBITDA by {((totalAdj / Math.abs(ab.gaapEbitda)) * 100).toFixed(0)}%.</div>}
+                    {totalAdj > 0 && ab.gaapEbitda !== 0 && <div style={{ marginTop: 4 }}>Total adjustments of <b>${totalAdj.toLocaleString()}M</b> improve EBITDA by {((totalAdj / Math.abs(ab.gaapEbitda)) * 100).toFixed(0)}%.</div>}
+                    {totalAdj > 0 && ab.gaapEbitda === 0 && <div style={{ marginTop: 4 }}>Total adjustments of <b>${totalAdj.toLocaleString()}M</b> applied (GAAP EBITDA is zero).</div>}
                   </div>
                 </div>
               </div>
@@ -837,7 +839,7 @@ return (
             const tradBurnAbs = Math.abs(tradBurn);
             const adjBurnAbs = Math.abs(adjBurnTotal);
             const diff = adjBurnAbs - tradBurnAbs;
-            const maxBurn = Math.max(tradBurnAbs, adjBurnAbs);
+            const maxBurn = Math.max(tradBurnAbs, adjBurnAbs, 1); // guard against zero to avoid NaN bar widths
 
             // Waterfall items for adjusted burn
             const waterfall = [
@@ -899,19 +901,19 @@ return (
                       {adjBurnTotal > tradBurn ? " HIGHER" : " LOWER"}
                     </div>
                     <div style={{ fontSize: 9, color: "#64748b", marginTop: 4 }}>
-                      {adjBurnTotal >= 0 && tradBurn >= 0 ? "Both measures show positive cash generation" : adjBurnTotal >= 0 ? "Adjusted measure shows cash generation; traditional FCF is negative" : tradBurnAbs > 0 ? `Adjusted outflow differs from traditional FCF by ${((Math.abs(diff) / tradBurnAbs) * 100).toFixed(0)}%` : ""}
+                      {adjBurnTotal >= 0 && tradBurn >= 0 ? "Both measures show positive cash generation" : adjBurnTotal >= 0 ? "Adjusted measure shows cash generation; traditional FCF is negative" : tradBurnAbs > 0 ? `Adjusted outflow differs from traditional FCF by ${((Math.abs(diff) / tradBurnAbs) * 100).toFixed(0)}%` : tradBurnAbs === 0 ? "Traditional FCF is zero; adjusted measure reflects non-FCF items" : ""}
                     </div>
                   </div>
                   {/* Runway comparison */}
                   <div style={{ marginTop: 12, display: "grid", gridTemplateColumns: mob ? "1fr" : "1fr 1fr", gap: 8 }}>
                     <div style={{ padding: 10, background: "#0a0e1a", borderRadius: 6, textAlign: "center" }}>
                       <div style={{ fontSize: 9, color: "#64748b", textTransform: "uppercase" }}>{tradBurn >= 0 ? "Traditional: Cash Flow Positive" : "Traditional Runway"}</div>
-                      <div style={{ fontSize: 20, fontWeight: 800, color: tradBurn >= 0 ? "#22c55e" : (detail.cash / (tradBurnAbs / 4)) >= 6 ? "#eab308" : "#ef4444" }}>{tradBurn >= 0 ? "\u2713 Positive" : `${(detail.cash / (tradBurnAbs / 4)).toFixed(1)} qtrs`}</div>
+                      <div style={{ fontSize: 20, fontWeight: 800, color: tradBurn >= 0 ? "#22c55e" : tradBurnAbs > 0 ? ((detail.cash / (tradBurnAbs / 4)) >= 6 ? "#eab308" : "#ef4444") : "#22c55e" }}>{tradBurn >= 0 ? "\u2713 Positive" : tradBurnAbs > 0 ? `${(detail.cash / (tradBurnAbs / 4)).toFixed(1)} qtrs` : "\u2014"}</div>
                       <div style={{ fontSize: 9, color: "#64748b" }}>{tradBurn >= 0 ? `+${fmt(tradBurn * 1e6)} FCF generated` : "Cash \u00F7 Quarterly FCF Burn"}</div>
                     </div>
                     <div style={{ padding: 10, background: "#0a0e1a", borderRadius: 6, textAlign: "center" }}>
                       <div style={{ fontSize: 9, color: "#64748b", textTransform: "uppercase" }}>{adjBurnTotal >= 0 ? "Adjusted: Cash Flow Positive" : "Adjusted Runway"}</div>
-                      <div style={{ fontSize: 20, fontWeight: 800, color: adjBurnTotal >= 0 ? "#22c55e" : (detail.cash / (adjBurnAbs / 4)) >= 6 ? "#eab308" : "#ef4444" }}>{adjBurnTotal >= 0 ? "\u2713 Positive" : `${(detail.cash / (adjBurnAbs / 4)).toFixed(1)} qtrs`}</div>
+                      <div style={{ fontSize: 20, fontWeight: 800, color: adjBurnTotal >= 0 ? "#22c55e" : adjBurnAbs > 0 ? ((detail.cash / (adjBurnAbs / 4)) >= 6 ? "#eab308" : "#ef4444") : "#22c55e" }}>{adjBurnTotal >= 0 ? "\u2713 Positive" : adjBurnAbs > 0 ? `${(detail.cash / (adjBurnAbs / 4)).toFixed(1)} qtrs` : "\u2014"}</div>
                       <div style={{ fontSize: 9, color: "#64748b" }}>{adjBurnTotal >= 0 ? `+${fmt(adjBurnTotal * 1e6)} adj. cash flow` : "Cash \u00F7 Quarterly Adj. Burn"}</div>
                     </div>
                   </div>
@@ -921,7 +923,7 @@ return (
                 <div>
                   <div style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.5px" }}>Adjusted Cash Flow Waterfall ($M)</div>
                   {waterfall.map((w, wi) => {
-                    const barPct = maxWf > 0 ? (Math.abs(w.amount) / maxWf * 100) : 0;
+                    const barPct = (maxWf > 0 && isFinite(w.amount)) ? (Math.abs(w.amount) / maxWf * 100) : 0;
                     return (
                       <div key={wi} style={{ marginBottom: wi < waterfall.length - 1 ? 6 : 0 }}>
                         {w.isTotal && <div style={{ borderTop: "2px dashed #475569", margin: "8px 0" }} />}
