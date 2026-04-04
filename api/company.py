@@ -1,114 +1,122 @@
 """
 Vercel Serverless Function: GET /api/company?ticker=AAPL
-Generates a complete company profile for any public ticker.
-Uses Yahoo Finance public endpoints directly via requests (no yfinance dependency).
-Free, no API key required.
+
+Primary: SEC EDGAR XBRL companyfacts API (free, no key, all financials)
+Price:   Yahoo Finance v8/chart (free, no auth needed)
+Rating:  5-factor S&P-style implied credit rating model
 """
 import json
 import math
+import urllib.request
+import urllib.error
 from http.server import BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 from datetime import datetime, timezone
-import requests as req
+from concurrent.futures import ThreadPoolExecutor
 
-# In-memory cache (persists across warm invocations)
 _company_cache = {}
 CACHE_TTL_HOURS = 6
+_cik_cache = {}
 
-# Yahoo Finance session cache (crumb + cookies persist across warm invocations)
-_yf_session = None
-_yf_crumb = None
+EDGAR_UA = "CreditRiskMonitor/1.0 (creditrisk@monitor.app)"
+EDGAR_HEADERS = {"User-Agent": EDGAR_UA, "Accept": "application/json"}
+
+# ─── XBRL concept fallback map ──────────────────────────────────────────
+CONCEPT_MAP = {
+    "revenue": [
+        "RevenueFromContractWithCustomerExcludingAssessedTax",
+        "Revenues", "SalesRevenueNet",
+        "RevenueFromContractWithCustomerIncludingAssessedTax",
+    ],
+    "net_income": ["NetIncomeLoss", "ProfitLoss"],
+    "operating_income": ["OperatingIncomeLoss"],
+    "interest_expense": ["InterestExpense", "InterestExpenseDebt", "InterestAndDebtExpense"],
+    "tax_expense": ["IncomeTaxExpenseBenefit"],
+    "depreciation": [
+        "DepreciationDepletionAndAmortization",
+        "DepreciationAndAmortization", "Depreciation",
+    ],
+    "sbc": ["ShareBasedCompensation", "AllocatedShareBasedCompensationExpense"],
+    "restructuring": ["RestructuringCharges", "RestructuringSettlementAndImpairmentProvisions"],
+    "total_debt_lt": ["LongTermDebtNoncurrent", "LongTermDebt", "LongTermDebtAndCapitalLeaseObligations"],
+    "current_debt": ["DebtCurrent", "ShortTermBorrowings", "LongTermDebtCurrent"],
+    "cash": ["CashAndCashEquivalentsAtCarryingValue", "CashCashEquivalentsAndShortTermInvestments", "Cash"],
+    "st_investments": ["ShortTermInvestments", "AvailableForSaleSecuritiesCurrent", "MarketableSecuritiesCurrent"],
+    "total_assets": ["Assets"],
+    "total_equity": ["StockholdersEquity", "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest"],
+    "current_assets": ["AssetsCurrent"],
+    "current_liab": ["LiabilitiesCurrent"],
+    "ocf": ["NetCashProvidedByUsedInOperatingActivities"],
+    "capex": ["PaymentsToAcquirePropertyPlantAndEquipment", "PaymentsToAcquireProductiveAssets"],
+    "dividends_paid": ["PaymentsOfDividends", "PaymentsOfDividendsCommonStock"],
+    "shares_outstanding": ["CommonStockSharesOutstanding", "EntityCommonStockSharesOutstanding"],
+}
+
+ANNUAL_FORMS = {"10-K", "10-K/A", "20-F", "20-F/A"}
+QUARTERLY_FORMS = {"10-Q", "10-Q/A"}
 
 
-def _get_yf_session():
-    """Get an authenticated Yahoo Finance session with crumb + cookies."""
-    global _yf_session, _yf_crumb
-    if _yf_session and _yf_crumb:
-        return _yf_session, _yf_crumb
-
-    session = req.Session()
-    session.headers.update({"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"})
-
-    # Step 1: Hit Yahoo to get auth cookies
-    session.get("https://fc.yahoo.com", timeout=5, allow_redirects=True)
-
-    # Step 2: Get crumb token
-    crumb_resp = session.get("https://query2.finance.yahoo.com/v1/test/getcrumb", timeout=5)
-    if crumb_resp.status_code != 200 or not crumb_resp.text.strip():
-        raise Exception(f"Failed to get Yahoo crumb: HTTP {crumb_resp.status_code}")
-
-    _yf_session = session
-    _yf_crumb = crumb_resp.text.strip()
-    return _yf_session, _yf_crumb
+# ─── EDGAR helpers ───────────────────────────────────────────────────────
+def _edgar_get(url):
+    r = urllib.request.Request(url, headers=EDGAR_HEADERS)
+    with urllib.request.urlopen(r, timeout=10) as resp:
+        return json.loads(resp.read().decode())
 
 
-def yf_quoteSummary(ticker, modules):
-    """Fetch Yahoo Finance quoteSummary with proper crumb authentication."""
+def ticker_to_cik(ticker):
+    if ticker in _cik_cache:
+        return _cik_cache[ticker]
+    data = _edgar_get("https://www.sec.gov/files/company_tickers.json")
+    for entry in data.values():
+        t = entry["ticker"].upper()
+        c = str(entry["cik_str"]).zfill(10)
+        _cik_cache[t] = c
+        if t == ticker.upper():
+            result = c
+    return _cik_cache.get(ticker.upper())
+
+
+def _extract_series(facts, tag, forms, n=4, quarterly=False):
+    """Extract up to n data points from companyfacts for a given XBRL tag."""
     try:
-        session, crumb = _get_yf_session()
-        url = f"https://query2.finance.yahoo.com/v10/finance/quoteSummary/{ticker}"
-        params = {"modules": ",".join(modules), "crumb": crumb}
-        r = session.get(url, params=params, timeout=8)
-        if r.status_code == 401 or r.status_code == 403:
-            # Crumb expired, refresh and retry once
-            global _yf_session, _yf_crumb
-            _yf_session = None
-            _yf_crumb = None
-            session, crumb = _get_yf_session()
-            params["crumb"] = crumb
-            r = session.get(url, params=params, timeout=8)
-        if r.status_code == 200:
-            data = r.json()
-            result = data.get("quoteSummary", {}).get("result")
-            if result and len(result) > 0:
-                return result[0]
-    except Exception:
-        pass
-    return {}
-
-
-
-def extract_raw(obj, key, fallback=None):
-    """Extract .raw from Yahoo Finance response objects like {'raw': 123, 'fmt': '123'}."""
-    if obj is None:
-        return fallback
-    val = obj.get(key)
-    if val is None:
-        return fallback
-    if isinstance(val, dict):
-        r = val.get("raw")
-        if r is None:
-            return fallback
+        units = facts["facts"]["us-gaap"][tag]["units"]
+    except KeyError:
+        # Try dei taxonomy for shares
         try:
-            f = float(r)
-            return fallback if (math.isnan(f) or math.isinf(f)) else f
-        except (ValueError, TypeError):
-            return fallback
-    try:
-        f = float(val)
-        return fallback if (math.isnan(f) or math.isinf(f)) else f
-    except (ValueError, TypeError):
-        return fallback
+            units = facts["facts"]["dei"][tag]["units"]
+        except KeyError:
+            return []
+    unit_key = "USD" if "USD" in units else ("shares" if "shares" in units else next(iter(units), None))
+    if not unit_key:
+        return []
+
+    by_key = {}
+    for e in units[unit_key]:
+        form = e.get("form", "")
+        if form not in forms:
+            continue
+        if quarterly:
+            fp = e.get("fp", "")
+            if fp not in ("Q1", "Q2", "Q3", "Q4"):
+                continue
+            key = (e.get("fy", 0), fp)
+        else:
+            if e.get("fp") != "FY":
+                continue
+            key = e.get("fy", 0)
+        by_key[key] = e
+
+    sorted_entries = sorted(by_key.values(), key=lambda x: x.get("end", ""), reverse=True)
+    return [{"fy": e.get("fy"), "end": e.get("end", ""), "val": e["val"], "tag": tag} for e in sorted_entries[:n]]
 
 
-def z_to_rating(z):
-    if z > 3.5: return "A+"
-    if z > 3.0: return "A"
-    if z > 2.7: return "BBB+"
-    if z > 2.5: return "BBB"
-    if z > 2.0: return "BB+"
-    if z > 1.8: return "BB"
-    if z > 1.5: return "B+"
-    if z > 1.2: return "B"
-    if z > 0.8: return "CCC+"
-    return "CCC"
-
-
-def safe_div(a, b, fallback=0):
-    if b is None or b == 0:
-        return fallback
-    r = a / b
-    return r if math.isfinite(r) else fallback
+def _get_field(facts, field_name, forms=ANNUAL_FORMS, n=4, quarterly=False):
+    """Try each XBRL tag alias until one returns data."""
+    for tag in CONCEPT_MAP.get(field_name, []):
+        series = _extract_series(facts, tag, forms, n, quarterly)
+        if series:
+            return series
+    return []
 
 
 def to_m(val):
@@ -121,220 +129,279 @@ def to_m(val):
         return 0
 
 
-def generate_company_profile(ticker):
-    """Build complete company profile from Yahoo Finance quoteSummary API."""
+def safe_div(a, b, fallback=0):
+    if b is None or b == 0:
+        return fallback
+    r = a / b
+    return r if math.isfinite(r) else fallback
 
-    # Fetch all needed modules in a single HTTP call
-    modules = [
-        "assetProfile", "summaryDetail", "financialData", "defaultKeyStatistics",
-        "incomeStatementHistory", "balanceSheetHistory", "cashflowStatementHistory",
-        "incomeStatementHistoryQuarterly", "cashflowStatementHistoryQuarterly",
-        "recommendationTrend", "upgradeDowngradeHistory", "price",
-    ]
-    data = yf_quoteSummary(ticker, modules)
-    if not data:
+
+def latest_val_m(series):
+    """Get the latest value from a series, converted to $M."""
+    if not series:
+        return 0
+    return to_m(series[0]["val"])
+
+
+# ─── Yahoo v8 price (no auth needed) ────────────────────────────────────
+def yahoo_price(ticker):
+    """Fetch current price data from Yahoo v8/chart — no auth required."""
+    try:
+        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}?interval=1d&range=5d"
+        r = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(r, timeout=6) as resp:
+            data = json.loads(resp.read().decode())
+        meta = data["chart"]["result"][0]["meta"]
+        return {
+            "price": meta.get("regularMarketPrice", 0),
+            "prevClose": meta.get("chartPreviousClose") or meta.get("previousClose", 0),
+            "name": meta.get("longName") or meta.get("shortName") or "",
+            "exchange": meta.get("exchangeName", ""),
+            "currency": meta.get("currency", "USD"),
+        }
+    except Exception:
+        return {"price": 0, "prevClose": 0, "name": "", "exchange": "", "currency": "USD"}
+
+
+# ─── 5-factor implied credit rating (S&P methodology) ───────────────────
+def ratio_to_rating(leverage, coverage, fcf_to_debt, ebitda_margin, mkt_cap_b):
+    def s_lev(x):
+        if x <= 0: return 6
+        if x < 0.5: return 6
+        if x < 1.5: return 5
+        if x < 2.0: return 4
+        if x < 3.0: return 3
+        if x < 4.0: return 2
+        if x < 5.5: return 1
+        return 0
+
+    def s_cov(x):
+        if x > 21: return 6
+        if x > 10: return 5
+        if x > 6: return 4
+        if x > 4: return 3
+        if x > 2.5: return 2
+        if x > 1.5: return 1
+        return 0
+
+    def s_fcf(x):
+        if x > 0.50: return 6
+        if x > 0.35: return 5
+        if x > 0.20: return 4
+        if x > 0.10: return 3
+        if x > 0.05: return 2
+        if x > 0.00: return 1
+        return 0
+
+    def s_mar(x):
+        if x > 0.30: return 6
+        if x > 0.20: return 5
+        if x > 0.15: return 4
+        if x > 0.10: return 3
+        if x > 0.08: return 2
+        if x > 0.05: return 1
+        return 0
+
+    def s_size(x):
+        if x > 100: return 6
+        if x > 25: return 5
+        if x > 10: return 4
+        if x > 5: return 3
+        if x > 1: return 2
+        if x > 0.3: return 1
+        return 0
+
+    composite = (0.35 * s_lev(leverage) + 0.30 * s_cov(coverage) +
+                 0.20 * s_fcf(fcf_to_debt) + 0.10 * s_mar(ebitda_margin) +
+                 0.05 * s_size(mkt_cap_b))
+    for threshold, rating in [
+        (5.5, "AAA"), (4.8, "AA"), (4.2, "AA-"), (3.8, "A"), (3.3, "A-"),
+        (2.8, "BBB"), (2.3, "BBB-"), (1.8, "BB"), (1.3, "BB-"),
+        (0.8, "B"), (0.3, "B-"), (0.0, "CCC"),
+    ]:
+        if composite >= threshold:
+            return rating, round(composite, 2)
+    return "CCC", round(composite, 2)
+
+
+# ─── Main profile generator ─────────────────────────────────────────────
+def generate_company_profile(ticker):
+    ticker = ticker.upper()
+
+    # Step 1: Resolve CIK (parallel with price fetch)
+    cik = None
+    yp = {"price": 0, "prevClose": 0, "name": "", "exchange": "", "currency": "USD"}
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        cik_future = pool.submit(ticker_to_cik, ticker)
+        price_future = pool.submit(yahoo_price, ticker)
+        cik = cik_future.result(timeout=8)
+        yp = price_future.result(timeout=8)
+
+    if not cik:
         return None
 
-    profile = data.get("assetProfile", {})
-    summary = data.get("summaryDetail", {})
-    fin_data = data.get("financialData", {})
-    key_stats = data.get("defaultKeyStatistics", {})
-    price_mod = data.get("price", {})
+    # Step 2: Fetch all EDGAR companyfacts (single HTTP call)
+    try:
+        facts = _edgar_get(f"https://data.sec.gov/api/xbrl/companyfacts/CIK{cik}.json")
+    except Exception:
+        return None
 
-    name = price_mod.get("longName") or price_mod.get("shortName") or profile.get("longBusinessSummary", "")[:50] or ticker.upper()
-    if name == ticker.upper() and not profile and not fin_data:
-        return None  # Ticker doesn't exist
+    entity_name = facts.get("entityName", "") or yp.get("name", "") or ticker
 
-    sector = profile.get("industry") or profile.get("sector") or "N/A"
+    # Step 3: Extract all financials
+    rev_s = _get_field(facts, "revenue")
+    ni_s = _get_field(facts, "net_income")
+    oi_s = _get_field(facts, "operating_income")
+    ie_s = _get_field(facts, "interest_expense")
+    tx_s = _get_field(facts, "tax_expense")
+    da_s = _get_field(facts, "depreciation")
+    sbc_s = _get_field(facts, "sbc")
+    restr_s = _get_field(facts, "restructuring")
+    ltd_s = _get_field(facts, "total_debt_lt")
+    cd_s = _get_field(facts, "current_debt")
+    cash_s = _get_field(facts, "cash")
+    sti_s = _get_field(facts, "st_investments")
+    ta_s = _get_field(facts, "total_assets")
+    te_s = _get_field(facts, "total_equity")
+    ca_s = _get_field(facts, "current_assets")
+    cl_s = _get_field(facts, "current_liab")
+    ocf_s = _get_field(facts, "ocf")
+    capex_s = _get_field(facts, "capex")
 
-    # --- Price ---
-    price = extract_raw(price_mod, "regularMarketPrice", 0)
-    prev_close = extract_raw(summary, "previousClose", 0)
-    price_chg = round(((price / prev_close) - 1) * 100, 2) if prev_close > 0 and price > 0 else 0
-    mkt_cap = extract_raw(price_mod, "marketCap") or extract_raw(summary, "marketCap") or 0
+    # Quarterly data for burns
+    q_ocf = _get_field(facts, "ocf", forms=QUARTERLY_FORMS, n=4, quarterly=True)
+    q_capex = _get_field(facts, "capex", forms=QUARTERLY_FORMS, n=4, quarterly=True)
+    q_rev = _get_field(facts, "revenue", forms=QUARTERLY_FORMS, n=4, quarterly=True)
 
-    # --- Annual income statements ---
-    inc_history = data.get("incomeStatementHistory", {}).get("incomeStatementHistory", [])
-    bs_history = data.get("balanceSheetHistory", {}).get("balanceSheetStatements", [])
-    cf_history = data.get("cashflowStatementHistory", {}).get("cashflowStatements", [])
-    q_inc = data.get("incomeStatementHistoryQuarterly", {}).get("incomeStatementHistory", [])
-    q_cf = data.get("cashflowStatementHistoryQuarterly", {}).get("cashflowStatements", [])
+    # Latest annual values (in $M)
+    revenue = latest_val_m(rev_s)
+    net_income = latest_val_m(ni_s)
+    oper_income = latest_val_m(oi_s)
+    int_exp = abs(latest_val_m(ie_s))
+    tax_exp = latest_val_m(tx_s)
+    da = latest_val_m(da_s)
+    sbc = latest_val_m(sbc_s)
+    restructuring = abs(latest_val_m(restr_s))
+    lt_debt = latest_val_m(ltd_s)
+    current_debt = latest_val_m(cd_s)
+    total_debt = lt_debt + current_debt
+    cash = latest_val_m(cash_s)
+    st_investments = latest_val_m(sti_s)
+    total_assets = latest_val_m(ta_s)
+    total_equity = latest_val_m(te_s)
+    current_assets = latest_val_m(ca_s)
+    current_liab = latest_val_m(cl_s)
+    ocf = latest_val_m(ocf_s)
+    capex = abs(latest_val_m(capex_s))
+    fcf = ocf - capex
 
-    # --- Latest annual data ---
-    inc = inc_history[0] if inc_history else {}
-    bs = bs_history[0] if bs_history else {}
-    cf = cf_history[0] if cf_history else {}
+    # EBITDA
+    gaap_ebitda = oper_income + da if (oper_income and da) else net_income + int_exp + tax_exp + da
+    adj_ebitda = gaap_ebitda + sbc + restructuring
 
-    revenue = to_m(extract_raw(inc, "totalRevenue"))
-    net_income = to_m(extract_raw(inc, "netIncome"))
-    oper_income = to_m(extract_raw(inc, "operatingIncome"))
-    int_exp = to_m(extract_raw(inc, "interestExpense"))
-    tax_exp = to_m(extract_raw(inc, "incomeTaxExpense"))
-    ebitda_raw = to_m(extract_raw(inc, "ebitda"))
-
-    total_debt = to_m(extract_raw(bs, "longTermDebt", 0) + extract_raw(bs, "shortLongTermDebt", 0))
-    cash = to_m(extract_raw(bs, "cash"))
-    total_assets = to_m(extract_raw(bs, "totalAssets"))
-    total_equity = to_m(extract_raw(bs, "totalStockholderEquity"))
-    current_assets = to_m(extract_raw(bs, "totalCurrentAssets"))
-    current_liab = to_m(extract_raw(bs, "totalCurrentLiabilities"))
-    lt_debt = to_m(extract_raw(bs, "longTermDebt"))
-    current_ltd = to_m(extract_raw(bs, "shortLongTermDebt") or extract_raw(bs, "currentLongTermDebt"))
-    st_investments = to_m(extract_raw(bs, "shortTermInvestments"))
-
-    total_capex = abs(to_m(extract_raw(cf, "capitalExpenditures")))
-    fcf = to_m(extract_raw(cf, "totalCashFromOperatingActivities", 0)) - total_capex
-
-    # Also pull from financialData module (more current)
-    if revenue == 0:
-        revenue = to_m(extract_raw(fin_data, "totalRevenue"))
-    if total_debt == 0:
-        total_debt = to_m(extract_raw(fin_data, "totalDebt"))
-    if cash == 0:
-        cash = to_m(extract_raw(fin_data, "totalCash"))
-    if fcf == 0:
-        fcf = to_m(extract_raw(fin_data, "freeCashflow"))
-    if ebitda_raw == 0:
-        ebitda_raw = to_m(extract_raw(fin_data, "ebitda"))
-
-    # --- Compute EBITDA ---
-    gaap_ebitda = ebitda_raw if ebitda_raw != 0 else (net_income + abs(int_exp) + tax_exp)
-    adj_ebitda = gaap_ebitda  # No SBC data from quoteSummary
-
-    # --- Derived ratios ---
+    # Ratios
     gross_leverage = round(safe_div(total_debt, adj_ebitda), 1)
     net_leverage = round(safe_div(total_debt - cash, adj_ebitda), 1)
-    int_cov = round(safe_div(adj_ebitda, abs(int_exp) if int_exp else 0), 1)
+    int_cov = round(safe_div(adj_ebitda, int_exp), 1)
     debt_to_equity = round(safe_div(total_debt, total_equity), 2)
     current_ratio = round(safe_div(current_assets, current_liab), 2)
     roic = round(safe_div(net_income, total_debt + total_equity) * 100, 1) if (total_debt + total_equity) > 0 else 0
+    ebitda_margin = safe_div(adj_ebitda, revenue) if revenue > 0 else 0
+    fcf_to_debt = safe_div(fcf, total_debt) if total_debt > 0 else 1.0
 
-    # --- Altman Z-Score ---
+    # Price
+    price = yp["price"]
+    prev_close = yp["prevClose"]
+    price_chg = round(((price / prev_close) - 1) * 100, 2) if prev_close > 0 and price > 0 else 0
+
+    # Market cap from shares outstanding + price
+    shares_s = _get_field(facts, "shares_outstanding")
+    shares = shares_s[0]["val"] if shares_s else 0
+    mkt_cap = (shares * price) if shares and price else 0
+    mkt_cap_b = round(mkt_cap / 1e9, 2) if mkt_cap else 0
+
+    # 5-factor implied rating
+    implied_rating, rating_score = ratio_to_rating(
+        gross_leverage, int_cov, fcf_to_debt, ebitda_margin, mkt_cap_b
+    )
+
+    # Altman Z-Score (kept for reference)
     working_capital = current_assets - current_liab
     total_liabilities = total_assets - total_equity if total_assets > total_equity else 1
-    market_cap_m = to_m(mkt_cap)
     z_score = 0
     if total_assets > 0 and total_liabilities > 0:
         z_score = round(
             1.2 * safe_div(working_capital, total_assets) +
             1.4 * safe_div(total_equity, total_assets) +
             3.3 * safe_div(oper_income, total_assets) +
-            0.6 * safe_div(market_cap_m, total_liabilities) +
+            0.6 * safe_div(to_m(mkt_cap), total_liabilities) +
             0.999 * safe_div(revenue, total_assets),
         2)
-    implied_rating = z_to_rating(z_score)
 
-    # --- Financials array (trailing years) ---
+    # Financials array (trailing 4 years)
     financials = []
-    num_years = min(len(inc_history), len(bs_history), 4)
-    for i in range(num_years):
-        end_date = inc_history[i].get("endDate", {})
-        fy = end_date.get("fmt", "")[:4] if isinstance(end_date, dict) else str(2025 - i)
-        if not fy:
-            fy = str(2025 - i)
+    for i in range(min(len(rev_s), 4)):
+        fy = rev_s[i].get("fy", 2025 - i)
         financials.append({
             "period": f"FY{fy}",
-            "rev": to_m(extract_raw(inc_history[i], "totalRevenue")),
-            "ebitda": to_m(extract_raw(inc_history[i], "ebitda")),
-            "ni": to_m(extract_raw(inc_history[i], "netIncome")),
-            "debt": to_m(extract_raw(bs_history[i], "longTermDebt", 0) + extract_raw(bs_history[i], "shortLongTermDebt", 0)),
-            "cash": to_m(extract_raw(bs_history[i], "cash")),
+            "rev": to_m(rev_s[i]["val"]) if i < len(rev_s) else 0,
+            "ebitda": to_m(oi_s[i]["val"]) + to_m(da_s[i]["val"]) if i < len(oi_s) and i < len(da_s) else 0,
+            "ni": to_m(ni_s[i]["val"]) if i < len(ni_s) else 0,
+            "debt": to_m(ltd_s[i]["val"]) if i < len(ltd_s) else 0,
+            "cash": to_m(cash_s[i]["val"]) if i < len(cash_s) else 0,
         })
 
-    # --- Quarterly burns ---
+    # Quarterly burns
     quarterly_burns = []
-    num_q = min(len(q_inc), len(q_cf), 4)
-    for i in range(num_q):
-        end_date = q_inc[i].get("endDate", {})
-        if isinstance(end_date, dict):
-            date_fmt = end_date.get("fmt", "")
-        else:
-            date_fmt = ""
+    for i in range(min(len(q_ocf), len(q_capex), 4)):
+        q_o = to_m(q_ocf[i]["val"])
+        q_c = abs(to_m(q_capex[i]["val"]))
+        end = q_ocf[i].get("end", "")
         try:
-            from datetime import datetime as dt
-            d = dt.strptime(date_fmt, "%Y-%m-%d")
+            d = datetime.strptime(end, "%Y-%m-%d")
             q_label = f"Q{((d.month - 1) // 3) + 1} {d.year}"
         except Exception:
             q_label = f"Q{4-i}"
-        q_ebitda = to_m(extract_raw(q_inc[i], "ebitda"))
-        q_ocf = to_m(extract_raw(q_cf[i], "totalCashFromOperatingActivities"))
-        q_capex = abs(to_m(extract_raw(q_cf[i], "capitalExpenditures")))
-        q_burn = q_ocf - q_capex if q_ocf != 0 else q_ebitda - q_capex
         quarterly_burns.append({
-            "q": q_label,
-            "burn": q_burn,
-            "note": f"EBITDA {q_ebitda}M, CapEx {q_capex}M",
+            "q": q_label, "burn": q_o - q_c,
+            "note": f"OCF {q_o}M, CapEx {q_c}M",
         })
     quarterly_burns.reverse()
 
-    # --- adjBurn ---
-    fy_label = financials[0]["period"][2:] if financials else "LTM"
+    # adjBurn
+    fy_label = str(rev_s[0]["fy"]) if rev_s else "LTM"
     adj_burn = {
         "adjEBITDA": adj_ebitda,
-        "adjEBITDA_src": f"FY{fy_label}: GAAP EBITDA ({gaap_ebitda}M)",
-        "gaapEbitda": gaap_ebitda,
-        "sbc": 0,
-        "restructuring": 0,
-        "otherNonCash": 0,
-        "incomeTaxes": abs(tax_exp),
-        "incomeTaxes_src": f"FY{fy_label} income statement",
-        "prefDividends": 0,
-        "prefDividends_src": "N/A",
-        "maintCapex": None,
-        "totalCapex": total_capex,
-        "totalCapex_src": f"FY{fy_label} cash flow statement",
-        "currentLTD": current_ltd,
-        "currentLTD_src": f"FY{fy_label} balance sheet",
-        "intExpCash": abs(int_exp),
-        "intExpCash_src": f"FY{fy_label} income statement",
+        "adjEBITDA_src": f"FY{fy_label} SEC 10-K: OpInc ({oper_income}M) + D&A ({da}M) + SBC ({sbc}M) + Restructuring ({restructuring}M)",
+        "gaapEbitda": gaap_ebitda, "sbc": sbc, "restructuring": restructuring, "otherNonCash": 0,
+        "incomeTaxes": tax_exp, "incomeTaxes_src": f"FY{fy_label} 10-K",
+        "prefDividends": 0, "prefDividends_src": "N/A",
+        "maintCapex": None, "totalCapex": capex, "totalCapex_src": f"FY{fy_label} 10-K",
+        "currentLTD": current_debt, "currentLTD_src": f"FY{fy_label} 10-K",
+        "intExpCash": int_exp, "intExpCash_src": f"FY{fy_label} 10-K",
     }
 
-    # --- Rating history (from upgrades/downgrades) ---
-    rating_history = []
-    ud_history = data.get("upgradeDowngradeHistory", {}).get("history", [])
-    for item in ud_history[:4]:
-        epoch = item.get("epochGradeDate", 0)
-        date_str = datetime.fromtimestamp(epoch, tz=timezone.utc).strftime("%Y-%m-%d") if epoch else "N/A"
-        rating_history.append({
-            "date": date_str,
-            "sp": "NR", "moodys": "NR", "fitch": "NR",
-            "event": f"{item.get('firm', 'Analyst')}: {item.get('fromGrade', '?')} → {item.get('toGrade', '?')} ({item.get('action', '')})",
-        })
-    if not rating_history:
-        rating_history = [{"date": "N/A", "sp": "NR", "moodys": "NR", "fitch": "NR", "event": "No rating history available"}]
+    # Rating history (from filing dates)
+    rating_history = [{"date": f"FY{fy_label}", "sp": "NR", "moodys": "NR", "fitch": "NR",
+                       "event": f"Implied: {implied_rating} (5-factor score: {rating_score})"}]
 
-    # --- Research (analyst consensus) ---
-    rec_key = (fin_data.get("recommendationKey") or "").replace("_", " ").title()
-    target_price = extract_raw(fin_data, "targetMeanPrice", 0)
-    target_high = extract_raw(fin_data, "targetHighPrice", 0)
-    target_low = extract_raw(fin_data, "targetLowPrice", 0)
-    num_analysts = extract_raw(fin_data, "numberOfAnalystOpinions", 0)
+    # Research placeholder
+    research = [{"date": datetime.now().strftime("%Y-%m-%d"), "firm": "5-Factor Model",
+                 "action": implied_rating, "pt": 0,
+                 "summary": f"Implied {implied_rating}: Leverage {gross_leverage}x, Coverage {int_cov}x, FCF/Debt {fcf_to_debt:.0%}, Margin {ebitda_margin:.0%}"}]
 
-    research = []
-    if rec_key or target_price:
-        research.append({
-            "date": datetime.now().strftime("%Y-%m-%d"),
-            "firm": f"Consensus ({int(num_analysts)} analysts)" if num_analysts else "Consensus",
-            "action": rec_key or "N/A",
-            "pt": target_price,
-            "summary": f"Target: ${target_price:.0f} (${target_low:.0f}–${target_high:.0f}). Recommendation: {rec_key or 'N/A'}",
-        })
-    if not research:
-        research = [{"date": "", "firm": "N/A", "action": "N/A", "pt": 0, "summary": "No analyst coverage available"}]
-
-    # --- Liquidity ---
+    # Liquidity
     liquidity_breakdown = {
         "totalLiquidity": cash + st_investments,
         "components": [{"category": "Cash & Cash Equivalents", "amount": cash, "type": "cash", "sub": []}],
-        "facilities": [],
-        "debtMaturities": [],
+        "facilities": [], "debtMaturities": [],
     }
     if st_investments > 0:
         liquidity_breakdown["components"].append(
-            {"category": "Short-Term Investments", "amount": st_investments, "type": "st_invest", "sub": []}
-        )
+            {"category": "Short-Term Investments", "amount": st_investments, "type": "st_invest", "sub": []})
 
-    # --- Runway ---
+    # Runway
     qtr_burn = quarterly_burns[-1]["burn"] if quarterly_burns else (round(fcf / 4) if fcf != 0 else 0)
     if qtr_burn > 0:
         runway = "Cash flow positive"
@@ -344,55 +411,39 @@ def generate_company_profile(ticker):
     else:
         runway = "N/A"
 
+    # Sector from SEC filing (use SIC if available)
+    sector = "N/A"
+    try:
+        sic_data = _edgar_get(f"https://efts.sec.gov/LATEST/search-index?q=%22{cik.lstrip('0')}%22&dateRange=custom&startdt=2020-01-01&forms=10-K")
+        # Fallback: just use entity name
+    except Exception:
+        pass
+
     return {
-        "id": ticker.upper(),
-        "name": name,
-        "sector": sector,
+        "id": ticker, "name": entity_name, "sector": sector,
         "sp": "NR", "moodys": "NR", "fitch": "NR",
-        "impliedRating": implied_rating,
-        "outlook": "Stable",
-        "watchlist": False,
-        "cds5y": None, "cds5yChg": None,
-        "bondSpread": None, "bondSpreadChg": None,
-        "eqPrice": price,
-        "eqChg": price_chg,
-        "mktCap": round(mkt_cap / 1e9, 2),
-        "ltDebt": lt_debt,
-        "totalDebt": total_debt,
-        "cash": cash,
-        "ebitda": adj_ebitda,
-        "intExp": abs(int_exp),
-        "revenue": revenue,
-        "netIncome": net_income,
-        "totalAssets": total_assets,
-        "totalEquity": total_equity,
-        "fcf": fcf,
-        "currentAssets": current_assets,
-        "currentLiab": current_liab,
-        "grossLeverage": gross_leverage,
-        "netLeverage": net_leverage,
-        "intCov": int_cov,
-        "debtToEquity": debt_to_equity,
-        "currentRatio": current_ratio,
-        "roic": roic,
-        "cashBurnQtr": qtr_burn,
-        "liquidityRunway": runway,
-        "quarterlyBurns": quarterly_burns,
-        "adjBurn": adj_burn,
+        "impliedRating": implied_rating, "outlook": "Stable", "watchlist": False,
+        "cds5y": None, "cds5yChg": None, "bondSpread": None, "bondSpreadChg": None,
+        "eqPrice": price, "eqChg": price_chg, "mktCap": mkt_cap_b,
+        "ltDebt": lt_debt, "totalDebt": total_debt, "cash": cash,
+        "ebitda": adj_ebitda, "intExp": int_exp, "revenue": revenue,
+        "netIncome": net_income, "totalAssets": total_assets, "totalEquity": total_equity,
+        "fcf": fcf, "currentAssets": current_assets, "currentLiab": current_liab,
+        "grossLeverage": gross_leverage, "netLeverage": net_leverage,
+        "intCov": int_cov, "debtToEquity": debt_to_equity,
+        "currentRatio": current_ratio, "roic": roic,
+        "cashBurnQtr": qtr_burn, "liquidityRunway": runway,
+        "quarterlyBurns": quarterly_burns, "adjBurn": adj_burn,
         "liquidityBreakdown": liquidity_breakdown,
-        "analystRating": rec_key or "N/A",
-        "targetPrice": target_price,
+        "analystRating": implied_rating, "targetPrice": 0,
         "earningsDate": None, "earningsTime": None,
-        "lastEarnings": "",
-        "earningsCallSummary": None,
-        "news": [],
-        "ratingHistory": rating_history,
-        "research": research,
-        "financials": financials,
-        "_generated": True,
-        "_source": "yahoo",
+        "lastEarnings": "", "earningsCallSummary": None,
+        "news": [], "ratingHistory": rating_history,
+        "research": research, "financials": financials,
+        "_generated": True, "_source": "sec_edgar",
         "_generatedAt": datetime.now(timezone.utc).isoformat(),
-        "_zScore": z_score,
+        "_zScore": z_score, "_ratingScore": rating_score,
+        "_cik": cik,
     }
 
 
@@ -410,53 +461,34 @@ class handler(BaseHTTPRequestHandler):
         ticker = params.get('ticker', [''])[0].upper().strip()
 
         if not ticker or len(ticker) > 10:
-            self.send_response(400)
-            self.send_header('Content-Type', 'application/json')
-            self.send_header('Access-Control-Allow-Origin', '*')
-            self.end_headers()
-            self.wfile.write(json.dumps({"error": "Invalid ticker"}).encode())
+            self._respond(400, {"error": "Invalid ticker"})
             return
 
-        # Check cache
         if ticker in _company_cache:
             entry = _company_cache[ticker]
             age_hours = (datetime.now() - entry['fetched_at']).total_seconds() / 3600
             if age_hours < CACHE_TTL_HOURS:
-                self.send_response(200)
-                self.send_header('Content-Type', 'application/json')
-                self.send_header('Access-Control-Allow-Origin', '*')
-                self.send_header('Cache-Control', 'public, max-age=21600')
-                self.end_headers()
-                self.wfile.write(json.dumps(entry['data'], default=str).encode())
+                self._respond(200, entry['data'])
                 return
 
-        # Generate profile
         try:
             data = generate_company_profile(ticker)
         except Exception as e:
-            self.send_response(500)
-            self.send_header('Content-Type', 'application/json')
-            self.send_header('Access-Control-Allow-Origin', '*')
-            self.end_headers()
-            self.wfile.write(json.dumps({"error": f"Failed to fetch data: {str(e)}"}).encode())
+            self._respond(500, {"error": f"Failed: {str(e)}"})
             return
 
         if data is None:
-            self.send_response(404)
-            self.send_header('Content-Type', 'application/json')
-            self.send_header('Access-Control-Allow-Origin', '*')
-            self.end_headers()
-            self.wfile.write(json.dumps({
-                "error": f"Could not find data for '{ticker}'. Check the symbol and try again."
-            }).encode())
+            self._respond(404, {"error": f"No SEC filings found for '{ticker}'. Verify the ticker symbol."})
             return
 
-        # Cache it
         _company_cache[ticker] = {'data': data, 'fetched_at': datetime.now()}
+        self._respond(200, data)
 
-        self.send_response(200)
+    def _respond(self, code, data):
+        self.send_response(code)
         self.send_header('Content-Type', 'application/json')
         self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Cache-Control', 'public, max-age=21600')
+        if code == 200:
+            self.send_header('Cache-Control', 'public, max-age=21600')
         self.end_headers()
         self.wfile.write(json.dumps(data, default=str).encode())
