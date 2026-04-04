@@ -2006,17 +2006,16 @@ return (
                     const hasValue = p.company !== null && p.company !== undefined && isFinite(p.company);
                     // For margin, compute scale supporting negatives
                     let scale = p.maxScale;
+                    let lo = 0;
                     if (p.label === "EBITDA Margin") {
-                      const lo = Math.min(0, hasValue ? p.company : 0, p.median);
+                      lo = Math.min(0, hasValue ? p.company : 0, p.median);
                       const hi = Math.max(hasValue ? p.company : 0, p.median) * 1.3 || 20;
-                      scale = hi - lo;
+                      scale = (hi - lo) || 1;
                     }
                     const companyBarPct = hasValue
-                      ? (p.label === "EBITDA Margin"
-                          ? Math.max(0, (p.company - Math.min(0, p.company, p.median)) / scale) * 100
-                          : Math.min(p.company / scale, 1) * 100)
+                      ? Math.min(Math.max((p.company - lo) / (scale || 1), 0), 1) * 100
                       : 0;
-                    const medianBarPct = Math.min(p.median / (scale || 1), 1) * 100;
+                    const medianBarPct = Math.min(Math.max((p.median - lo) / (scale || 1), 0), 1) * 100;
                     const barColor = hasValue ? p.color(p.company, p.median) : "#64748b";
                     return (
                       <div key={pi} style={{ marginBottom: pi < peers.length - 1 ? 12 : 0 }}>
