@@ -141,7 +141,9 @@ const [sortCol, setSortCol] = useState(null);
 const [sortDir, setSortDir] = useState("asc");
 const [dbPortfolio, setDbPortfolio] = useState(null);
 const [portfolioSource, setPortfolioSource] = useState("static");
-const [expandedNews, setExpandedNews] = useState({}); // "static" | "api" | "error"
+const [expandedNews, setExpandedNews] = useState({});
+const [adHocCompany, setAdHocCompany] = useState(null);
+const [adHocLoading, setAdHocLoading] = useState(false); // "static" | "api" | "error"
 
 // ─── NAVIGATION HISTORY ───────────────────────────────────────────────
 const [navHistory, setNavHistory] = useState([{ selected: null, tab: "overview", detailTab: "financials" }]);
@@ -284,6 +286,40 @@ setDataError(prev => ({ ...prev, market: e.message }));
 }
 setDataLoading(prev => ({ ...prev, market: false }));
 }, []);
+
+// ─── AD-HOC TICKER LOOKUP ────────────────────────────────────────────
+const lookupTicker = useCallback(async (ticker) => {
+  ticker = ticker.toUpperCase().trim();
+  if (!ticker || ticker.length > 10) return;
+
+  // Check if already in portfolio
+  const existing = enrichedPortfolio.find(c => c.id === ticker);
+  if (existing) {
+    navigate(ticker, tab, "financials");
+    return;
+  }
+
+  setAdHocLoading(true);
+  try {
+    const resp = await fetch(`/api/company?ticker=${ticker}`);
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.error || `HTTP ${resp.status}`);
+    }
+    const company = await resp.json();
+    // Also fetch news for this ticker
+    try {
+      const newsResp = await fetch(`/api/news?ticker=${ticker}&max=6`);
+      const newsData = await newsResp.json();
+      if (newsData.news) company.news = newsData.news;
+    } catch(e) { /* news fetch is non-critical */ }
+    setAdHocCompany(company);
+    navigate(ticker, tab, "financials");
+  } catch (e) {
+    setDataError(prev => ({ ...prev, lookup: e.message }));
+  }
+  setAdHocLoading(false);
+}, [enrichedPortfolio, navigate, tab]);
 
 const refreshAll = useCallback(() => {
 fetchPortfolio();
@@ -441,7 +477,7 @@ const filteredPortfolio = useMemo(() => {
   let list = enrichedPortfolio;
   if (searchQuery.trim()) {
     const q = searchQuery.trim().toLowerCase();
-    list = list.filter(c => c.id.toLowerCase().includes(q) || c.name.toLowerCase().includes(q) || c.sector.toLowerCase().includes(q) || (c.sp !== "NR" && c.sp.toLowerCase().includes(q)) || c.impliedRating.toLowerCase().includes(q));
+    list = list.filter(c => c.id.toLowerCase().includes(q) || c.name.toLowerCase().includes(q) || c.sector.toLowerCase().includes(q) || (c.sp !== "NR" && c.sp.toLowerCase().includes(q)) || (c.impliedRating || "").toLowerCase().includes(q));
   }
   if (sortCol) {
     const getSortVal = (c) => {
@@ -509,7 +545,44 @@ const allNews = useMemo(() => {
   return enrichedPortfolio.flatMap((c) => c.news.map((n) => ({ ...n, ticker: c.id, company: c.name }))).sort((a, b) => b.date.localeCompare(a.date));
 }, [liveNews, enrichedPortfolio]);
 
-const detail = selected ? enrichedPortfolio.find((c) => c.id === selected) : null;
+// ─── DETAIL LOOKUP (portfolio + ad-hoc) ────────────────────────────────
+const rawDetail = selected ? (enrichedPortfolio.find((c) => c.id === selected) || adHocCompany) : null;
+// Normalize: default all required fields so generated/partial objects render safely
+const detail = useMemo(() => {
+  if (!rawDetail) return null;
+  return {
+    ...rawDetail,
+    news: rawDetail.news || [],
+    financials: rawDetail.financials || [],
+    ratingHistory: rawDetail.ratingHistory || [{ date: "N/A", sp: "NR", moodys: "NR", fitch: "NR", event: "No rating history available" }],
+    research: rawDetail.research || [{ date: "", firm: "N/A", action: "N/A", pt: 0, summary: "No analyst coverage data available" }],
+    lastEarnings: rawDetail.lastEarnings || "",
+    impliedRating: rawDetail.impliedRating || "NR",
+    outlook: rawDetail.outlook || "Stable",
+    sp: rawDetail.sp || "NR",
+    moodys: rawDetail.moodys || "NR",
+    fitch: rawDetail.fitch || "NR",
+    liquidityRunway: rawDetail.liquidityRunway || "N/A",
+    analystRating: rawDetail.analystRating || "N/A",
+    targetPrice: rawDetail.targetPrice || 0,
+    cash: rawDetail.cash ?? 0,
+    totalDebt: rawDetail.totalDebt ?? 0,
+    ebitda: rawDetail.ebitda ?? 0,
+    revenue: rawDetail.revenue ?? 0,
+    fcf: rawDetail.fcf ?? 0,
+    netIncome: rawDetail.netIncome ?? 0,
+    intExp: rawDetail.intExp ?? 0,
+    totalAssets: rawDetail.totalAssets ?? 0,
+    totalEquity: rawDetail.totalEquity ?? 0,
+    intCov: rawDetail.intCov ?? 0,
+    currentRatio: rawDetail.currentRatio ?? 0,
+    debtToEquity: rawDetail.debtToEquity ?? 0,
+    roic: rawDetail.roic ?? 0,
+    cashBurnQtr: rawDetail.cashBurnQtr ?? 0,
+    currentAssets: rawDetail.currentAssets ?? 0,
+    currentLiab: rawDetail.currentLiab ?? 0,
+  };
+}, [rawDetail]);
 
 // ─── STYLES ─────────────────────────────────────────────────────────────
 const root = { fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", background: "#060a14", color: "#e2e8f0", minHeight: "100vh", fontSize: mob ? 13 : 14, WebkitFontSmoothing: "antialiased", MozOsxFontSmoothing: "grayscale", maxWidth: "100vw", overflowX: "clip", wordWrap: "break-word", overflowWrap: "break-word" };
@@ -539,6 +612,7 @@ return (
 {getWatchlistStatus(detail).active && <span style={{ background: "rgba(127,29,29,0.5)", color: "#fca5a5", fontSize: 10, fontWeight: 700, padding: "4px 10px", borderRadius: 20, textTransform: "uppercase", letterSpacing: "0.5px", flexShrink: 0, border: "1px solid rgba(220,38,38,0.2)" }}>{"\u26A0"} WATCHLIST</span>}
 {!getWatchlistStatus(detail).active && <span style={{ background: "rgba(5,46,22,0.5)", color: "#86efac", fontSize: 10, fontWeight: 700, padding: "4px 10px", borderRadius: 20, textTransform: "uppercase", letterSpacing: "0.5px", flexShrink: 0, border: "1px solid rgba(34,197,94,0.2)" }}>{"\u2713"} ACTIVE</span>}
 {isPubliclyRated(detail) ? <span style={{ background: "rgba(234,179,8,0.15)", color: "#fcd34d", fontSize: 10, fontWeight: 700, padding: "4px 10px", borderRadius: 20, textTransform: "uppercase", letterSpacing: "0.5px", flexShrink: 0, border: "1px solid rgba(234,179,8,0.2)" }}>RATED</span> : <span style={{ background: "rgba(100,116,139,0.15)", color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "4px 10px", borderRadius: 20, textTransform: "uppercase", letterSpacing: "0.5px", flexShrink: 0, border: "1px solid rgba(100,116,139,0.2)" }}>NOT RATED</span>}
+{detail._generated && <span style={{ background: "rgba(59,130,246,0.15)", color: "#60a5fa", fontSize: 10, fontWeight: 700, padding: "4px 10px", borderRadius: 20, textTransform: "uppercase", letterSpacing: "0.5px", flexShrink: 0, border: "1px solid rgba(59,130,246,0.2)" }}>API Generated {detail._zScore ? `\u00B7 Z=${detail._zScore}` : ""}</span>}
 </div>
 <div style={{ position: "relative", width: mob ? "100%" : "auto", marginTop: mob ? 2 : 0 }}>
 {mob && <div style={{ position: "absolute", right: 0, top: 0, bottom: 0, width: 24, background: "linear-gradient(to right, transparent, rgba(15,22,41,0.85))", zIndex: 1, pointerEvents: "none" }} />}
@@ -2029,10 +2103,10 @@ return (
           <div style={card}>
             <div style={{ fontSize: 12, fontWeight: 700, color: "#94a3b8", marginBottom: 16, textTransform: "uppercase", letterSpacing: "0.5px" }}>Last Earnings Result</div>
             <div style={{ padding: mob ? 14 : 20, background: "#0a0e1a", borderRadius: 6, textAlign: "center" }}>
-              <div style={{ fontSize: mob ? 14 : 16, fontWeight: 700, color: detail.lastEarnings.startsWith("Beat") ? "#22c55e" : "#ef4444" }}>{detail.lastEarnings}</div>
+              <div style={{ fontSize: mob ? 14 : 16, fontWeight: 700, color: (detail.lastEarnings || "").startsWith("Beat") ? "#22c55e" : "#ef4444" }}>{detail.lastEarnings}</div>
             </div>
           </div>
-          <div style={{ ...card, gridColumn: "1 / -1" }}>
+          {detail.earningsCallSummary ? <div style={{ ...card, gridColumn: "1 / -1" }}>
             <div style={{ display: "flex", flexDirection: mob ? "column" : "row", justifyContent: "space-between", alignItems: mob ? "flex-start" : "center", gap: mob ? 4 : 0, marginBottom: 16 }}>
               <div style={{ fontSize: 12, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.5px" }}>Earnings Call Summary</div>
               <div style={{ fontSize: 11, color: "#64748b" }}>{detail.earningsCallSummary.quarter} {"\u00B7"} {detail.earningsCallSummary.date}</div>
@@ -2081,7 +2155,10 @@ return (
                 </div>
               ))}
             </div>}
-          </div>
+          </div> : <div style={{ ...card, gridColumn: "1 / -1", textAlign: "center", padding: 32 }}>
+            <div style={{ fontSize: 13, color: "#64748b", marginBottom: 4 }}>Earnings Call Summary</div>
+            <div style={{ fontSize: 11, color: "#475569" }}>Add to portfolio for curated earnings analysis</div>
+          </div>}
           <div style={{ ...card, gridColumn: "1 / -1" }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: "#94a3b8", marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.5px" }}>Earnings Call {"\u2014"} Credit-Relevant Items to Monitor</div>
             <div style={{ fontSize: 12, color: "#94a3b8", lineHeight: 1.8 }}>
@@ -2181,9 +2258,21 @@ return (
       {filteredPortfolio.length === 0 ? (
         <div style={{ ...card, textAlign: "center", padding: 40 }}>
           <div style={{ fontSize: 32, marginBottom: 12, opacity: 0.3 }}>{"\u{1F50D}"}</div>
-          <div style={{ fontSize: 14, fontWeight: 600, color: "#94a3b8", marginBottom: 6 }}>No credits match "{searchQuery}"</div>
-          <div style={{ fontSize: 12, color: "#64748b", marginBottom: 16 }}>Try searching by ticker, company name, sector, or rating</div>
-          <button onClick={() => setSearchQuery("")} style={{ padding: "6px 16px", borderRadius: 4, fontSize: 11, fontWeight: 600, border: "1px solid rgba(59,130,246,0.3)", background: "rgba(59,130,246,0.1)", color: "#60a5fa", cursor: "pointer" }}>Clear Search</button>
+          <div style={{ fontSize: 14, fontWeight: 600, color: "#94a3b8", marginBottom: 6 }}>No portfolio credits match "{searchQuery}"</div>
+          {searchQuery.match(/^[A-Za-z]{1,6}$/) ? (
+            <div>
+              <div style={{ fontSize: 12, color: "#64748b", marginBottom: 16 }}>Look up <b style={{ color: "#60a5fa" }}>{searchQuery.toUpperCase()}</b> as a public company?</div>
+              <button onClick={() => lookupTicker(searchQuery)} disabled={adHocLoading} style={{ padding: "8px 20px", borderRadius: 6, fontSize: 12, fontWeight: 700, border: "1px solid rgba(59,130,246,0.4)", background: "linear-gradient(135deg, rgba(59,130,246,0.15) 0%, rgba(37,99,235,0.15) 100%)", color: "#60a5fa", cursor: adHocLoading ? "wait" : "pointer", transition: "all .15s ease" }}>
+                {adHocLoading ? "\u21BB Generating full analysis..." : `\u{1F50D} Look up ${searchQuery.toUpperCase()}`}
+              </button>
+              {dataError.lookup && <div style={{ fontSize: 11, color: "#ef4444", marginTop: 8 }}>{"\u26A0"} {dataError.lookup}</div>}
+            </div>
+          ) : (
+            <div>
+              <div style={{ fontSize: 12, color: "#64748b", marginBottom: 16 }}>Try a ticker symbol (e.g., AAPL, TSLA, MSFT) to look up any public company</div>
+              <button onClick={() => setSearchQuery("")} style={{ padding: "6px 16px", borderRadius: 4, fontSize: 11, fontWeight: 600, border: "1px solid rgba(59,130,246,0.3)", background: "rgba(59,130,246,0.1)", color: "#60a5fa", cursor: "pointer" }}>Clear Search</button>
+            </div>
+          )}
         </div>
       ) : mob ? (
         /* ─── MOBILE: Card layout ─── */
@@ -2509,7 +2598,7 @@ return (
               </div>
               <div style={{ textAlign: "right" }}>
                 <div style={{ fontSize: 11, color: "#64748b" }}>Last result</div>
-                <div style={{ fontSize: 12, fontWeight: 600, color: c.lastEarnings.startsWith("Beat") ? "#22c55e" : "#ef4444" }}>{c.lastEarnings.split("\u2014")[0]}</div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: (c.lastEarnings || "").startsWith("Beat") ? "#22c55e" : "#ef4444" }}>{c.lastEarnings.split("\u2014")[0]}</div>
               </div>
               <div style={{ fontSize: 11, color: "#3b82f6" }}>{"\u2192"}</div>
             </div>
