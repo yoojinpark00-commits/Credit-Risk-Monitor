@@ -264,6 +264,76 @@ def latest_val_m(series):
     return to_m(series[0]["val"])
 
 
+def _latest_xbrl_val(facts, tag):
+    """Return the most-recent filed value (any form/period) for a point-in-time
+    XBRL balance-sheet tag, or None if the tag is absent.
+
+    Credit-facility disclosures use 'instant' context (no start/end span and no
+    fp= filter), so they are invisible to _extract_series which requires fp=FY
+    or fp=Q*.  This helper scans all entries for the tag and returns the value
+    with the latest 'end' date.
+    """
+    try:
+        units = facts["facts"]["us-gaap"][tag]["units"]
+    except KeyError:
+        return None
+    unit_key = "USD" if "USD" in units else next(iter(units), None)
+    if not unit_key:
+        return None
+    entries = [e for e in units[unit_key] if e.get("end")]
+    if not entries:
+        return None
+    best = max(entries, key=lambda e: e.get("end", ""))
+    return best["val"]
+
+
+def _build_credit_facilities(facts):
+    """Extract credit-facility data directly from EDGAR XBRL companyfacts and
+    return (facilities_list, total_available_m).
+
+    Tags queried
+    ------------
+    LineOfCreditFacilityMaximumBorrowingCapacity   -> total committed size
+    LineOfCreditFacilityRemainingBorrowingCapacity -> undrawn / available
+    LongTermLineOfCredit                           -> drawn balance on revolver
+    LineOfCreditFacilityCurrentBorrowingCapacity   -> current limit (fallback)
+    LettersOfCreditOutstandingAmount               -> LC usage (reduces available)
+    """
+    committed = _latest_xbrl_val(facts, "LineOfCreditFacilityMaximumBorrowingCapacity")
+    available = _latest_xbrl_val(facts, "LineOfCreditFacilityRemainingBorrowingCapacity")
+    drawn     = _latest_xbrl_val(facts, "LongTermLineOfCredit")
+    cur_cap   = _latest_xbrl_val(facts, "LineOfCreditFacilityCurrentBorrowingCapacity")
+    lc_amount = _latest_xbrl_val(facts, "LettersOfCreditOutstandingAmount")
+
+    # Nothing to show if no credit-facility data exists at all
+    if all(v is None for v in (committed, available, drawn, cur_cap)):
+        return [], 0
+
+    # Prefer maximum borrowing capacity; fall back to current capacity
+    committed_val = committed if committed is not None else cur_cap
+
+    # Derive any missing piece from the two others
+    if drawn is None and committed_val is not None and available is not None:
+        lc = lc_amount if lc_amount is not None else 0
+        drawn = committed_val - available - lc
+    if available is None and committed_val is not None and drawn is not None:
+        lc = lc_amount if lc_amount is not None else 0
+        available = committed_val - drawn - lc
+
+    facility = {
+        "name": "Revolving Credit Facility",
+        "committed": to_m(committed_val) if committed_val is not None else None,
+        "drawn":     to_m(drawn)         if drawn     is not None else 0,
+        "available": to_m(available)     if available is not None else None,
+        "type": "revolver",
+    }
+    if lc_amount is not None:
+        facility["lettersOfCredit"] = to_m(lc_amount)
+
+    total_available_m = to_m(available) if available is not None else 0
+    return [facility], total_available_m
+
+
 # ─── Yahoo v8 price (no auth needed) ────────────────────────────────────
 def yahoo_price(ticker):
     """Fetch current price data from Yahoo v8/chart — no auth required."""
@@ -992,43 +1062,24 @@ def generate_company_profile(ticker):
         _year_str = str(_base_year + _offset) if _base_year else ""
         debt_maturities.append({"year": _year_str, "amount": _amt, "label": _label})
 
-    # Liquidity
+    # Credit facilities — use _build_credit_facilities which reads point-in-time
+    # XBRL tags directly (credit facility disclosures use instant/balance-sheet
+    # context, so _get_field / _extract_series miss them entirely).
+    credit_facilities, fac_available_m = _build_credit_facilities(facts)
+
+    # Liquidity — totalLiquidity includes undrawn revolver capacity
     liquidity_breakdown = {
-        "totalLiquidity": cash + st_investments,
+        "totalLiquidity": cash + st_investments + fac_available_m,
         "components": [{"category": "Cash & Cash Equivalents", "amount": cash, "type": "cash", "sub": []}],
-        "facilities": [], "debtMaturities": debt_maturities,
+        "facilities": credit_facilities, "debtMaturities": debt_maturities,
     }
     if st_investments > 0:
         liquidity_breakdown["components"].append(
             {"category": "Short-Term Investments", "amount": st_investments, "type": "st_invest", "sub": []})
-
-    # Credit facilities from XBRL
-    loc_capacity = latest_val_m(loc_cap_s)
-    loc_remaining = latest_val_m(loc_rem_s)
-    loc_drawn = latest_val_m(loc_drawn_s)
-    # Derive missing fields where possible
-    if loc_capacity > 0 and loc_remaining == 0 and loc_drawn > 0:
-        loc_remaining = max(0, loc_capacity - loc_drawn)
-    elif loc_capacity > 0 and loc_drawn == 0 and loc_remaining > 0:
-        loc_drawn = max(0, loc_capacity - loc_remaining)
-
-    credit_facilities = []
-    if loc_capacity > 0:
-        facility = {
-            "name": "Revolving Credit Facility",
-            "type": "revolver",
-            "committed": loc_capacity,
-            "drawn": loc_drawn,
-            "available": loc_remaining,
-            "source": "SEC EDGAR XBRL",
-        }
-        credit_facilities.append(facility)
-        liquidity_breakdown["facilities"].append({
-            "name": "Revolving Credit Facility",
-            "committed": loc_capacity,
-            "drawn": loc_drawn,
-            "available": loc_remaining,
-        })
+    if fac_available_m > 0:
+        liquidity_breakdown["components"].append(
+            {"category": "Undrawn Revolving Credit Facility", "amount": fac_available_m,
+             "type": "revolver", "sub": []})
 
 
     # Runway
