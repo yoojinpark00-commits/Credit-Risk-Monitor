@@ -1807,6 +1807,119 @@ return (
             </div>
           </div>
 
+          {/* ═══ LEVERAGE & COVERAGE TREND ═══ */}
+          {detail.financials.length >= 2 && (() => {
+            // Build per-year leverage and intCov data from the financials array.
+            // Works for both hardcoded portfolio entries and EDGAR-generated companies.
+            const levRows = [...detail.financials].reverse().map((f) => ({
+              period: f.period.replace("FY", ""),
+              lev: (f.ebitda > 0 && f.debt != null) ? +(f.debt / f.ebitda).toFixed(2) : null,
+              intCovRow: null, // per-year intCov not stored in financials; shown only at LTM level
+            }));
+            const hasAnyLev = levRows.some(r => r.lev !== null);
+            const levValues = levRows.map(r => r.lev).filter(v => v !== null);
+            const maxLev = levValues.length ? Math.max(...levValues, peerBenchmarks.medianLeverage) * 1.25 : 10;
+            const medLevPct = Math.min(peerBenchmarks.medianLeverage / maxLev, 1) * 100;
+
+            // Margin trend from financials (works for all companies)
+            const marginRows = [...detail.financials].reverse().map((f) => ({
+              period: f.period.replace("FY", ""),
+              margin: f.rev > 0 ? +((f.ebitda / f.rev) * 100).toFixed(1) : null,
+            }));
+            const hasAnyMargin = marginRows.some(r => r.margin !== null);
+            const allMargins = marginRows.map(r => r.margin).filter(v => v !== null);
+            const minMargin = allMargins.length ? Math.min(...allMargins, peerBenchmarks.medianMargin, 0) : 0;
+            const maxMargin = allMargins.length ? Math.max(...allMargins, peerBenchmarks.medianMargin) * 1.25 || 20 : 20;
+            const marginRange = maxMargin - minMargin || 1;
+            const medMarginPct = Math.min((peerBenchmarks.medianMargin - minMargin) / marginRange, 1) * 100;
+
+            return (
+              <div style={{ ...card, gridColumn: "1 / -1" }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "#94a3b8", marginBottom: 16, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                  Leverage & Margin Trend
+                  {detail._generated && <span style={{ fontSize: 9, fontWeight: 500, color: "#60a5fa", textTransform: "none", letterSpacing: 0, marginLeft: 8 }}>— EDGAR data</span>}
+                  <span style={{ fontSize: 9, fontWeight: 400, color: "#64748b", textTransform: "none", letterSpacing: 0, marginLeft: 8 }}>Blue line = portfolio median</span>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: mob ? "1fr" : "1fr 1fr", gap: mob ? 16 : 24, minWidth: 0 }}>
+
+                  {/* Leverage trend */}
+                  <div>
+                    <div style={{ fontSize: 10, color: "#64748b", marginBottom: 8, textTransform: "uppercase" }}>Gross Leverage (Debt / EBITDA)</div>
+                    {!hasAnyLev ? (
+                      <div style={{ padding: "10px 12px", background: "#0a0e1a", borderRadius: 6, fontSize: 10, color: "#64748b", fontStyle: "italic" }}>
+                        Not calculable — EBITDA is negative across all periods
+                      </div>
+                    ) : (
+                      <>
+                        <div style={{ display: "flex", gap: 4, alignItems: "flex-end", height: 80, marginBottom: 4, position: "relative" }}>
+                          {/* Median reference line */}
+                          <div style={{ position: "absolute", left: 0, right: 0, bottom: `${medLevPct}%`, height: 1, background: "#3b82f6", opacity: 0.6, zIndex: 1, borderTop: "1px dashed #3b82f6" }} />
+                          {levRows.map((r, idx) => {
+                            const barH = r.lev !== null ? Math.max(4, (r.lev / maxLev) * 74) : 4;
+                            const barColor = r.lev === null ? "#334155" : r.lev > peerBenchmarks.medianLeverage * 1.5 ? "#ef4444" : r.lev > peerBenchmarks.medianLeverage ? "#f97316" : "#22c55e";
+                            return (
+                              <div key={idx} style={{ flex: 1, textAlign: "center" }}>
+                                <div style={{ fontSize: 9, fontWeight: 700, color: barColor, marginBottom: 2 }}>
+                                  {r.lev !== null ? `${r.lev.toFixed(1)}x` : "N/M"}
+                                </div>
+                                <div style={{ height: barH, background: barColor, borderRadius: "3px 3px 0 0", margin: "0 4px", opacity: r.lev !== null ? 0.85 : 0.3 }} />
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <div style={{ display: "flex", gap: 4 }}>
+                          {levRows.map((r, idx) => (
+                            <div key={idx} style={{ flex: 1, textAlign: "center", fontSize: 8, color: "#64748b" }}>{r.period}</div>
+                          ))}
+                        </div>
+                        <div style={{ display: "flex", gap: 12, marginTop: 6, fontSize: 9, color: "#64748b" }}>
+                          <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ display: "inline-block", width: 16, height: 1, borderTop: "1px dashed #3b82f6", verticalAlign: "middle" }} />Portfolio median ({peerBenchmarks.medianLeverage.toFixed(1)}x)</span>
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  {/* EBITDA Margin trend */}
+                  <div>
+                    <div style={{ fontSize: 10, color: "#64748b", marginBottom: 8, textTransform: "uppercase" }}>EBITDA Margin (%)</div>
+                    {!hasAnyMargin ? (
+                      <div style={{ padding: "10px 12px", background: "#0a0e1a", borderRadius: 6, fontSize: 10, color: "#64748b", fontStyle: "italic" }}>
+                        Not calculable — revenue data unavailable
+                      </div>
+                    ) : (
+                      <>
+                        <div style={{ display: "flex", gap: 4, alignItems: "flex-end", height: 80, marginBottom: 4, position: "relative" }}>
+                          {/* Median reference line */}
+                          <div style={{ position: "absolute", left: 0, right: 0, bottom: `${Math.max(0, Math.min(medMarginPct, 100))}%`, height: 1, background: "#3b82f6", opacity: 0.6, zIndex: 1, borderTop: "1px dashed #3b82f6" }} />
+                          {marginRows.map((r, idx) => {
+                            const normH = r.margin !== null ? Math.max(4, ((r.margin - minMargin) / marginRange) * 74) : 4;
+                            const barColor = r.margin === null ? "#334155" : r.margin < 0 ? "#ef4444" : r.margin < peerBenchmarks.medianMargin * 0.5 ? "#f97316" : "#22c55e";
+                            return (
+                              <div key={idx} style={{ flex: 1, textAlign: "center" }}>
+                                <div style={{ fontSize: 9, fontWeight: 700, color: barColor, marginBottom: 2 }}>
+                                  {r.margin !== null ? `${r.margin.toFixed(0)}%` : "N/M"}
+                                </div>
+                                <div style={{ height: normH, background: barColor, borderRadius: "3px 3px 0 0", margin: "0 4px", opacity: r.margin !== null ? 0.85 : 0.3 }} />
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <div style={{ display: "flex", gap: 4 }}>
+                          {marginRows.map((r, idx) => (
+                            <div key={idx} style={{ flex: 1, textAlign: "center", fontSize: 8, color: "#64748b" }}>{r.period}</div>
+                          ))}
+                        </div>
+                        <div style={{ display: "flex", gap: 12, marginTop: 6, fontSize: 9, color: "#64748b" }}>
+                          <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ display: "inline-block", width: 16, height: 1, borderTop: "1px dashed #3b82f6", verticalAlign: "middle" }} />Portfolio median ({peerBenchmarks.medianMargin.toFixed(1)}%)</span>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
           {/* ═══ TRADITIONAL CREDIT METRICS + OPERATIONAL ═══ */}
           <div style={card}>
             <div style={{ fontSize: 12, fontWeight: 700, color: "#94a3b8", marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.5px" }}>Traditional Credit Metrics</div>
