@@ -1828,6 +1828,99 @@ return (
                 ))}
               </tbody>
             </table></div>
+
+            {/* ── vs Portfolio Median bars (always shown; works for both portfolio + generated companies) ── */}
+            {(() => {
+              const detailLev = detail.ebitda > 0 ? detail.totalDebt / detail.ebitda : null;
+              const detailMargin = detail.revenue > 0 ? (detail.ebitda / detail.revenue) * 100 : null;
+              const peers = [
+                {
+                  label: "Gross Leverage",
+                  company: detailLev,
+                  median: peerBenchmarks.medianLeverage,
+                  fmt: (v) => `${v.toFixed(1)}x`,
+                  // lower is better for leverage
+                  color: (v, med) => v > med * 1.5 ? "#ef4444" : v > med ? "#f97316" : "#22c55e",
+                  note: detailLev !== null ? (detailLev > peerBenchmarks.medianLeverage ? "above" : "below") + " portfolio median" : "N/M \u2014 negative EBITDA",
+                  maxScale: Math.max((detailLev || 0), peerBenchmarks.medianLeverage) * 1.4 || 10,
+                },
+                {
+                  label: "Interest Coverage",
+                  company: detail.intCov > 0 && detail.intCov < 999 ? detail.intCov : null,
+                  median: peerBenchmarks.medianIntCov,
+                  fmt: (v) => `${v.toFixed(1)}x`,
+                  // higher is better for coverage
+                  color: (v, med) => v < med * 0.5 ? "#ef4444" : v < med ? "#f97316" : "#22c55e",
+                  note: (detail.intCov > 0 && detail.intCov < 999) ? (detail.intCov > peerBenchmarks.medianIntCov ? "above" : "below") + " portfolio median" : "N/M",
+                  maxScale: Math.max((detail.intCov > 0 && detail.intCov < 999 ? detail.intCov : 0), peerBenchmarks.medianIntCov) * 1.4 || 10,
+                },
+                {
+                  label: "EBITDA Margin",
+                  company: detailMargin,
+                  median: peerBenchmarks.medianMargin,
+                  fmt: (v) => `${v.toFixed(1)}%`,
+                  // higher is better for margin
+                  color: (v, med) => v < 0 ? "#ef4444" : v < med * 0.5 ? "#f97316" : "#22c55e",
+                  note: detailMargin !== null ? (detailMargin > peerBenchmarks.medianMargin ? "above" : "below") + " portfolio median" : "N/M",
+                  // support negative margins: scale from min(0, company, median) to max
+                  maxScale: null, // computed inline
+                },
+                {
+                  label: "Current Ratio",
+                  company: detail.currentRatio > 0 ? detail.currentRatio : null,
+                  median: peerBenchmarks.medianCurrentRatio,
+                  fmt: (v) => `${v.toFixed(1)}x`,
+                  // higher is better
+                  color: (v, med) => v < 1 ? "#ef4444" : v < med ? "#f97316" : "#22c55e",
+                  note: detail.currentRatio > 0 ? (detail.currentRatio > peerBenchmarks.medianCurrentRatio ? "above" : "below") + " portfolio median" : "N/M",
+                  maxScale: Math.max((detail.currentRatio || 0), peerBenchmarks.medianCurrentRatio) * 1.4 || 4,
+                },
+              ];
+              return (
+                <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid #1e293b" }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: "#3b82f6", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 10 }}>
+                    vs Portfolio Median <span style={{ fontSize: 9, fontWeight: 400, color: "#64748b", textTransform: "none" }}>({PORTFOLIO.length}-company benchmark)</span>
+                  </div>
+                  {peers.map((p, pi) => {
+                    const hasValue = p.company !== null && p.company !== undefined && isFinite(p.company);
+                    // For margin, compute scale supporting negatives
+                    let scale = p.maxScale;
+                    if (p.label === "EBITDA Margin") {
+                      const lo = Math.min(0, hasValue ? p.company : 0, p.median);
+                      const hi = Math.max(hasValue ? p.company : 0, p.median) * 1.3 || 20;
+                      scale = hi - lo;
+                    }
+                    const companyBarPct = hasValue
+                      ? (p.label === "EBITDA Margin"
+                          ? Math.max(0, (p.company - Math.min(0, p.company, p.median)) / scale) * 100
+                          : Math.min(p.company / scale, 1) * 100)
+                      : 0;
+                    const medianBarPct = Math.min(p.median / (scale || 1), 1) * 100;
+                    const barColor = hasValue ? p.color(p.company, p.median) : "#64748b";
+                    return (
+                      <div key={pi} style={{ marginBottom: pi < peers.length - 1 ? 12 : 0 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 3 }}>
+                          <span style={{ fontSize: 10, color: "#94a3b8" }}>{p.label}</span>
+                          <div style={{ display: "flex", gap: 8, alignItems: "baseline" }}>
+                            <span style={{ fontSize: 11, fontWeight: 700, color: barColor }}>{hasValue ? p.fmt(p.company) : "N/M"}</span>
+                            <span style={{ fontSize: 9, color: "#64748b" }}>median: {p.fmt(p.median)}</span>
+                          </div>
+                        </div>
+                        <div style={{ position: "relative", height: 10, background: "#1e293b", borderRadius: 4, overflow: "visible" }}>
+                          {/* Company bar */}
+                          {hasValue && (
+                            <div style={{ height: "100%", width: `${Math.max(companyBarPct, hasValue ? 2 : 0)}%`, background: barColor, borderRadius: 4, opacity: 0.85 }} />
+                          )}
+                          {/* Median marker */}
+                          <div style={{ position: "absolute", top: -2, bottom: -2, left: `${Math.min(medianBarPct, 98)}%`, width: 2, background: "#3b82f6", borderRadius: 1, zIndex: 2 }} />
+                        </div>
+                        <div style={{ fontSize: 8, color: "#64748b", marginTop: 2 }}>{p.note}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </div>
 
           <div style={card}>
