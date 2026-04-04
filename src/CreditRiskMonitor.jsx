@@ -1935,6 +1935,58 @@ return (
             </table></div>
           </div>
 
+          {/* 5-factor model breakdown — generated companies only */}
+          {detail._generated && detail._ratingScore != null && (() => {
+            const lev = detail.ebitda > 0 ? detail.totalDebt / detail.ebitda : Infinity;
+            const cov = detail.intCov;
+            const fcfToDebt = detail.totalDebt > 0 ? detail.fcf / detail.totalDebt : 0;
+            const margin = detail.revenue > 0 ? detail.ebitda / detail.revenue : 0;
+            const size = detail.mktCap || 0;
+            const sLev = lev <= 0 || lev < 0.5 ? 6 : lev < 1.5 ? 5 : lev < 2.0 ? 4 : lev < 3.0 ? 3 : lev < 4.0 ? 2 : lev < 5.5 ? 1 : 0;
+            const sCov = cov > 21 ? 6 : cov > 10 ? 5 : cov > 6 ? 4 : cov > 4 ? 3 : cov > 2.5 ? 2 : cov > 1.5 ? 1 : 0;
+            const sFcf = fcfToDebt > 0.50 ? 6 : fcfToDebt > 0.35 ? 5 : fcfToDebt > 0.20 ? 4 : fcfToDebt > 0.10 ? 3 : fcfToDebt > 0.05 ? 2 : fcfToDebt > 0 ? 1 : 0;
+            const sMar = margin > 0.30 ? 6 : margin > 0.20 ? 5 : margin > 0.15 ? 4 : margin > 0.10 ? 3 : margin > 0.08 ? 2 : margin > 0.05 ? 1 : 0;
+            const sSize = size > 100 ? 6 : size > 25 ? 5 : size > 10 ? 4 : size > 5 ? 3 : size > 1 ? 2 : size > 0.3 ? 1 : 0;
+            const factors = [
+              { label: "Leverage", weight: "35%", score: sLev, value: !isFinite(lev) ? "N/M" : `${lev.toFixed(1)}x gross`, desc: "Debt / EBITDA" },
+              { label: "Coverage", weight: "30%", score: sCov, value: `${fmtNum(cov)}x`, desc: "EBITDA / Interest" },
+              { label: "FCF / Debt", weight: "20%", score: sFcf, value: detail.totalDebt > 0 ? `${(fcfToDebt * 100).toFixed(1)}%` : "N/M", desc: "Free cash flow yield on debt" },
+              { label: "Margin", weight: "10%", score: sMar, value: detail.revenue > 0 ? `${(margin * 100).toFixed(1)}%` : "N/M", desc: "EBITDA margin" },
+              { label: "Size", weight: "5%", score: sSize, value: size ? `$${size.toFixed(1)}B mkt cap` : "Private", desc: "Market capitalisation" },
+            ];
+            const scoreColor = (s) => s >= 4 ? "#22c55e" : s >= 2 ? "#eab308" : "#ef4444";
+            return (
+              <div style={{ ...card, gridColumn: "1 / -1", border: "1px solid rgba(59,130,246,0.15)" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, flexWrap: "wrap", gap: 8 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.5px" }}>5-Factor Model Breakdown</div>
+                  <div style={{ fontSize: 11, color: "#64748b" }}>Composite: <span style={{ fontWeight: 700, color: ratingColor(detail.impliedRating) }}>{detail._ratingScore}</span> &rarr; <span style={{ fontWeight: 700, color: ratingColor(detail.impliedRating) }}>{detail.impliedRating}</span></div>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: mob ? "1fr 1fr" : "repeat(5, 1fr)", gap: 10 }}>
+                  {factors.map((f) => (
+                    <div key={f.label} style={{ padding: 12, background: "#0a0e1a", borderRadius: 6, border: `1px solid ${scoreColor(f.score)}22` }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+                        <span style={{ fontSize: 10, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.5px" }}>{f.label}</span>
+                        <span style={{ fontSize: 9, color: "#475569" }}>{f.weight}</span>
+                      </div>
+                      {/* Score bar: 0–6 */}
+                      <div style={{ display: "flex", gap: 2, marginBottom: 8 }}>
+                        {[0, 1, 2, 3, 4, 5].map((i) => (
+                          <div key={i} style={{ flex: 1, height: 4, borderRadius: 2, background: i < f.score ? scoreColor(f.score) : "rgba(148,163,184,0.1)" }} />
+                        ))}
+                      </div>
+                      <div style={{ fontSize: 13, fontWeight: 800, color: scoreColor(f.score), fontFamily: "'JetBrains Mono', monospace" }}>{f.value}</div>
+                      <div style={{ fontSize: 10, color: "#475569", marginTop: 3 }}>{f.desc}</div>
+                      <div style={{ fontSize: 9, color: "#334155", marginTop: 4 }}>Score {f.score}/6</div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ marginTop: 10, fontSize: 10, color: "#475569", lineHeight: 1.5 }}>
+                  Weights: leverage 35% + coverage 30% + FCF/debt 20% + margin 10% + size 5%. Data sourced from SEC EDGAR filings.
+                </div>
+              </div>
+            );
+          })()}
+
           <div style={{ ...card, gridColumn: "1 / -1" }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: "#94a3b8", marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.5px" }}>Credit Assessment Summary</div>
             <div style={{ fontSize: 12, color: "#94a3b8", lineHeight: 1.7 }}>
