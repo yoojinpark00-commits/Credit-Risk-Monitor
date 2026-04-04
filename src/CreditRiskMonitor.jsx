@@ -287,40 +287,6 @@ setDataError(prev => ({ ...prev, market: e.message }));
 setDataLoading(prev => ({ ...prev, market: false }));
 }, []);
 
-// ─── AD-HOC TICKER LOOKUP ────────────────────────────────────────────
-const lookupTicker = useCallback(async (ticker) => {
-  ticker = ticker.toUpperCase().trim();
-  if (!ticker || ticker.length > 10) return;
-
-  // Check if already in portfolio
-  const existing = enrichedPortfolio.find(c => c.id === ticker);
-  if (existing) {
-    navigate(ticker, tab, "financials");
-    return;
-  }
-
-  setAdHocLoading(true);
-  try {
-    const resp = await fetch(`/api/company?ticker=${ticker}`);
-    if (!resp.ok) {
-      const err = await resp.json().catch(() => ({}));
-      throw new Error(err.error || `HTTP ${resp.status}`);
-    }
-    const company = await resp.json();
-    // Also fetch news for this ticker
-    try {
-      const newsResp = await fetch(`/api/news?ticker=${ticker}&max=6`);
-      const newsData = await newsResp.json();
-      if (newsData.news) company.news = newsData.news;
-    } catch(e) { /* news fetch is non-critical */ }
-    setAdHocCompany(company);
-    navigate(ticker, tab, "financials");
-  } catch (e) {
-    setDataError(prev => ({ ...prev, lookup: e.message }));
-  }
-  setAdHocLoading(false);
-}, [enrichedPortfolio, navigate, tab]);
-
 const refreshAll = useCallback(() => {
 fetchPortfolio();
 fetchSecFilings();
@@ -544,6 +510,40 @@ const allNews = useMemo(() => {
   }
   return enrichedPortfolio.flatMap((c) => c.news.map((n) => ({ ...n, ticker: c.id, company: c.name }))).sort((a, b) => b.date.localeCompare(a.date));
 }, [liveNews, enrichedPortfolio]);
+
+// ─── AD-HOC TICKER LOOKUP ────────────────────────────────────────────
+const lookupTicker = useCallback(async (ticker) => {
+  ticker = ticker.toUpperCase().trim();
+  if (!ticker || ticker.length > 10) return;
+
+  // Check if already in portfolio
+  const existing = enrichedPortfolio.find(c => c.id === ticker);
+  if (existing) {
+    navigate(ticker, tab, "financials");
+    return;
+  }
+
+  setAdHocLoading(true);
+  try {
+    const resp = await fetch(`/api/company?ticker=${ticker}`);
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.error || `HTTP ${resp.status}`);
+    }
+    const company = await resp.json();
+    // Also fetch news for this ticker
+    try {
+      const newsResp = await fetch(`/api/news?ticker=${ticker}&max=6`);
+      const newsData = await newsResp.json();
+      if (newsData.news) company.news = newsData.news;
+    } catch(e) { /* news fetch is non-critical */ }
+    setAdHocCompany(company);
+    navigate(ticker, tab, "financials");
+  } catch (e) {
+    setDataError(prev => ({ ...prev, lookup: e.message }));
+  }
+  setAdHocLoading(false);
+}, [enrichedPortfolio, navigate, tab]);
 
 // ─── DETAIL LOOKUP (portfolio + ad-hoc) ────────────────────────────────
 const rawDetail = selected ? (enrichedPortfolio.find((c) => c.id === selected) || adHocCompany) : null;
