@@ -1679,37 +1679,45 @@ return (
             )}
             {detail.quarterlyBurns && detail.quarterlyBurns.length > 0 && (
               <div style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.5px" }}>Trailing 4-Quarter {isNetCashGenerator ? "Cash Flow" : "Cash Burn"} Trend ($M)</div>
-                <div style={{ display: "grid", gridTemplateColumns: `repeat(${detail.quarterlyBurns.length}, 1fr)`, gap: mob ? 6 : 10 }}>
-                  {(() => {
-                    const burns = detail.quarterlyBurns;
-                    const maxB = Math.max(...burns.map(b => Math.abs(b.burn)));
-                    const ltmTotal = burns.reduce((s, b) => s + b.burn, 0);
-                    return burns.map((b, i) => {
-                      const pct = maxB > 0 ? (Math.abs(b.burn) / maxB * 100) : 0;
-                      const isPos = b.burn >= 0;
-                      const prev = i > 0 ? burns[i - 1].burn : null;
-                      const delta = prev != null ? b.burn - prev : null;
-                      return (
-                        <div key={i} style={{ background: "#0a0e1a", borderRadius: 6, padding: mob ? 8 : 10, textAlign: "center" }}>
-                          <div style={{ fontSize: 9, color: "#64748b", fontWeight: 600, marginBottom: 6 }}>{b.q}</div>
-                          <div style={{ fontSize: mob ? 16 : 20, fontWeight: 800, color: isPos ? "#22c55e" : "#ef4444" }}>{isPos ? "+" : ""}{b.burn}</div>
-                          <div style={{ margin: "6px auto", height: 4, background: "#1e293b", borderRadius: 2, width: "80%" }}>
-                            <div style={{ height: "100%", borderRadius: 2, width: `${Math.max(pct, 5)}%`, background: isPos ? "#22c55e" : "#ef4444", opacity: 0.7 }} />
-                          </div>
-                          {delta != null && <div style={{ fontSize: 9, color: delta > 0 ? (isNetCashGenerator ? "#22c55e" : "#ef4444") : (isNetCashGenerator ? "#ef4444" : "#22c55e"), fontWeight: 600 }}>{delta > 0 ? "\u25B2" : "\u25BC"} {Math.abs(delta)}M QoQ</div>}
-                          <div style={{ fontSize: 8, color: "#64748b", marginTop: 2 }}>{b.note}</div>
-                        </div>
-                      );
-                    });
-                  })()}
-                </div>
-                <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, padding: "6px 10px", background: "#0a0e1a", borderRadius: 4 }}>
-                  <span style={{ fontSize: 10, color: "#64748b" }}>LTM Total (sum of 4Q):</span>
-                  <span style={{ fontSize: 11, fontWeight: 800, color: detail.quarterlyBurns.reduce((s, b) => s + b.burn, 0) >= 0 ? "#22c55e" : "#ef4444" }}>
-                    {detail.quarterlyBurns.reduce((s, b) => s + b.burn, 0) >= 0 ? "+" : ""}{fmt(Math.abs(detail.quarterlyBurns.reduce((s, b) => s + b.burn, 0)) * 1e6)} ({isNetCashGenerator ? "generated" : "consumed"})
-                  </span>
-                </div>
+                {(() => {
+                  const burns = detail.quarterlyBurns;
+                  const nQ = burns.length;
+                  const absVals = burns.map(b => Math.abs(b.burn ?? 0));
+                  const maxB = absVals.length > 0 ? Math.max(...absVals) : 0;
+                  const ltmTotal = burns.reduce((s, b) => s + (b.burn ?? 0), 0);
+                  const qLabel = nQ === 4 ? "Trailing 4-Quarter" : `Trailing ${nQ}-Quarter`;
+                  return (
+                    <>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.5px" }}>{qLabel} {isNetCashGenerator ? "Cash Flow" : "Cash Burn"} Trend ($M)</div>
+                      <div style={{ display: "grid", gridTemplateColumns: `repeat(${nQ}, 1fr)`, gap: mob ? 6 : 10 }}>
+                        {burns.map((b, i) => {
+                          const burnVal = b.burn ?? 0;
+                          const pct = maxB > 0 ? (Math.abs(burnVal) / maxB * 100) : 0;
+                          const isPos = burnVal >= 0;
+                          const prev = i > 0 ? (burns[i - 1].burn ?? 0) : null;
+                          const delta = prev != null ? burnVal - prev : null;
+                          return (
+                            <div key={i} style={{ background: "#0a0e1a", borderRadius: 6, padding: mob ? 8 : 10, textAlign: "center" }}>
+                              <div style={{ fontSize: 9, color: "#64748b", fontWeight: 600, marginBottom: 6 }}>{b.q}</div>
+                              <div style={{ fontSize: mob ? 16 : 20, fontWeight: 800, color: isPos ? "#22c55e" : "#ef4444" }}>{isPos ? "+" : ""}{burnVal}</div>
+                              <div style={{ margin: "6px auto", height: 4, background: "#1e293b", borderRadius: 2, width: "80%" }}>
+                                <div style={{ height: "100%", borderRadius: 2, width: `${Math.max(pct, 5)}%`, background: isPos ? "#22c55e" : "#ef4444", opacity: 0.7 }} />
+                              </div>
+                              {delta != null && <div style={{ fontSize: 9, color: delta > 0 ? (isNetCashGenerator ? "#22c55e" : "#ef4444") : (isNetCashGenerator ? "#ef4444" : "#22c55e"), fontWeight: 600 }}>{delta > 0 ? "\u25B2" : "\u25BC"} {Math.abs(delta)}M QoQ</div>}
+                              <div style={{ fontSize: 8, color: "#64748b", marginTop: 2 }}>{b.note}</div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, padding: "6px 10px", background: "#0a0e1a", borderRadius: 4 }}>
+                        <span style={{ fontSize: 10, color: "#64748b" }}>LTM Total (sum of {nQ}Q{nQ < 4 ? " \u2014 partial" : ""}):</span>
+                        <span style={{ fontSize: 11, fontWeight: 800, color: ltmTotal >= 0 ? "#22c55e" : "#ef4444" }}>
+                          {ltmTotal >= 0 ? "+" : ""}{fmt(Math.abs(ltmTotal) * 1e6)} ({isNetCashGenerator ? "generated" : "consumed"})
+                        </span>
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
             )}
 
@@ -1738,8 +1746,8 @@ return (
                   return (
                     <tr key={i} style={{ borderBottom: "1px solid #1e293b" }}>
                       <td style={{ padding: "8px 4px", fontSize: 12, fontWeight: i === 0 ? 700 : 400, color: i === 0 ? "#f1f5f9" : "#94a3b8" }}>{s.sc}</td>
-                      <td style={{ padding: "8px 4px", fontSize: 12, color: "#ef4444", fontWeight: 600 }}>{isNetCashGenerator ? "+" : "-"}{fmt(scenarioBurnAnn * 1e6)}</td>
-                      <td style={{ padding: "8px 4px", fontSize: 11, color: "#64748b" }}>{fmt(scenarioBurnQtr * 1e6)}/qtr</td>
+                      <td style={{ padding: "8px 4px", fontSize: 12, color: "#ef4444", fontWeight: 600 }}>{annBurn > 0 ? `${isNetCashGenerator ? "+" : "-"}${fmt(scenarioBurnAnn * 1e6)}` : "N/A"}</td>
+                      <td style={{ padding: "8px 4px", fontSize: 11, color: "#64748b" }}>{annBurn > 0 ? `${fmt(scenarioBurnQtr * 1e6)}/qtr` : "N/A"}</td>
                       <td style={{ padding: "8px 4px" }}>
                         <span style={{ fontSize: 13, fontWeight: 800, color: rwColor }}>{rwDisplay} qtrs</span>
                         <div style={{ marginTop: 2, background: "#1e293b", borderRadius: 3, height: 4, width: 80 }}>
@@ -1755,7 +1763,7 @@ return (
               </tbody>
             </table></div>
             <div style={{ marginTop: 12, padding: "8px 10px", background: "#0a0e1a", borderRadius: 4, fontSize: 10, color: "#64748b", lineHeight: 1.6 }}>
-              <b style={{ color: "#94a3b8" }}>Methodology:</b> Scenarios apply multipliers to LTM adjusted cash burn ({isNetCashGenerator ? "+" : "-"}{fmt(annBurn * 1e6)}). Runway = Total Liquidity ({fmt(detail.cash * 1e6)}) / Scenario Quarterly Burn. Trailing 4Q trend shows quarter-by-quarter progression of adjusted cash flow.
+              <b style={{ color: "#94a3b8" }}>Methodology:</b> Scenarios apply multipliers to LTM adjusted cash burn ({annBurn > 0 ? `${isNetCashGenerator ? "+" : "-"}${fmt(annBurn * 1e6)}` : "N/A"}). Runway = Total Liquidity ({fmt(detail.cash * 1e6)}) / Scenario Quarterly Burn. Trailing {detail.quarterlyBurns ? detail.quarterlyBurns.length : 0}Q trend shows quarter-by-quarter progression of adjusted cash flow.
             </div>
           </div>
 
