@@ -15,15 +15,48 @@ import requests as req
 _company_cache = {}
 CACHE_TTL_HOURS = 6
 
-YF_HEADERS = {"User-Agent": "Mozilla/5.0"}
+# Yahoo Finance session cache (crumb + cookies persist across warm invocations)
+_yf_session = None
+_yf_crumb = None
+
+
+def _get_yf_session():
+    """Get an authenticated Yahoo Finance session with crumb + cookies."""
+    global _yf_session, _yf_crumb
+    if _yf_session and _yf_crumb:
+        return _yf_session, _yf_crumb
+
+    session = req.Session()
+    session.headers.update({"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"})
+
+    # Step 1: Hit Yahoo to get auth cookies
+    session.get("https://fc.yahoo.com", timeout=5, allow_redirects=True)
+
+    # Step 2: Get crumb token
+    crumb_resp = session.get("https://query2.finance.yahoo.com/v1/test/getcrumb", timeout=5)
+    if crumb_resp.status_code != 200 or not crumb_resp.text.strip():
+        raise Exception(f"Failed to get Yahoo crumb: HTTP {crumb_resp.status_code}")
+
+    _yf_session = session
+    _yf_crumb = crumb_resp.text.strip()
+    return _yf_session, _yf_crumb
 
 
 def yf_quoteSummary(ticker, modules):
-    """Fetch Yahoo Finance quoteSummary modules."""
-    url = f"https://query1.finance.yahoo.com/v10/finance/quoteSummary/{ticker}"
-    params = {"modules": ",".join(modules)}
+    """Fetch Yahoo Finance quoteSummary with proper crumb authentication."""
     try:
-        r = req.get(url, params=params, headers=YF_HEADERS, timeout=8)
+        session, crumb = _get_yf_session()
+        url = f"https://query2.finance.yahoo.com/v10/finance/quoteSummary/{ticker}"
+        params = {"modules": ",".join(modules), "crumb": crumb}
+        r = session.get(url, params=params, timeout=8)
+        if r.status_code == 401 or r.status_code == 403:
+            # Crumb expired, refresh and retry once
+            global _yf_session, _yf_crumb
+            _yf_session = None
+            _yf_crumb = None
+            session, crumb = _get_yf_session()
+            params["crumb"] = crumb
+            r = session.get(url, params=params, timeout=8)
         if r.status_code == 200:
             data = r.json()
             result = data.get("quoteSummary", {}).get("result")
@@ -33,15 +66,6 @@ def yf_quoteSummary(ticker, modules):
         pass
     return {}
 
-
-def yf_fundamentals(ticker, stmt_type, period="annual", limit=4):
-    """Fetch Yahoo Finance fundamentals (financials/balance-sheet/cash-flow).
-    stmt_type: 'financials' | 'balance-sheet' | 'cash-flow'
-    period: 'annual' | 'quarterly'
-    """
-    url = f"https://query2.finance.yahoo.com/ws/fundamentals-timeseries/v1/finance/timeseries/{ticker}"
-    # We'll use the quoteSummary approach instead for reliability
-    return None
 
 
 def extract_raw(obj, key, fallback=None):
