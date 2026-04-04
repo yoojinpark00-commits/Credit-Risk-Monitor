@@ -388,13 +388,42 @@ def generate_company_profile(ticker):
     if not cik:
         return None
 
-    # Step 2: Fetch all EDGAR companyfacts (single HTTP call)
-    try:
-        facts = _edgar_get(f"https://data.sec.gov/api/xbrl/companyfacts/CIK{cik}.json")
-    except Exception:
+    # Step 2: Fetch companyfacts AND submissions in parallel
+    def _fetch_facts():
+        return _edgar_get(f"https://data.sec.gov/api/xbrl/companyfacts/CIK{cik}.json")
+
+    def _fetch_submissions():
+        return _edgar_get(f"https://data.sec.gov/submissions/CIK{cik}.json")
+
+    facts = None
+    submissions = None
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        facts_future = pool.submit(_fetch_facts)
+        submissions_future = pool.submit(_fetch_submissions)
+        try:
+            facts = facts_future.result(timeout=12)
+        except Exception:
+            facts = None
+        try:
+            submissions = submissions_future.result(timeout=12)
+        except Exception:
+            submissions = None
+
+    if facts is None:
         return None
 
     entity_name = facts.get("entityName", "") or yp.get("name", "") or ticker
+
+    # Extract company metadata from submissions endpoint
+    sic_description = ""
+    state_of_incorporation = ""
+    entity_type = ""
+    fiscal_year_end = ""
+    if submissions:
+        sic_description = submissions.get("sicDescription", "") or ""
+        state_of_incorporation = submissions.get("stateOfIncorporation", "") or ""
+        entity_type = submissions.get("entityType", "") or ""
+        fiscal_year_end = submissions.get("fiscalYearEnd", "") or ""
 
     # Step 3: Extract all financials
     rev_s = _get_field(facts, "revenue")
@@ -1012,16 +1041,14 @@ def generate_company_profile(ticker):
     else:
         runway = "N/A"
 
-    # Sector from SEC filing (use SIC if available)
-    sector = "N/A"
-    try:
-        sic_data = _edgar_get(f"https://efts.sec.gov/LATEST/search-index?q=%22{cik.lstrip('0')}%22&dateRange=custom&startdt=2020-01-01&forms=10-K")
-        # Fallback: just use entity name
-    except Exception:
-        pass
+    # Sector: use sicDescription from the submissions endpoint
+    sector = sic_description or "N/A"
 
     return {
         "id": ticker, "name": entity_name, "sector": sector,
+        "stateOfIncorporation": state_of_incorporation,
+        "entityType": entity_type,
+        "fiscalYearEnd": fiscal_year_end,
         "sp": "NR", "moodys": "NR", "fitch": "NR",
         "impliedRating": implied_rating, "outlook": "Stable", "watchlist": False,
         "cds5y": None, "cds5yChg": None, "bondSpread": None, "bondSpreadChg": None,
