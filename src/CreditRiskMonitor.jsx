@@ -1868,20 +1868,41 @@ return (
         <div style={{ display: "grid", gridTemplateColumns: mob ? "1fr" : "1fr 1fr", gap: 16, minWidth: 0 }}>
           <div style={card}>
             <div style={{ fontSize: 12, fontWeight: 700, color: "#94a3b8", marginBottom: 16, textTransform: "uppercase", letterSpacing: "0.5px" }}>Rating Status</div>
+            {/* Agency rating cards — dimmed with note for generated (unrated) companies */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: mob ? 8 : 16 }}>
               {[{ agency: "S&P", rating: detail.sp }, { agency: "Moody's", rating: detail.moodys }, { agency: "Fitch", rating: detail.fitch }].map((r) => (
-                <div key={r.agency} style={{ textAlign: "center", padding: mob ? 10 : 16, background: r.rating !== "NR" ? "rgba(234,179,8,0.05)" : "#0a0e1a", borderRadius: 6, border: r.rating !== "NR" ? "1px solid rgba(234,179,8,0.15)" : "1px solid transparent" }}>
+                <div key={r.agency} style={{ textAlign: "center", padding: mob ? 10 : 16, background: r.rating !== "NR" ? "rgba(234,179,8,0.05)" : "#0a0e1a", borderRadius: 6, border: r.rating !== "NR" ? "1px solid rgba(234,179,8,0.15)" : "1px solid rgba(100,116,139,0.1)", opacity: detail._generated && r.rating === "NR" ? 0.5 : 1 }}>
                   <div style={{ fontSize: mob ? 18 : 22, fontWeight: 800, color: ratingColor(r.rating) }}>{r.rating}</div>
                   <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>{r.agency}</div>
+                  {detail._generated && r.rating === "NR" && (
+                    <div style={{ fontSize: 9, color: "#475569", marginTop: 5, lineHeight: 1.4 }}>Not publicly<br />rated</div>
+                  )}
                 </div>
               ))}
             </div>
-            <div style={{ marginTop: 16, padding: 12, background: "#0a0e1a", borderRadius: 6 }}>
+            {detail._generated && (
+              <div style={{ marginTop: 8, padding: "6px 10px", background: "rgba(59,130,246,0.06)", borderRadius: 5, border: "1px solid rgba(59,130,246,0.12)", fontSize: 10, color: "#60a5fa", lineHeight: 1.5 }}>
+                Not publicly rated \u2014 implied rating derived from SEC filings via 5-factor model
+              </div>
+            )}
+
+            {/* Implied rating — large prominent display for generated companies */}
+            <div style={{ marginTop: 16, padding: detail._generated ? 16 : 12, background: "#0a0e1a", borderRadius: 6, border: detail._generated ? `1px solid ${ratingColor(detail.impliedRating)}33` : "none" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-                <span style={{ fontSize: 18, color: ratingColor(detail.impliedRating) }}>{"\u25C6"}</span>
+                <span style={{ fontSize: detail._generated ? 28 : 18, color: ratingColor(detail.impliedRating) }}>{"\u25C6"}</span>
                 <div>
-                  <div style={{ fontSize: 13, fontWeight: 700 }}>Implied Rating: <span style={{ color: ratingColor(detail.impliedRating) }}>{detail.impliedRating}</span></div>
-                  <div style={{ fontSize: 11, color: "#64748b" }}>Based on CDS spreads, financial profile & market signals</div>
+                  {detail._generated ? (
+                    <>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 2 }}>Implied Credit Rating</div>
+                      <div style={{ fontSize: mob ? 28 : 34, fontWeight: 800, color: ratingColor(detail.impliedRating), lineHeight: 1, fontFamily: "'JetBrains Mono', monospace" }}>{detail.impliedRating}</div>
+                      <div style={{ fontSize: 10, color: "#64748b", marginTop: 4 }}>5-factor model{detail._ratingScore != null ? ` \u00B7 composite score\u00A0${detail._ratingScore}` : ""}</div>
+                    </>
+                  ) : (
+                    <>
+                      <div style={{ fontSize: 13, fontWeight: 700 }}>Implied Rating: <span style={{ color: ratingColor(detail.impliedRating) }}>{detail.impliedRating}</span></div>
+                      <div style={{ fontSize: 11, color: "#64748b" }}>Based on CDS spreads, financial profile & market signals</div>
+                    </>
+                  )}
                 </div>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
