@@ -28,7 +28,7 @@ def fmp_get(endpoint, params=None):
     params = params or {}
     params["apikey"] = FMP_API_KEY
     url = f"https://financialmodelingprep.com/api{endpoint}"
-    resp = requests.get(url, params=params, timeout=(5, 15))
+    resp = requests.get(url, params=params, timeout=(3, 8))
     if resp.status_code == 200:
         return resp.json()
     return []
@@ -86,20 +86,41 @@ def generate_company_profile(ticker):
     if not FMP_API_KEY:
         return None
 
-    # --- Fetch all data from FMP (10 API calls) ---
-    profile_list = fmp_get(f"/v3/profile/{ticker}")
+    # --- Fetch all data from FMP in parallel (8 API calls) ---
+    from concurrent.futures import ThreadPoolExecutor
+    calls = {
+        "profile": (f"/v3/profile/{ticker}", None),
+        "income": (f"/v3/income-statement/{ticker}", {"limit": "4"}),
+        "balance": (f"/v3/balance-sheet-statement/{ticker}", {"limit": "4"}),
+        "cashflow": (f"/v3/cash-flow-statement/{ticker}", {"limit": "4"}),
+        "q_income": (f"/v3/income-statement/{ticker}", {"period": "quarter", "limit": "4"}),
+        "q_cashflow": (f"/v3/cash-flow-statement/{ticker}", {"period": "quarter", "limit": "4"}),
+        "rating": (f"/v3/rating/{ticker}", None),
+        "analyst": (f"/v3/analyst-estimates/{ticker}", {"limit": "1"}),
+        "hist_rating": (f"/v3/historical-rating/{ticker}", {"limit": "4"}),
+    }
+    results = {}
+    with ThreadPoolExecutor(max_workers=9) as pool:
+        futures = {key: pool.submit(fmp_get, ep, p) for key, (ep, p) in calls.items()}
+        for key, fut in futures.items():
+            try:
+                results[key] = fut.result(timeout=8)
+            except Exception:
+                results[key] = []
+
+    profile_list = results["profile"]
     if not profile_list:
         return None
     profile = profile_list[0]
 
-    income_stmts = fmp_get(f"/v3/income-statement/{ticker}", {"limit": "4"})
-    balance_sheets = fmp_get(f"/v3/balance-sheet-statement/{ticker}", {"limit": "4"})
-    cash_flows = fmp_get(f"/v3/cash-flow-statement/{ticker}", {"limit": "4"})
-    quarterly_inc = fmp_get(f"/v3/income-statement/{ticker}", {"period": "quarter", "limit": "4"})
-    quarterly_cf = fmp_get(f"/v3/cash-flow-statement/{ticker}", {"period": "quarter", "limit": "4"})
-    rating_list = fmp_get(f"/v3/rating/{ticker}")
-    analyst_list = fmp_get(f"/v3/analyst-estimates/{ticker}", {"limit": "1"})
-    hist_rating = fmp_get(f"/v3/historical-rating/{ticker}", {"limit": "4"})
+    income_stmts = results["income"]
+    balance_sheets = results["balance"]
+    cash_flows = results["cashflow"]
+    quarterly_inc = results["q_income"]
+    quarterly_cf = results["q_cashflow"]
+    rating_list = results["rating"]
+    analyst_list = results["analyst"]
+    hist_rating = results["hist_rating"]
 
     if not income_stmts or not balance_sheets:
         return None
