@@ -946,6 +946,16 @@ def generate_company_profile(ticker):
             "analystQA": [],
         }
 
+    # Runway (computed early because research entries reference it)
+    qtr_burn = quarterly_burns[-1]["burn"] if quarterly_burns else (round(fcf / 4) if fcf != 0 else 0)
+    if qtr_burn > 0:
+        runway = "Cash flow positive"
+    elif qtr_burn < 0:
+        qtrs = round(cash / abs(qtr_burn), 1) if abs(qtr_burn) > 0 else 999
+        runway = f"~{qtrs} qtrs at current burn"
+    else:
+        runway = "N/A"
+
     # Research entries — 4 synthetic analyst-style assessments derived from financials
     _today = datetime.now().strftime("%Y-%m-%d")
 
@@ -1081,16 +1091,6 @@ def generate_company_profile(ticker):
             {"category": "Undrawn Revolving Credit Facility", "amount": fac_available_m,
              "type": "revolver", "sub": []})
 
-
-    # Runway
-    qtr_burn = quarterly_burns[-1]["burn"] if quarterly_burns else (round(fcf / 4) if fcf != 0 else 0)
-    if qtr_burn > 0:
-        runway = "Cash flow positive"
-    elif qtr_burn < 0:
-        qtrs = round(cash / abs(qtr_burn), 1) if abs(qtr_burn) > 0 else 999
-        runway = f"~{qtrs} qtrs at current burn"
-    else:
-        runway = "N/A"
 
     # Sector: use sicDescription from the submissions endpoint
     sector = sic_description or "N/A"
