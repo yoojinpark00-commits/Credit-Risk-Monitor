@@ -2258,6 +2258,11 @@ liquidityRunway: "Adequate — $425M ABL + Water Solutions FCF; no bond maturiti
 // Adjusted Cash Burn Components (FY2025, $M) — MLP structure, preferred distributions material
 // Source: Q4 FY2025 Earnings Release (May 29, 2025), 10-K filed for fiscal year ended March 31, 2025
 adjBurn: {
+gaapEbitda: 596,
+gaapEbitda_src: "FY2025 10-K — GAAP EBITDA $596M (vs. company-reported Adjusted EBITDA $622.9M)",
+sbc: 12,
+restructuring: 10,
+otherNonCash: 4.9,
 adjEBITDA: 622.9,
 adjEBITDA_src: "FY2025 Earnings Release (May 29, 2025) — Adj. EBITDA from continuing operations $622.9M",
 incomeTaxes: 3,
@@ -3130,8 +3135,8 @@ intercreditorNotes: "ABL/Notes Intercreditor Agreement dated Feb 2, 2024 among T
 controlAgreements: "Deposit Account Control Agreements (DACAs) required on all material deposit and securities accounts of Borrower and Guarantors; daily cash dominion triggered upon occurrence of Cash Dominion Event (availability < greater of 10% of lesser of BB/commitments or $30M for 3 consecutive business days, or Event of Default).",
 },
 financialCovenants: [
-"Springing Fixed Charge Coverage Ratio ≥ 1.00x tested only when Excess Availability falls below greater of (i) 10% of lesser of Borrowing Base or Commitments and (ii) $30M, tested monthly while triggered",
-"No other financial maintenance covenants (cov-lite ABL structure)",
+{ covenant: "Springing Fixed Charge Coverage Ratio", test: "≥ 1.00x", status: "Not triggered", notes: "Tested only when Excess Availability falls below greater of (i) 10% of lesser of Borrowing Base or Commitments and (ii) $30M; tested monthly while triggered. Sep 2025 availability $354M is well above trigger." },
+{ covenant: "Other Maintenance Covenants", test: "None", status: "N/A", notes: "Cov-lite ABL structure — no leverage, interest coverage, or other financial maintenance covenants outside the springing FCCR." },
 ],
 negativeCov: "Customary high-yield-style negative covenants: limitations on indebtedness (with ratio incurrence baskets), liens (ABL and Notes Priority carve-outs), restricted payments (common unit distributions restricted until leverage target), investments, affiliate transactions, asset sales (with mandatory prepayment from ABL Priority Collateral sales), mergers, and changes in business. Debt incurrence permitted at Consolidated Total Leverage Ratio ≤ 4.75x (secured ≤ 3.75x).",
 availCurrent: 354,
