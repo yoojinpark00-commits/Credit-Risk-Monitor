@@ -55,11 +55,18 @@ def _normalize_name(name):
     n = re.sub(r'\s+', ' ', n).strip().lower()
     return n
 
+_NAME_STOPWORDS = {
+    "the", "and", "group", "energy", "partners", "solutions", "industries",
+    "international", "global", "motor", "motors", "stores", "retail", "financial",
+    "tire", "rubber", "steel", "secret", "rentals", "corporation",
+}
+
 def _is_relevant(headline, summary, ticker, name=None):
     """Protect against common-word ticker false positives.
 
-    Returns True if the combined text mentions the ticker as a whole word
-    or contains the normalized company name.
+    Returns True if the combined text mentions the ticker as a whole word,
+    OR contains any significant token of the normalized company name as a
+    whole word (tokens shorter than 4 chars and generic stopwords are ignored).
     """
     if not ticker and not name:
         return True
@@ -70,8 +77,14 @@ def _is_relevant(headline, summary, ticker, name=None):
     norm_name = _normalize_name(name)
     if norm_name:
         norm_text = _normalize_name(text)
-        if norm_name and norm_name in norm_text:
+        # Full-name whole-phrase match (best signal)
+        if re.search(rf'\b{re.escape(norm_name)}\b', norm_text):
             return True
+        # Token match — any distinctive name token >=4 chars, not a stopword
+        tokens = [t for t in norm_name.split() if len(t) >= 4 and t not in _NAME_STOPWORDS]
+        for tok in tokens:
+            if re.search(rf'\b{re.escape(tok)}\b', norm_text):
+                return True
     return False
 
 # Credit-relevant keyword scoring
