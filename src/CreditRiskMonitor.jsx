@@ -73,6 +73,8 @@ if (o === "Developing") return "#f97316";
 return "#94a3b8";
 };
 
+const isPubliclyRated = (c) => c.sp !== "NR" || c.moodys !== "NR" || c.fitch !== "NR";
+
 const sentimentColor = (s) => {
 if (s === "positive") return "#22c55e";
 if (s === "negative") return "#ef4444";
@@ -83,32 +85,43 @@ return "#94a3b8";
 const ltmAdjCashFlow = (c) => {
 if (!c.adjBurn) return c.fcf || 0;
 const ab = c.adjBurn;
-const capex = ab.maintCapex !== null ? ab.maintCapex : ab.totalCapex;
-return ab.adjEBITDA - ab.incomeTaxes - ab.prefDividends - capex - ab.currentLTD - ab.intExpCash;
+const capex = ab.maintCapex != null ? ab.maintCapex : (ab.totalCapex || 0);
+const result = (ab.adjEBITDA || 0) - (ab.incomeTaxes || 0) - (ab.prefDividends || 0) - capex - (ab.currentLTD || 0) - (ab.intExpCash || 0);
+return isFinite(result) ? result : (c.fcf || 0);
 };
 
+// ─── SKELETON LOADER ────────────────────────────────────────────────────────
+const Skeleton = ({ w = "100%", h = 16, r = 4 }) => (
+<div className="skeleton" style={{ width: w, height: h, borderRadius: r }} />
+);
+
 // ─── SPARKLINE ──────────────────────────────────────────────────────────────
-const Sparkline = ({ data, color = "#60a5fa", w = 80, h = 24 }) => {
+const Sparkline = ({ data, color = "#60a5fa", w = 80, h = 24, label }) => {
 if (!data || data.length < 2) return null;
 const mn = Math.min(...data);
 const mx = Math.max(...data);
 const range = mx - mn || 1;
 const pts = data.map((v, i) => `${(i / (data.length - 1)) * w},${h - ((v - mn) / range) * h}`).join(" ");
+const latest = data[data.length - 1];
+const first = data[0];
+const trendPct = ((latest - first) / Math.abs(first || 1) * 100).toFixed(0);
 return (
-<svg width={w} height={h} style={{ display: "block" }}>
+<svg width={w} height={h} style={{ display: "block" }} aria-label={label ? `${label}: ${trendPct > 0 ? "+" : ""}${trendPct}% trend` : undefined} role="img">
+{label && <title>{label}: {trendPct > 0 ? "+" : ""}{trendPct}% trend</title>}
 <polyline points={pts} fill="none" stroke={color} strokeWidth="1.5" strokeLinejoin="round" />
+<circle cx={w} cy={h - ((latest - mn) / range) * h} r="2" fill={color} />
 </svg>
 );
 };
 
 // ─── BAR CHART ──────────────────────────────────────────────────────────────
-const MiniBar = ({ data, labels, color = "#60a5fa", w = 200, h = 80 }) => {
+const MiniBar = ({ data, labels, color = "#60a5fa", w = 200, h = 80, ariaLabel }) => {
 if (!data || data.length === 0) return null;
 const mx = Math.max(...data.map(Math.abs));
 const barW = w / data.length - 4;
 const zeroY = h * 0.5;
 return (
-<svg width={w} height={h + 18} style={{ display: "block" }}>
+<svg width={w} height={h + 18} style={{ display: "block" }} role="img" aria-label={ariaLabel || "Bar chart"}>
 <line x1={0} y1={zeroY} x2={w} y2={zeroY} stroke="#334155" strokeWidth="0.5" />
 {data.map((v, i) => {
 const bh = (Math.abs(v) / (mx || 1)) * (h * 0.45);
@@ -134,6 +147,14 @@ const [winW, setWinW] = useState(typeof window !== "undefined" ? window.innerWid
 const [watchlistOverrides, setWatchlistOverrides] = useState({});
 const [showOverrideModal, setShowOverrideModal] = useState(null);
 const [overrideReason, setOverrideReason] = useState("");
+const [searchQuery, setSearchQuery] = useState("");
+const [sortCol, setSortCol] = useState(null);
+const [sortDir, setSortDir] = useState("asc");
+const [dbPortfolio, setDbPortfolio] = useState(null);
+const [portfolioSource, setPortfolioSource] = useState("static");
+const [expandedNews, setExpandedNews] = useState({});
+const [adHocCompany, setAdHocCompany] = useState(null);
+const [adHocLoading, setAdHocLoading] = useState(false); // "static" | "api" | "error"
 
 // ─── NAVIGATION HISTORY ───────────────────────────────────────────────
 const [navHistory, setNavHistory] = useState([{ selected: null, tab: "overview", detailTab: "financials" }]);
@@ -211,7 +232,7 @@ return () => window.removeEventListener("popstate", onPopState);
 const [secFilings, setSecFilings] = useState([]);
 const [liveNews, setLiveNews] = useState([]);
 const [marketData, setMarketData] = useState({});
-const [dataLoading, setDataLoading] = useState({ sec: false, news: false, market: false });
+const [dataLoading, setDataLoading] = useState({ sec: false, news: false, market: false, portfolio: false });
 const [dataError, setDataError] = useState({});
 const [lastRefresh, setLastRefresh] = useState(null);
 
@@ -247,6 +268,23 @@ setDataError(prev => ({ ...prev, news: e.message }));
 setDataLoading(prev => ({ ...prev, news: false }));
 }, []);
 
+const fetchPortfolio = useCallback(async () => {
+  setDataLoading(prev => ({ ...prev, portfolio: true }));
+  try {
+    const resp = await fetch("/api/portfolio?all=true");
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const data = await resp.json();
+    if (data.portfolio && Object.keys(data.portfolio).length > 0) {
+      setDbPortfolio(data.portfolio);
+      setPortfolioSource("api");
+    }
+  } catch (e) {
+    console.warn("Portfolio API unavailable, using static data:", e.message);
+    setPortfolioSource("error");
+  }
+  setDataLoading(prev => ({ ...prev, portfolio: false }));
+}, []);
+
 const fetchMarketData = useCallback(async () => {
 setDataLoading(prev => ({ ...prev, market: true }));
 try {
@@ -261,11 +299,12 @@ setDataLoading(prev => ({ ...prev, market: false }));
 }, []);
 
 const refreshAll = useCallback(() => {
+fetchPortfolio();
 fetchSecFilings();
 fetchLiveNews();
 fetchMarketData();
 setLastRefresh(new Date());
-}, [fetchSecFilings, fetchLiveNews, fetchMarketData]);
+}, [fetchPortfolio, fetchSecFilings, fetchLiveNews, fetchMarketData]);
 
 useEffect(() => { refreshAll(); }, []);
 
@@ -350,12 +389,54 @@ const mob = winW < 768;
 const tablet = winW >= 768 && winW < 1024;
 const px = mob ? 12 : 24; // responsive padding
 
+// ─── NORMALIZE DB DATA TO MATCH STATIC SHAPE ────────────────────────
+// The credit_data_fetcher returns snake_case keys with SourcedValue wrappers
+// and raw dollar amounts. This maps them to the camelCase primitives in $M
+// that the UI expects.
+const normalizeDbEntry = (db) => {
+  if (!db) return null;
+  const sv = (key) => { const v = db[key]; return v && typeof v === "object" && "value" in v ? v.value : v; };
+  const toM = (val) => val != null ? +(val / 1e6).toFixed(0) : null;
+  const kf = db.key_financials || db;
+  const bs = db.balance_sheet || db;
+  const mapped = {};
+  // Map fetcher fields → static field names (snake_case → camelCase, raw$ → $M)
+  const pairs = [
+    ["revenue", () => toM(sv("gaap_revenue") ?? sv("revenue"))],
+    ["ebitda", () => toM(sv("adj_ebitda") ?? sv("ebitda_gaap"))],
+    ["netIncome", () => toM(sv("gaap_net_income") ?? sv("net_income"))],
+    ["totalDebt", () => toM(sv("total_debt"))],
+    ["cash", () => toM(sv("cash_and_equivalents"))],
+    ["totalAssets", () => toM(sv("total_assets"))],
+    ["totalEquity", () => toM(sv("stockholders_equity"))],
+    ["fcf", () => toM(sv("free_cash_flow"))],
+    ["intExp", () => toM(sv("cash_interest_paid") ?? sv("interest_expense"))],
+  ];
+  for (const [key, getter] of pairs) {
+    const val = getter();
+    if (val != null) mapped[key] = val;
+  }
+  return Object.keys(mapped).length > 0 ? mapped : null;
+};
+
 // ─── APPLY LIVE MARKET DATA TO PORTFOLIO ─────────────────────────────
 // Overlay live equity prices from API onto portfolio entries so all views
 // (KPIs, detail headers, tables) reflect current market data.
+const basePortfolio = useMemo(() => {
+  if (!dbPortfolio) return PORTFOLIO;
+  return PORTFOLIO.map((staticEntry) => {
+    const dbEntry = dbPortfolio[staticEntry.id];
+    if (!dbEntry) return staticEntry;
+    // Normalize DB shape → static shape, then overlay only non-null values
+    const normalized = normalizeDbEntry(dbEntry);
+    if (!normalized) return staticEntry;
+    return { ...staticEntry, ...normalized, _dbSource: true };
+  });
+}, [dbPortfolio]);
+
 const enrichedPortfolio = useMemo(() => {
-  if (Object.keys(marketData).length === 0) return PORTFOLIO;
-  return PORTFOLIO.map((c) => {
+  if (Object.keys(marketData).length === 0) return basePortfolio;
+  return basePortfolio.map((c) => {
     const quote = marketData[c.id];
     if (!quote || quote.error) return c;
     return {
@@ -366,9 +447,49 @@ const enrichedPortfolio = useMemo(() => {
       _liveEquity: true,
     };
   });
-}, [marketData]);
+}, [basePortfolio, marketData]);
 
-const totalExposure = enrichedPortfolio.reduce((s, c) => s + c.exposure, 0);
+// ─── SEARCH & SORT ──────────────────────────────────────────────────
+const filteredPortfolio = useMemo(() => {
+  let list = enrichedPortfolio;
+  if (searchQuery.trim()) {
+    const q = searchQuery.trim().toLowerCase();
+    list = list.filter(c => c.id.toLowerCase().includes(q) || c.name.toLowerCase().includes(q) || c.sector.toLowerCase().includes(q) || (c.sp !== "NR" && c.sp.toLowerCase().includes(q)) || (c.impliedRating || "").toLowerCase().includes(q));
+  }
+  if (sortCol) {
+    const getSortVal = (c) => {
+      switch (sortCol) {
+        case "company": return c.id;
+        case "pm": return c.pm || "";
+        case "rating": return isPubliclyRated(c) ? ratingScore(c.sp) : ratingScore(c.impliedRating);
+        case "outlook": return c.outlook;
+        case "cds": return c.cds5y ?? 99999;
+        case "spread": return c.bondSpread ?? 99999;
+        case "cashflow": return ltmAdjCashFlow(c);
+        case "liquidity": return c.cash;
+        case "equity": return c.eqPrice ?? -99999;
+        case "rev": return c.revenue;
+        default: return 0;
+      }
+    };
+    list = [...list].sort((a, b) => {
+      const va = getSortVal(a), vb = getSortVal(b);
+      if (typeof va === "string") return sortDir === "asc" ? va.localeCompare(vb) : vb.localeCompare(va);
+      return sortDir === "asc" ? va - vb : vb - va;
+    });
+  }
+  return list;
+}, [enrichedPortfolio, searchQuery, sortCol, sortDir]);
+
+const handleSort = useCallback((col) => {
+  if (sortCol === col) {
+    setSortDir(d => d === "asc" ? "desc" : "asc");
+  } else {
+    setSortCol(col);
+    setSortDir("asc");
+  }
+}, [sortCol]);
+
 const negFcfCount = enrichedPortfolio.filter((c) => c.fcf < 0).length;
 const watchCount = enrichedPortfolio.filter((c) => getWatchlistStatus(c).active).length;
 const negOutlook = enrichedPortfolio.filter((c) => c.outlook === "Negative" || c.outlook === "Developing").length;
@@ -402,7 +523,78 @@ const allNews = useMemo(() => {
   return enrichedPortfolio.flatMap((c) => c.news.map((n) => ({ ...n, ticker: c.id, company: c.name }))).sort((a, b) => b.date.localeCompare(a.date));
 }, [liveNews, enrichedPortfolio]);
 
-const detail = selected ? enrichedPortfolio.find((c) => c.id === selected) : null;
+// ─── AD-HOC TICKER LOOKUP ────────────────────────────────────────────
+const lookupTicker = useCallback(async (ticker) => {
+  ticker = ticker.toUpperCase().trim();
+  if (!ticker || ticker.length > 10) return;
+
+  // Check if already in portfolio
+  const existing = enrichedPortfolio.find(c => c.id === ticker);
+  if (existing) {
+    navigate(ticker, tab, "financials");
+    return;
+  }
+
+  setAdHocLoading(true);
+  try {
+    const resp = await fetch(`/api/company?ticker=${ticker}`);
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.error || `HTTP ${resp.status}`);
+    }
+    const company = await resp.json();
+    // Also fetch news for this ticker
+    try {
+      const newsResp = await fetch(`/api/news?ticker=${ticker}&max=6`);
+      const newsData = await newsResp.json();
+      if (newsData.news) company.news = newsData.news;
+    } catch(e) { /* news fetch is non-critical */ }
+    setAdHocCompany(company);
+    navigate(ticker, tab, "financials");
+  } catch (e) {
+    setDataError(prev => ({ ...prev, lookup: e.message }));
+  }
+  setAdHocLoading(false);
+}, [enrichedPortfolio, navigate, tab]);
+
+// ─── DETAIL LOOKUP (portfolio + ad-hoc) ────────────────────────────────
+const rawDetail = selected ? (enrichedPortfolio.find((c) => c.id === selected) || adHocCompany) : null;
+// Normalize: default all required fields so generated/partial objects render safely
+const detail = useMemo(() => {
+  if (!rawDetail) return null;
+  return {
+    ...rawDetail,
+    news: rawDetail.news || [],
+    financials: rawDetail.financials || [],
+    ratingHistory: rawDetail.ratingHistory || [{ date: "N/A", sp: "NR", moodys: "NR", fitch: "NR", event: "No rating history available" }],
+    research: rawDetail.research || [{ date: "", firm: "N/A", action: "N/A", pt: 0, summary: "No analyst coverage data available" }],
+    lastEarnings: rawDetail.lastEarnings || "",
+    impliedRating: rawDetail.impliedRating || "NR",
+    outlook: rawDetail.outlook || "Stable",
+    sp: rawDetail.sp || "NR",
+    moodys: rawDetail.moodys || "NR",
+    fitch: rawDetail.fitch || "NR",
+    liquidityRunway: rawDetail.liquidityRunway || "N/A",
+    analystRating: rawDetail.analystRating || "N/A",
+    targetPrice: rawDetail.targetPrice || 0,
+    cash: rawDetail.cash ?? 0,
+    totalDebt: rawDetail.totalDebt ?? 0,
+    ebitda: rawDetail.ebitda ?? 0,
+    revenue: rawDetail.revenue ?? 0,
+    fcf: rawDetail.fcf ?? 0,
+    netIncome: rawDetail.netIncome ?? 0,
+    intExp: rawDetail.intExp ?? 0,
+    totalAssets: rawDetail.totalAssets ?? 0,
+    totalEquity: rawDetail.totalEquity ?? 0,
+    intCov: rawDetail.intCov ?? 0,
+    currentRatio: rawDetail.currentRatio ?? 0,
+    debtToEquity: rawDetail.debtToEquity ?? 0,
+    roic: rawDetail.roic ?? 0,
+    cashBurnQtr: rawDetail.cashBurnQtr ?? 0,
+    currentAssets: rawDetail.currentAssets ?? 0,
+    currentLiab: rawDetail.currentLiab ?? 0,
+  };
+}, [rawDetail]);
 
 // ─── STYLES ─────────────────────────────────────────────────────────────
 const root = { fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", background: "#060a14", color: "#e2e8f0", minHeight: "100vh", fontSize: mob ? 13 : 14, WebkitFontSmoothing: "antialiased", MozOsxFontSmoothing: "grayscale", maxWidth: "100vw", overflowX: "clip", wordWrap: "break-word", overflowWrap: "break-word" };
@@ -417,7 +609,7 @@ const sectionGrid = mob ? "1fr" : "1fr 1fr";
 // ─── RENDER: DETAIL VIEW ──────────────────────────────────────────────────
 if (detail) {
 return (
-<div style={root}>
+<div style={{ ...root, animation: "fadeIn 0.25s ease forwards" }}>
 <div style={headerBar}>
 <div style={{ display: "flex", alignItems: "center", gap: mob ? 8 : 10, flexWrap: "wrap", flex: 1, minWidth: 0 }}>
 <div style={{ display: "flex", gap: 3, flexShrink: 0 }}>
@@ -431,26 +623,31 @@ return (
 </div>
 {getWatchlistStatus(detail).active && <span style={{ background: "rgba(127,29,29,0.5)", color: "#fca5a5", fontSize: 10, fontWeight: 700, padding: "4px 10px", borderRadius: 20, textTransform: "uppercase", letterSpacing: "0.5px", flexShrink: 0, border: "1px solid rgba(220,38,38,0.2)" }}>{"\u26A0"} WATCHLIST</span>}
 {!getWatchlistStatus(detail).active && <span style={{ background: "rgba(5,46,22,0.5)", color: "#86efac", fontSize: 10, fontWeight: 700, padding: "4px 10px", borderRadius: 20, textTransform: "uppercase", letterSpacing: "0.5px", flexShrink: 0, border: "1px solid rgba(34,197,94,0.2)" }}>{"\u2713"} ACTIVE</span>}
+{isPubliclyRated(detail) ? <span style={{ background: "rgba(234,179,8,0.15)", color: "#fcd34d", fontSize: 10, fontWeight: 700, padding: "4px 10px", borderRadius: 20, textTransform: "uppercase", letterSpacing: "0.5px", flexShrink: 0, border: "1px solid rgba(234,179,8,0.2)" }}>RATED</span> : <span style={{ background: "rgba(100,116,139,0.15)", color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "4px 10px", borderRadius: 20, textTransform: "uppercase", letterSpacing: "0.5px", flexShrink: 0, border: "1px solid rgba(100,116,139,0.2)" }}>NOT RATED</span>}
+{detail._generated && <span style={{ background: "rgba(59,130,246,0.15)", color: "#60a5fa", fontSize: 10, fontWeight: 700, padding: "4px 10px", borderRadius: 20, textTransform: "uppercase", letterSpacing: "0.5px", flexShrink: 0, border: "1px solid rgba(59,130,246,0.2)" }}>API Generated {detail._zScore ? `\u00B7 Z=${detail._zScore}` : ""}</span>}
 {detail.pm && <span style={{ background: "rgba(30,41,59,0.6)", color: "#cbd5e1", fontSize: 10, fontWeight: 700, padding: "4px 10px", borderRadius: 20, textTransform: "uppercase", letterSpacing: "0.5px", flexShrink: 0, border: "1px solid rgba(148,163,184,0.18)" }}>PM {detail.pm}</span>}
 </div>
-<div style={{ display: "flex", gap: mob ? 4 : 6, overflowX: "auto", WebkitOverflowScrolling: "touch", width: mob ? "100%" : "auto", marginTop: mob ? 2 : 0, paddingBottom: mob ? 2 : 0 }}>
+<div style={{ position: "relative", width: mob ? "100%" : "auto", marginTop: mob ? 2 : 0 }}>
+{mob && <div style={{ position: "absolute", right: 0, top: 0, bottom: 0, width: 24, background: "linear-gradient(to right, transparent, rgba(15,22,41,0.85))", zIndex: 1, pointerEvents: "none" }} />}
+<div style={{ display: "flex", gap: mob ? 4 : 6, overflowX: "auto", WebkitOverflowScrolling: "touch", paddingBottom: mob ? 2 : 0, scrollbarWidth: "none" }}>
 {["financials", "ratings", "filings", "news", "research", "earnings"].map((t) => (
 <button key={t} onClick={() => setDetailTab(t)} style={pill(detailTab === t)}>{t === "filings" ? "SEC" : t}</button>
 ))}
+</div>
 </div>
 </div>
 
     {/* KPI strip */}
     <div style={{ display: "grid", gridTemplateColumns: mob ? "repeat(2, 1fr)" : tablet ? "repeat(4, 1fr)" : "repeat(8, 1fr)", gap: mob ? 8 : 12, padding: `16px ${px}px` }}>
       {[
-        { l: "Implied Rating", v: detail.impliedRating, c: ratingColor(detail.impliedRating) },
-        { l: "Agency Rating", v: detail.sp !== "NR" ? `${detail.sp} / ${detail.moodys}` : "Not Rated", c: detail.sp !== "NR" ? ratingColor(detail.sp) : "#64748b" },
-        { l: "Outlook", v: `${outlookIcon(detail.outlook)} ${detail.outlook}`, c: outlookColor(detail.outlook) },
+        { l: isPubliclyRated(detail) ? "Agency Rating" : "Implied Rating", v: isPubliclyRated(detail) ? `${detail.sp}${detail.moodys !== "NR" ? ` / ${detail.moodys}` : ""}` : (detail.impliedRating || "N/A"), c: isPubliclyRated(detail) ? ratingColor(detail.sp) : ratingColor(detail.impliedRating) },
+        { l: isPubliclyRated(detail) ? "Implied Rating" : "Agency Rating", v: isPubliclyRated(detail) ? (detail.impliedRating || "N/A") : "Not Rated", c: isPubliclyRated(detail) ? ratingColor(detail.impliedRating) : "#64748b" },
+        { l: "Outlook", v: detail.outlook ? `${outlookIcon(detail.outlook)} ${detail.outlook}` : "N/A", c: outlookColor(detail.outlook) },
         { l: "CDS 5Y", v: detail.cds5y != null ? `${detail.cds5y} bps` : "N/A", sub: detail.cds5yChg != null ? `${bps(detail.cds5yChg)} bps` : "", c: detail.cds5yChg != null ? (detail.cds5yChg <= 0 ? "#22c55e" : "#ef4444") : "#64748b" },
         { l: "Bond Spread", v: detail.bondSpread != null ? `${detail.bondSpread} bps` : "N/A", sub: detail.bondSpreadChg != null ? `${bps(detail.bondSpreadChg)} bps` : "", c: detail.bondSpreadChg != null ? (detail.bondSpreadChg <= 0 ? "#22c55e" : "#ef4444") : "#64748b" },
         { l: "Equity", v: detail.eqPrice != null ? `$${detail.eqPrice}` : "Private", sub: detail.eqChg != null ? pct(detail.eqChg) : "", c: detail.eqChg != null ? (detail.eqChg >= 0 ? "#22c55e" : "#ef4444") : "#64748b" },
-        { l: detail.fcf > 0 ? "Adj. Cash Flow / Qtr" : "Cash Burn / Qtr", v: detail.fcf > 0 ? `+${fmt(Math.abs(detail.cashBurnQtr) * 1e6)}` : fmt(detail.cashBurnQtr * 1e6), c: detail.fcf > 0 ? "#22c55e" : "#ef4444" },
-        { l: "Current Ratio", v: `${fmtNum(detail.currentRatio)}x`, c: detail.currentRatio >= 1.5 ? "#22c55e" : detail.currentRatio >= 1 ? "#eab308" : "#ef4444" },
+        { l: detail.fcf != null && detail.fcf > 0 ? "Adj. Cash Flow / Qtr" : "Cash Burn / Qtr", v: detail.cashBurnQtr != null ? (detail.fcf != null && detail.fcf > 0 ? `+${fmt(Math.abs(detail.cashBurnQtr) * 1e6)}` : fmt(detail.cashBurnQtr * 1e6)) : "N/A", c: detail.fcf != null && detail.fcf > 0 ? "#22c55e" : detail.cashBurnQtr != null ? "#ef4444" : "#64748b" },
+        { l: "Current Ratio", v: detail.currentRatio != null ? `${fmtNum(detail.currentRatio)}x` : "N/A", c: detail.currentRatio != null ? (detail.currentRatio >= 1.5 ? "#22c55e" : detail.currentRatio >= 1 ? "#eab308" : "#ef4444") : "#64748b" },
       ].map((k, i) => (
         <div key={i} style={{ ...card, position: "relative", overflow: "hidden", animation: "fadeIn 0.3s ease forwards", animationDelay: `${i * 30}ms`, opacity: 0 }}>
           <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: k.c || "#3b82f6", opacity: 0.5 }} />
@@ -516,7 +713,7 @@ return (
                 <div style={{ marginTop: 12, background: "#1e293b", borderRadius: 6, height: 10, overflow: "hidden" }}>
                   <div style={{ height: "100%", borderRadius: 6, width: `${isNetCashGenerator ? 100 : Math.min(ltmCovMonths / 36, 1) * 100}%`, background: `linear-gradient(90deg, ${runwayColor}, ${meets18mo ? "#86efac" : ltmCovMonths >= 12 ? "#fde047" : "#fca5a5"})`, transition: "width 0.5s" }} />
                 </div>
-                <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4, fontSize: 9, color: "#475569" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4, fontSize: 9, color: "#64748b" }}>
                   <span>0</span><span>12 mo</span><span style={{ color: "#22c55e", fontWeight: 700 }}>18 mo</span><span>36 mo</span>
                 </div>
                 <div style={{ fontSize: 10, color: "#64748b", marginTop: 8 }}>{isNetCashGenerator ? "\u2713 Net cash generator \u2014 coverage test automatically satisfied" : meets18mo ? "\u2713 LTM coverage exceeds 18-month threshold" : ltmCovMonths >= 12 ? "\u26A0 Below 18-month threshold \u2014 Special Mention territory" : "\u26A0 Below 12-month threshold \u2014 Substandard / Doubtful territory"}</div>
@@ -571,10 +768,85 @@ return (
             </div>
             <div style={{ display: "flex", gap: 2 }}>
               {["Opening\nCash", "Revenue", "OpEx &\nCOGS", "CapEx &\nOther", "Debt\nProceeds", "Ending\nCash"].map((l, i) => (
-                <div key={i} style={{ flex: 1, textAlign: "center", fontSize: 8, color: "#475569", lineHeight: 1.3, whiteSpace: "pre-line" }}>{l}</div>
+                <div key={i} style={{ flex: 1, textAlign: "center", fontSize: 8, color: "#64748b", lineHeight: 1.3, whiteSpace: "pre-line" }}>{l}</div>
               ))}
             </div>
           </div>
+
+          {/* ═══ EBITDA RECONCILIATION: GAAP → ADJUSTED ═══ */}
+          {detail.adjBurn && detail.adjBurn.gaapEbitda != null && (() => {
+            const ab = detail.adjBurn;
+            const totalAdj = ab.sbc + ab.restructuring + ab.otherNonCash;
+            const reconItems = [
+              { label: "GAAP EBITDA", amount: ab.gaapEbitda, isSubtotal: true, color: "#60a5fa" },
+              { label: "Stock-Based Compensation", amount: ab.sbc, color: "#a78bfa" },
+              ...(ab.restructuring ? [{ label: "Restructuring & Impairments", amount: ab.restructuring, color: "#f97316" }] : []),
+              ...(ab.otherNonCash ? [{ label: "Other Non-Cash Items", amount: ab.otherNonCash, color: ab.otherNonCash >= 0 ? "#94a3b8" : "#64748b" }] : []),
+              { label: "Adjusted EBITDA", amount: ab.adjEBITDA, isSubtotal: true, color: ab.adjEBITDA >= 0 ? "#22c55e" : "#ef4444" },
+            ];
+            const maxRecon = Math.max(...reconItems.map(r => Math.abs(r.amount)));
+
+            return (
+            <div style={{ ...card, gridColumn: "1 / -1" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                <div style={{ fontSize: mob ? 11 : 13, fontWeight: 800, color: "#94a3b8", textTransform: "uppercase", letterSpacing: mob ? "0.5px" : "1px" }}>
+                  EBITDA Reconciliation {"\u2014"} GAAP to Adjusted
+                </div>
+                <div style={{ fontSize: 9, color: "#64748b", textAlign: "right" }}>
+                  Total Adjustments: <span style={{ color: totalAdj >= 0 ? "#22c55e" : "#ef4444", fontWeight: 700 }}>{totalAdj >= 0 ? "+" : ""}{totalAdj.toLocaleString()}M</span>
+                </div>
+              </div>
+              <div style={{ fontSize: mob ? 9 : 10, color: "#64748b", marginBottom: 16 }}>
+                Reconciles reported GAAP EBITDA to company-reported Non-GAAP Adjusted EBITDA by adding back non-cash and non-recurring items.
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: sectionGrid, gap: mob ? 16 : 24, minWidth: 0 }}>
+                {/* Waterfall bars */}
+                <div>
+                  {reconItems.map((r, ri) => {
+                    const barPct = (maxRecon > 0 && isFinite(r.amount)) ? (Math.abs(r.amount) / maxRecon * 100) : 0;
+                    return (
+                      <div key={ri} style={{ marginBottom: ri < reconItems.length - 1 ? 8 : 0 }}>
+                        {r.isSubtotal && ri > 0 && <div style={{ borderTop: "2px dashed rgba(148,163,184,0.2)", margin: "10px 0" }} />}
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <div style={{ width: mob ? 80 : 110, fontSize: mob ? 9 : 10, color: r.isSubtotal ? "#e2e8f0" : "#94a3b8", fontWeight: r.isSubtotal ? 700 : 400, textAlign: "right", flexShrink: 0, lineHeight: 1.2 }}>{r.label}</div>
+                          <div style={{ flex: 1, height: 22, background: "#1e293b", borderRadius: 3, overflow: "hidden" }}>
+                            <div style={{ height: "100%", width: `${Math.max(barPct, 2)}%`, background: r.isSubtotal ? (r.amount >= 0 ? "linear-gradient(90deg, #22c55e, #15803d)" : "linear-gradient(90deg, #ef4444, #dc2626)") : r.color, borderRadius: 3, opacity: r.isSubtotal ? 1 : 0.7 }} />
+                          </div>
+                          <div style={{ width: mob ? 65 : 80, fontSize: mob ? 11 : 12, fontWeight: r.isSubtotal ? 800 : 600, color: r.isSubtotal ? r.color : "#e2e8f0", textAlign: "right", flexShrink: 0, fontFamily: "'JetBrains Mono', monospace" }}>
+                            {r.amount === 0 ? "\u2014" : r.amount < 0 ? `(${Math.abs(r.amount).toLocaleString()})` : r.isSubtotal ? `${r.amount > 0 ? "" : ""}${r.amount.toLocaleString()}` : `+${r.amount.toLocaleString()}`}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                {/* Summary table */}
+                <div style={{ background: "#0a0e1a", borderRadius: 8, padding: mob ? 12 : 16 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.5px" }}>Reconciliation Summary ($M)</div>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: mob ? 11 : 12 }}>
+                    <tbody>
+                      {reconItems.map((r, ri) => (
+                        <tr key={ri} style={{ borderTop: r.isSubtotal && ri > 0 ? "2px solid rgba(148,163,184,0.15)" : "none" }}>
+                          <td style={{ padding: "6px 0", color: r.isSubtotal ? "#e2e8f0" : "#94a3b8", fontWeight: r.isSubtotal ? 700 : 400 }}>{r.isSubtotal && ri > 0 ? "= " : ri > 0 && !r.isSubtotal ? "+ " : ""}{r.label}</td>
+                          <td style={{ padding: "6px 0", textAlign: "right", fontWeight: r.isSubtotal ? 800 : 600, color: r.isSubtotal ? r.color : "#e2e8f0", fontFamily: "'JetBrains Mono', monospace" }}>
+                            {r.amount === 0 ? "\u2014" : r.amount < 0 ? `(${Math.abs(r.amount).toLocaleString()})` : `${r.amount.toLocaleString()}`}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <div style={{ marginTop: 12, padding: 8, background: "rgba(96,165,250,0.05)", borderRadius: 4, border: "1px solid rgba(96,165,250,0.1)", fontSize: 9, color: "#64748b", lineHeight: 1.5 }}>
+                    {ab.sbc > 0 && ab.gaapEbitda !== 0 && <div><b>SBC:</b> Stock-based compensation is the largest non-cash add-back ({((ab.sbc / Math.abs(ab.gaapEbitda)) * 100).toFixed(0)}% of GAAP EBITDA).</div>}
+                    {ab.sbc > 0 && ab.gaapEbitda === 0 && <div><b>SBC:</b> ${ab.sbc.toLocaleString()}M stock-based compensation added back (GAAP EBITDA is zero).</div>}
+                    {ab.restructuring > 0 && <div><b>Restructuring:</b> ${ab.restructuring}M in non-recurring charges added back.</div>}
+                    {totalAdj > 0 && ab.gaapEbitda !== 0 && <div style={{ marginTop: 4 }}>Total adjustments of <b>${totalAdj.toLocaleString()}M</b> improve EBITDA by {((totalAdj / Math.abs(ab.gaapEbitda)) * 100).toFixed(0)}%.</div>}
+                    {totalAdj > 0 && ab.gaapEbitda === 0 && <div style={{ marginTop: 4 }}>Total adjustments of <b>${totalAdj.toLocaleString()}M</b> applied (GAAP EBITDA is zero).</div>}
+                  </div>
+                </div>
+              </div>
+            </div>
+            );
+          })()}
 
           {/* ═══ TRADITIONAL vs. ADJUSTED CASH BURN ═══ */}
           {detail.adjBurn && (() => {
@@ -586,7 +858,7 @@ return (
             const tradBurnAbs = Math.abs(tradBurn);
             const adjBurnAbs = Math.abs(adjBurnTotal);
             const diff = adjBurnAbs - tradBurnAbs;
-            const maxBurn = Math.max(tradBurnAbs, adjBurnAbs);
+            const maxBurn = Math.max(tradBurnAbs, adjBurnAbs, 1); // guard against zero to avoid NaN bar widths
 
             // Waterfall items for adjusted burn
             const waterfall = [
@@ -623,7 +895,7 @@ return (
                           {tradBurnAbs >= maxBurn * 0.15 ? `${tradBurn >= 0 ? "+" : "-"}$${(tradBurnAbs / 1000).toFixed(1)}B` : ""}
                         </div>
                       </div>
-                      <div style={{ fontSize: 9, color: "#475569", marginTop: 2 }}>{tradBurn >= 0 ? "Positive operating cash flow after CapEx" : "Operating Cash Flow minus Total CapEx"}</div>
+                      <div style={{ fontSize: 9, color: "#64748b", marginTop: 2 }}>{tradBurn >= 0 ? "Positive operating cash flow after CapEx" : "Operating Cash Flow minus Total CapEx"}</div>
                     </div>
                     {/* Adjusted */}
                     <div>
@@ -636,7 +908,7 @@ return (
                           {adjBurnAbs >= maxBurn * 0.15 ? `${adjBurnTotal >= 0 ? "+" : "-"}$${(adjBurnAbs / 1000).toFixed(1)}B` : ""}
                         </div>
                       </div>
-                      <div style={{ fontSize: 9, color: "#475569", marginTop: 2 }}>Adj. EBITDA less taxes, dividends, {ab.maintCapex !== null ? "maintenance" : "total"} capex, current LTD, and cash interest</div>
+                      <div style={{ fontSize: 9, color: "#64748b", marginTop: 2 }}>Adj. EBITDA less taxes, dividends, {ab.maintCapex !== null ? "maintenance" : "total"} capex, current LTD, and cash interest</div>
                     </div>
                   </div>
                   {/* Differential */}
@@ -648,20 +920,20 @@ return (
                       {adjBurnTotal > tradBurn ? " HIGHER" : " LOWER"}
                     </div>
                     <div style={{ fontSize: 9, color: "#64748b", marginTop: 4 }}>
-                      {adjBurnTotal >= 0 && tradBurn >= 0 ? "Both measures show positive cash generation" : adjBurnTotal >= 0 ? "Adjusted measure shows cash generation; traditional FCF is negative" : tradBurnAbs > 0 ? `Adjusted outflow differs from traditional FCF by ${((Math.abs(diff) / tradBurnAbs) * 100).toFixed(0)}%` : ""}
+                      {adjBurnTotal >= 0 && tradBurn >= 0 ? "Both measures show positive cash generation" : adjBurnTotal >= 0 ? "Adjusted measure shows cash generation; traditional FCF is negative" : tradBurnAbs > 0 ? `Adjusted outflow differs from traditional FCF by ${((Math.abs(diff) / tradBurnAbs) * 100).toFixed(0)}%` : tradBurnAbs === 0 ? "Traditional FCF is zero; adjusted measure reflects non-FCF items" : ""}
                     </div>
                   </div>
                   {/* Runway comparison */}
                   <div style={{ marginTop: 12, display: "grid", gridTemplateColumns: mob ? "1fr" : "1fr 1fr", gap: 8 }}>
                     <div style={{ padding: 10, background: "#0a0e1a", borderRadius: 6, textAlign: "center" }}>
                       <div style={{ fontSize: 9, color: "#64748b", textTransform: "uppercase" }}>{tradBurn >= 0 ? "Traditional: Cash Flow Positive" : "Traditional Runway"}</div>
-                      <div style={{ fontSize: 20, fontWeight: 800, color: tradBurn >= 0 ? "#22c55e" : (detail.cash / (tradBurnAbs / 4)) >= 6 ? "#eab308" : "#ef4444" }}>{tradBurn >= 0 ? "\u2713 Positive" : `${(detail.cash / (tradBurnAbs / 4)).toFixed(1)} qtrs`}</div>
-                      <div style={{ fontSize: 9, color: "#475569" }}>{tradBurn >= 0 ? `+${fmt(tradBurn * 1e6)} FCF generated` : "Cash \u00F7 Quarterly FCF Burn"}</div>
+                      <div style={{ fontSize: 20, fontWeight: 800, color: tradBurn >= 0 ? "#22c55e" : tradBurnAbs > 0 ? ((detail.cash / (tradBurnAbs / 4)) >= 6 ? "#eab308" : "#ef4444") : "#22c55e" }}>{tradBurn >= 0 ? "\u2713 Positive" : tradBurnAbs > 0 ? `${(detail.cash / (tradBurnAbs / 4)).toFixed(1)} qtrs` : "\u2014"}</div>
+                      <div style={{ fontSize: 9, color: "#64748b" }}>{tradBurn >= 0 ? `+${fmt(tradBurn * 1e6)} FCF generated` : "Cash \u00F7 Quarterly FCF Burn"}</div>
                     </div>
                     <div style={{ padding: 10, background: "#0a0e1a", borderRadius: 6, textAlign: "center" }}>
                       <div style={{ fontSize: 9, color: "#64748b", textTransform: "uppercase" }}>{adjBurnTotal >= 0 ? "Adjusted: Cash Flow Positive" : "Adjusted Runway"}</div>
-                      <div style={{ fontSize: 20, fontWeight: 800, color: adjBurnTotal >= 0 ? "#22c55e" : (detail.cash / (adjBurnAbs / 4)) >= 6 ? "#eab308" : "#ef4444" }}>{adjBurnTotal >= 0 ? "\u2713 Positive" : `${(detail.cash / (adjBurnAbs / 4)).toFixed(1)} qtrs`}</div>
-                      <div style={{ fontSize: 9, color: "#475569" }}>{adjBurnTotal >= 0 ? `+${fmt(adjBurnTotal * 1e6)} adj. cash flow` : "Cash \u00F7 Quarterly Adj. Burn"}</div>
+                      <div style={{ fontSize: 20, fontWeight: 800, color: adjBurnTotal >= 0 ? "#22c55e" : adjBurnAbs > 0 ? ((detail.cash / (adjBurnAbs / 4)) >= 6 ? "#eab308" : "#ef4444") : "#22c55e" }}>{adjBurnTotal >= 0 ? "\u2713 Positive" : adjBurnAbs > 0 ? `${(detail.cash / (adjBurnAbs / 4)).toFixed(1)} qtrs` : "\u2014"}</div>
+                      <div style={{ fontSize: 9, color: "#64748b" }}>{adjBurnTotal >= 0 ? `+${fmt(adjBurnTotal * 1e6)} adj. cash flow` : "Cash \u00F7 Quarterly Adj. Burn"}</div>
                     </div>
                   </div>
                 </div>
@@ -670,7 +942,7 @@ return (
                 <div>
                   <div style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.5px" }}>Adjusted Cash Flow Waterfall ($M)</div>
                   {waterfall.map((w, wi) => {
-                    const barPct = maxWf > 0 ? (Math.abs(w.amount) / maxWf * 100) : 0;
+                    const barPct = (maxWf > 0 && isFinite(w.amount)) ? (Math.abs(w.amount) / maxWf * 100) : 0;
                     return (
                       <div key={wi} style={{ marginBottom: wi < waterfall.length - 1 ? 6 : 0 }}>
                         {w.isTotal && <div style={{ borderTop: "2px dashed #475569", margin: "8px 0" }} />}
@@ -811,7 +1083,7 @@ return (
                 <div style={{ textAlign: "center", padding: mob ? "8px 12px" : "8px 20px", background: ratingBg[compositeRating], border: `2px solid ${ratingColors[compositeRating]}`, borderRadius: 6, flexShrink: 0 }}>
                   <div style={{ fontSize: 9, color: "#64748b", textTransform: "uppercase", marginBottom: 2 }}>Composite Rating</div>
                   <div style={{ fontSize: 22, fontWeight: 900, color: ratingColors[compositeRating] }}>{compositeRating}</div>
-                  <div style={{ fontSize: 8, color: "#475569", marginTop: 2 }}>Driven by 18-mo. liquidity test</div>
+                  <div style={{ fontSize: 8, color: "#64748b", marginTop: 2 }}>Driven by 18-mo. liquidity test</div>
                 </div>
               </div>
 
@@ -827,7 +1099,7 @@ return (
                       <div style={{ position: "absolute", left: `${(18 / Math.max(histBurnMonths, 24)) * 100}%`, top: -2, bottom: -2, width: 2, background: "#f1f5f9", zIndex: 2 }} />
                       <div style={{ height: "100%", width: `${Math.min(histBurnMonths / Math.max(histBurnMonths, 24), 1) * 100}%`, background: meetsHistorical18 ? "linear-gradient(90deg, #22c55e, #16a34a)" : "linear-gradient(90deg, #ef4444, #dc2626)", borderRadius: 4 }} />
                     </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 8, color: "#475569", marginTop: 2 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 8, color: "#64748b", marginTop: 2 }}>
                       <span>0</span>
                       <span style={{ color: "#f1f5f9", fontWeight: 700 }}>{"\u2190"} 18 mo. threshold</span>
                       <span>{Math.max(Math.ceil(histBurnMonths), 24)} mo.</span>
@@ -844,7 +1116,7 @@ return (
                       <div style={{ position: "absolute", left: `${(18 / Math.max(fwdBurnMonths, 24)) * 100}%`, top: -2, bottom: -2, width: 2, background: "#f1f5f9", zIndex: 2 }} />
                       <div style={{ height: "100%", width: `${Math.min(fwdBurnMonths / Math.max(fwdBurnMonths, 24), 1) * 100}%`, background: meetsForward18 ? "linear-gradient(90deg, #22c55e, #16a34a)" : "linear-gradient(90deg, #ef4444, #dc2626)", borderRadius: 4 }} />
                     </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 8, color: "#475569", marginTop: 2 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 8, color: "#64748b", marginTop: 2 }}>
                       <span>0</span>
                       <span style={{ color: "#f1f5f9", fontWeight: 700 }}>{"\u2190"} 18 mo. threshold</span>
                       <span>{Math.max(Math.ceil(fwdBurnMonths), 24)} mo.</span>
@@ -929,7 +1201,7 @@ return (
                       <div style={{ width: 10, height: 10, borderRadius: 2, background: leg.color, flexShrink: 0 }} />
                       <span style={{ color: "#94a3b8" }}>{leg.label}:</span>
                       <span style={{ color: "#f1f5f9", fontWeight: 700 }}>{fmt(comp.amount * 1e6)}</span>
-                      <span style={{ color: "#475569" }}>({(comp.amount / detail.liquidityBreakdown.totalLiquidity * 100).toFixed(1)}%)</span>
+                      <span style={{ color: "#64748b" }}>({(comp.amount / detail.liquidityBreakdown.totalLiquidity * 100).toFixed(1)}%)</span>
                     </div>
                   ) : null;
                 })}
@@ -1120,14 +1392,42 @@ return (
           </div>}
 
           {/* ═══ CREDIT AGREEMENT SUMMARY ═══ */}
-          {CREDIT_AGREEMENTS[detail.id] && CREDIT_AGREEMENTS[detail.id].committed > 0 && (() => {
-            const ca = CREDIT_AGREEMENTS[detail.id];
+          {(() => {
+            const _caStatic = CREDIT_AGREEMENTS[detail.id];
+            const _cfEdgar = !_caStatic && detail.creditFacilities && detail.creditFacilities.length > 0
+              ? detail.creditFacilities[0] : null;
+            const ca = _caStatic || (_cfEdgar ? {
+              facilityName: _cfEdgar.name || "Revolving Credit Facility",
+              agent: "See SEC filings",
+              committed: _cfEdgar.committed,
+              accordion: 0,
+              maturity: "See SEC filings",
+              availCurrent: _cfEdgar.available,
+              bbFormula: "",
+              borrowingBase: "",
+              bbComponents: [],
+              bbAvailCalc: null,
+              pricing: "",
+              pricingGrid: [],
+              pricingNotes: null,
+              security: "",
+              lcSublimit: 0,
+              swinglineSublimit: 0,
+              securityDetail: null,
+              financialCovenants: [],
+              negativeCov: "",
+              otherFacilities: null,
+              covenantCompliance: "Not available (EDGAR XBRL data)",
+              syndicate: "See SEC filings",
+              src: _cfEdgar.source || "SEC EDGAR XBRL",
+            } : null);
+            if (!ca || ca.committed <= 0) return null;
             return (
             <div style={{ ...card, gridColumn: "1 / -1", border: "1px solid #8b5cf6" }}>
               <div style={{ fontSize: mob ? 11 : 13, fontWeight: 800, color: "#c4b5fd", marginBottom: 4, textTransform: "uppercase", letterSpacing: mob ? "0.5px" : "1px" }}>
                 {"\u25C6"} Credit Agreement Summary
               </div>
-              <div style={{ fontSize: 10, color: "#475569", marginBottom: 16 }}>{ca.facilityName} {"\u2014"} Agent: {ca.agent}</div>
+              <div style={{ fontSize: 10, color: "#64748b", marginBottom: 16 }}>{ca.facilityName} {"\u2014"} Agent: {ca.agent}</div>
 
               {/* Key Terms Grid */}
               <div style={{ display: "grid", gridTemplateColumns: mob ? "1fr 1fr" : "repeat(4, 1fr)", gap: 8, marginBottom: 16, minWidth: 0 }}>
@@ -1299,7 +1599,7 @@ return (
                 </div>
               )}
 
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, fontSize: 9, color: "#475569" }}>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, fontSize: 9, color: "#64748b" }}>
                 <span><b>Compliance:</b> {ca.covenantCompliance}</span>
                 <span>{"\u00B7"} <b>Syndicate:</b> {ca.syndicate}</span>
                 <span>{"\u00B7"} <b>Source:</b> {ca.src}</span>
@@ -1420,11 +1720,64 @@ return (
 
           {/* ═══ CASH FLOW / BURN SCENARIO ANALYSIS ═══ */}
           <div style={card}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: "#94a3b8", marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.5px" }}>{isNetCashGenerator ? "Cash Flow Scenario Analysis" : "Burn Coverage Scenario Analysis"}</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#94a3b8", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.5px" }}>{isNetCashGenerator ? "Cash Flow Scenario Analysis" : "Burn Coverage Scenario Analysis"} — LTM Basis</div>
+            <div style={{ fontSize: 10, color: "#64748b", marginBottom: 16 }}>All scenarios use LTM adjusted cash burn of <b style={{ color: isNetCashGenerator ? "#22c55e" : "#ef4444" }}>{annBurn > 0 ? `${isNetCashGenerator ? "+" : "-"}${fmt(annBurn * 1e6)}` : "N/A (insufficient data)"}</b> as the baseline.</div>
+
+            {/* Trailing 4-Quarter Trend */}
+            {(!detail.quarterlyBurns || detail.quarterlyBurns.length === 0) && (
+              <div style={{ marginBottom: 16, padding: "10px 14px", background: "#0a0e1a", borderRadius: 6, border: "1px solid #1e293b", fontSize: 10, color: "#64748b", fontStyle: "italic" }}>
+                Quarterly trend data not available — showing annual estimates.
+              </div>
+            )}
+            {detail.quarterlyBurns && detail.quarterlyBurns.length > 0 && (
+              <div style={{ marginBottom: 16 }}>
+                {(() => {
+                  const burns = detail.quarterlyBurns;
+                  const nQ = burns.length;
+                  const absVals = burns.map(b => Math.abs(b.burn ?? 0));
+                  const maxB = absVals.length > 0 ? Math.max(...absVals) : 0;
+                  const ltmTotal = burns.reduce((s, b) => s + (b.burn ?? 0), 0);
+                  const qLabel = nQ === 4 ? "Trailing 4-Quarter" : `Trailing ${nQ}-Quarter`;
+                  return (
+                    <>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.5px" }}>{qLabel} {isNetCashGenerator ? "Cash Flow" : "Cash Burn"} Trend ($M)</div>
+                      <div style={{ display: "grid", gridTemplateColumns: `repeat(${nQ}, 1fr)`, gap: mob ? 6 : 10 }}>
+                        {burns.map((b, i) => {
+                          const burnVal = b.burn ?? 0;
+                          const pct = maxB > 0 ? (Math.abs(burnVal) / maxB * 100) : 0;
+                          const isPos = burnVal >= 0;
+                          const prev = i > 0 ? (burns[i - 1].burn ?? 0) : null;
+                          const delta = prev != null ? burnVal - prev : null;
+                          return (
+                            <div key={i} style={{ background: "#0a0e1a", borderRadius: 6, padding: mob ? 8 : 10, textAlign: "center" }}>
+                              <div style={{ fontSize: 9, color: "#64748b", fontWeight: 600, marginBottom: 6 }}>{b.q}</div>
+                              <div style={{ fontSize: mob ? 16 : 20, fontWeight: 800, color: isPos ? "#22c55e" : "#ef4444" }}>{isPos ? "+" : ""}{burnVal}</div>
+                              <div style={{ margin: "6px auto", height: 4, background: "#1e293b", borderRadius: 2, width: "80%" }}>
+                                <div style={{ height: "100%", borderRadius: 2, width: `${Math.max(pct, 5)}%`, background: isPos ? "#22c55e" : "#ef4444", opacity: 0.7 }} />
+                              </div>
+                              {delta != null && <div style={{ fontSize: 9, color: delta > 0 ? (isNetCashGenerator ? "#22c55e" : "#ef4444") : (isNetCashGenerator ? "#ef4444" : "#22c55e"), fontWeight: 600 }}>{delta > 0 ? "\u25B2" : "\u25BC"} {Math.abs(delta)}M QoQ</div>}
+                              <div style={{ fontSize: 8, color: "#64748b", marginTop: 2 }}>{b.note}</div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, padding: "6px 10px", background: "#0a0e1a", borderRadius: 4 }}>
+                        <span style={{ fontSize: 10, color: "#64748b" }}>LTM Total (sum of {nQ}Q{nQ < 4 ? " \u2014 partial" : ""}):</span>
+                        <span style={{ fontSize: 11, fontWeight: 800, color: ltmTotal >= 0 ? "#22c55e" : "#ef4444" }}>
+                          {ltmTotal >= 0 ? "+" : ""}{fmt(Math.abs(ltmTotal) * 1e6)} ({isNetCashGenerator ? "generated" : "consumed"})
+                        </span>
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
+            )}
+
+            {/* Scenario Table (LTM basis) */}
             <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}><table style={{ width: "100%", borderCollapse: "collapse", minWidth: mob ? 380 : "auto" }}>
               <thead>
                 <tr>
-                  {["Scenario", isNetCashGenerator ? "Qtr CF" : "Qtr Burn", "Runway", "Flag"].map(h => (
+                  {["Scenario", isNetCashGenerator ? "LTM CF" : "LTM Burn", "Qtr Avg", "Runway", "Flag"].map(h => (
                     <th key={h} style={{ padding: "8px 4px", fontSize: 10, color: "#64748b", textAlign: "left", borderBottom: "1px solid #1e293b", textTransform: "uppercase" }}>{h}</th>
                   ))}
                 </tr>
@@ -1446,24 +1799,30 @@ return (
                       { sc: "Burn -50% (Optimistic)",mult: 0.50, note: "Significant cost reduction + volume" },
                     ]
                 ).map((s, i) => {
-                  // Signed quarterly figure: positive = generated, negative = burned.
-                  const scenarioQtrCF = (annCashFlow / 4) * s.mult;
-                  const scenarioAbs = Math.abs(scenarioQtrCF);
-                  const scenarioGenerating = scenarioQtrCF > 0;
+                  // Signed annual + quarterly figure: positive = generated, negative = burned.
+                  const scenarioAnnCF = annCashFlow * s.mult;
+                  const scenarioQtrCF = scenarioAnnCF / 4;
+                  const scenarioAnnAbs = Math.abs(scenarioAnnCF);
+                  const scenarioQtrAbs = Math.abs(scenarioQtrCF);
+                  const scenarioGenerating = scenarioAnnCF > 0;
                   const rw = scenarioGenerating
                     ? 999
-                    : (scenarioAbs > 0 ? detail.cash / scenarioAbs : 999);
+                    : (scenarioQtrAbs > 0 ? detail.cash / scenarioQtrAbs : 999);
                   const rwColor = scenarioGenerating
                     ? "#22c55e"
                     : rw >= 8 ? "#22c55e" : rw >= 5 ? "#eab308" : "#ef4444";
                   const cfColor = scenarioGenerating ? "#22c55e" : "#ef4444";
-                  const cfLabel = scenarioAbs > 0
-                    ? `${scenarioGenerating ? "+" : "-"}${fmt(scenarioAbs * 1e6)}`
+                  const annLabel = scenarioAnnAbs > 0
+                    ? `${scenarioGenerating ? "+" : "-"}${fmt(scenarioAnnAbs * 1e6)}`
+                    : "\u2014";
+                  const qtrLabel = scenarioQtrAbs > 0
+                    ? `${scenarioGenerating ? "+" : "-"}${fmt(scenarioQtrAbs * 1e6)}/qtr`
                     : "\u2014";
                   return (
                     <tr key={i} style={{ borderBottom: "1px solid #1e293b" }}>
                       <td style={{ padding: "8px 4px", fontSize: 12, fontWeight: i === 0 ? 700 : 400, color: i === 0 ? "#f1f5f9" : "#94a3b8" }}>{s.sc}</td>
-                      <td style={{ padding: "8px 4px", fontSize: 12, color: cfColor, fontWeight: 600 }}>{cfLabel}</td>
+                      <td style={{ padding: "8px 4px", fontSize: 12, color: cfColor, fontWeight: 600 }}>{annLabel}</td>
+                      <td style={{ padding: "8px 4px", fontSize: 11, color: "#64748b" }}>{qtrLabel}</td>
                       <td style={{ padding: "8px 4px" }}>
                         <span style={{ fontSize: 13, fontWeight: 800, color: rwColor }}>{scenarioGenerating ? "Self-funding" : rw >= 99 ? "\u221E" : `${fmtNum(rw)} qtrs`}</span>
                         <div style={{ marginTop: 2, background: "#1e293b", borderRadius: 3, height: 4, width: 80 }}>
@@ -1479,7 +1838,7 @@ return (
               </tbody>
             </table></div>
             <div style={{ marginTop: 12, padding: "8px 10px", background: "#0a0e1a", borderRadius: 4, fontSize: 10, color: "#64748b", lineHeight: 1.6 }}>
-              <b style={{ color: "#94a3b8" }}>Methodology:</b> Scenarios apply multipliers to LTM adjusted {isNetCashGenerator ? "cash flow" : "cash burn"} ({annBurn > 0 ? `${isNetCashGenerator ? "+" : "-"}${fmt(annBurn * 1e6)}` : "N/A"}). Cash runway = Total Liquidity ({fmt(detail.cash * 1e6)}) / Scenario Quarterly Burn; scenarios that remain cash-generative are marked Self-funding. Does not account for potential capital raises, asset sales, or credit facility draws.
+              <b style={{ color: "#94a3b8" }}>Methodology:</b> Scenarios apply multipliers to LTM adjusted {isNetCashGenerator ? "cash flow" : "cash burn"} ({annBurn > 0 ? `${isNetCashGenerator ? "+" : "-"}${fmt(annBurn * 1e6)}` : "N/A"}). Runway = Total Liquidity ({fmt(detail.cash * 1e6)}) / Scenario Quarterly Burn; scenarios that remain cash-generative are marked Self-funding. Trailing {detail.quarterlyBurns ? detail.quarterlyBurns.length : 0}Q trend shows quarter-by-quarter progression of adjusted cash flow.
             </div>
           </div>
 
@@ -1535,6 +1894,119 @@ return (
             </div>
           </div>
 
+          {/* ═══ LEVERAGE & COVERAGE TREND ═══ */}
+          {detail.financials.length >= 2 && (() => {
+            // Build per-year leverage and intCov data from the financials array.
+            // Works for both hardcoded portfolio entries and EDGAR-generated companies.
+            const levRows = [...detail.financials].reverse().map((f) => ({
+              period: f.period.replace("FY", ""),
+              lev: (f.ebitda > 0 && f.debt != null) ? +(f.debt / f.ebitda).toFixed(2) : null,
+              intCovRow: null, // per-year intCov not stored in financials; shown only at LTM level
+            }));
+            const hasAnyLev = levRows.some(r => r.lev !== null);
+            const levValues = levRows.map(r => r.lev).filter(v => v !== null);
+            const maxLev = levValues.length ? Math.max(...levValues, peerBenchmarks.medianLeverage) * 1.25 : 10;
+            const medLevPct = Math.min(peerBenchmarks.medianLeverage / maxLev, 1) * 100;
+
+            // Margin trend from financials (works for all companies)
+            const marginRows = [...detail.financials].reverse().map((f) => ({
+              period: f.period.replace("FY", ""),
+              margin: f.rev > 0 ? +((f.ebitda / f.rev) * 100).toFixed(1) : null,
+            }));
+            const hasAnyMargin = marginRows.some(r => r.margin !== null);
+            const allMargins = marginRows.map(r => r.margin).filter(v => v !== null);
+            const minMargin = allMargins.length ? Math.min(...allMargins, peerBenchmarks.medianMargin, 0) : 0;
+            const maxMargin = allMargins.length ? Math.max(...allMargins, peerBenchmarks.medianMargin) * 1.25 || 20 : 20;
+            const marginRange = maxMargin - minMargin || 1;
+            const medMarginPct = Math.min((peerBenchmarks.medianMargin - minMargin) / marginRange, 1) * 100;
+
+            return (
+              <div style={{ ...card, gridColumn: "1 / -1" }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "#94a3b8", marginBottom: 16, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                  Leverage & Margin Trend
+                  {detail._generated && <span style={{ fontSize: 9, fontWeight: 500, color: "#60a5fa", textTransform: "none", letterSpacing: 0, marginLeft: 8 }}>— EDGAR data</span>}
+                  <span style={{ fontSize: 9, fontWeight: 400, color: "#64748b", textTransform: "none", letterSpacing: 0, marginLeft: 8 }}>Blue line = portfolio median</span>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: mob ? "1fr" : "1fr 1fr", gap: mob ? 16 : 24, minWidth: 0 }}>
+
+                  {/* Leverage trend */}
+                  <div>
+                    <div style={{ fontSize: 10, color: "#64748b", marginBottom: 8, textTransform: "uppercase" }}>Gross Leverage (Debt / EBITDA)</div>
+                    {!hasAnyLev ? (
+                      <div style={{ padding: "10px 12px", background: "#0a0e1a", borderRadius: 6, fontSize: 10, color: "#64748b", fontStyle: "italic" }}>
+                        Not calculable — EBITDA is negative across all periods
+                      </div>
+                    ) : (
+                      <>
+                        <div style={{ display: "flex", gap: 4, alignItems: "flex-end", height: 80, marginBottom: 4, position: "relative" }}>
+                          {/* Median reference line */}
+                          <div style={{ position: "absolute", left: 0, right: 0, bottom: `${medLevPct}%`, height: 1, background: "#3b82f6", opacity: 0.6, zIndex: 1, borderTop: "1px dashed #3b82f6" }} />
+                          {levRows.map((r, idx) => {
+                            const barH = r.lev !== null ? Math.max(4, (r.lev / maxLev) * 74) : 4;
+                            const barColor = r.lev === null ? "#334155" : r.lev > peerBenchmarks.medianLeverage * 1.5 ? "#ef4444" : r.lev > peerBenchmarks.medianLeverage ? "#f97316" : "#22c55e";
+                            return (
+                              <div key={idx} style={{ flex: 1, textAlign: "center" }}>
+                                <div style={{ fontSize: 9, fontWeight: 700, color: barColor, marginBottom: 2 }}>
+                                  {r.lev !== null ? `${r.lev.toFixed(1)}x` : "N/M"}
+                                </div>
+                                <div style={{ height: barH, background: barColor, borderRadius: "3px 3px 0 0", margin: "0 4px", opacity: r.lev !== null ? 0.85 : 0.3 }} />
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <div style={{ display: "flex", gap: 4 }}>
+                          {levRows.map((r, idx) => (
+                            <div key={idx} style={{ flex: 1, textAlign: "center", fontSize: 8, color: "#64748b" }}>{r.period}</div>
+                          ))}
+                        </div>
+                        <div style={{ display: "flex", gap: 12, marginTop: 6, fontSize: 9, color: "#64748b" }}>
+                          <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ display: "inline-block", width: 16, height: 1, borderTop: "1px dashed #3b82f6", verticalAlign: "middle" }} />Portfolio median ({peerBenchmarks.medianLeverage.toFixed(1)}x)</span>
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  {/* EBITDA Margin trend */}
+                  <div>
+                    <div style={{ fontSize: 10, color: "#64748b", marginBottom: 8, textTransform: "uppercase" }}>EBITDA Margin (%)</div>
+                    {!hasAnyMargin ? (
+                      <div style={{ padding: "10px 12px", background: "#0a0e1a", borderRadius: 6, fontSize: 10, color: "#64748b", fontStyle: "italic" }}>
+                        Not calculable — revenue data unavailable
+                      </div>
+                    ) : (
+                      <>
+                        <div style={{ display: "flex", gap: 4, alignItems: "flex-end", height: 80, marginBottom: 4, position: "relative" }}>
+                          {/* Median reference line */}
+                          <div style={{ position: "absolute", left: 0, right: 0, bottom: `${Math.max(0, Math.min(medMarginPct, 100))}%`, height: 1, background: "#3b82f6", opacity: 0.6, zIndex: 1, borderTop: "1px dashed #3b82f6" }} />
+                          {marginRows.map((r, idx) => {
+                            const normH = r.margin !== null ? Math.max(4, ((r.margin - minMargin) / marginRange) * 74) : 4;
+                            const barColor = r.margin === null ? "#334155" : r.margin < 0 ? "#ef4444" : r.margin < peerBenchmarks.medianMargin * 0.5 ? "#f97316" : "#22c55e";
+                            return (
+                              <div key={idx} style={{ flex: 1, textAlign: "center" }}>
+                                <div style={{ fontSize: 9, fontWeight: 700, color: barColor, marginBottom: 2 }}>
+                                  {r.margin !== null ? `${r.margin.toFixed(0)}%` : "N/M"}
+                                </div>
+                                <div style={{ height: normH, background: barColor, borderRadius: "3px 3px 0 0", margin: "0 4px", opacity: r.margin !== null ? 0.85 : 0.3 }} />
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <div style={{ display: "flex", gap: 4 }}>
+                          {marginRows.map((r, idx) => (
+                            <div key={idx} style={{ flex: 1, textAlign: "center", fontSize: 8, color: "#64748b" }}>{r.period}</div>
+                          ))}
+                        </div>
+                        <div style={{ display: "flex", gap: 12, marginTop: 6, fontSize: 9, color: "#64748b" }}>
+                          <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ display: "inline-block", width: 16, height: 1, borderTop: "1px dashed #3b82f6", verticalAlign: "middle" }} />Portfolio median ({peerBenchmarks.medianMargin.toFixed(1)}%)</span>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
           {/* ═══ TRADITIONAL CREDIT METRICS + OPERATIONAL ═══ */}
           <div style={card}>
             <div style={{ fontSize: 12, fontWeight: 700, color: "#94a3b8", marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.5px" }}>Traditional Credit Metrics</div>
@@ -1551,11 +2023,103 @@ return (
                   <tr key={i} style={{ borderBottom: "1px solid #1e293b" }}>
                     <td style={{ padding: "7px 0", color: "#94a3b8", fontSize: 11 }}>{l}</td>
                     <td style={{ padding: "7px 0", textAlign: "right", fontWeight: 700, fontSize: 12, color: warn ? "#ef4444" : "#e2e8f0" }}>{v}</td>
-                    <td style={{ padding: "7px 0 7px 8px", fontSize: 9, color: "#475569", maxWidth: 120 }}>{note}</td>
+                    <td style={{ padding: "7px 0 7px 8px", fontSize: 9, color: "#64748b", maxWidth: 120 }}>{note}</td>
                   </tr>
                 ))}
               </tbody>
             </table></div>
+
+            {/* ── vs Portfolio Median bars (always shown; works for both portfolio + generated companies) ── */}
+            {(() => {
+              const detailLev = detail.ebitda > 0 ? detail.totalDebt / detail.ebitda : null;
+              const detailMargin = detail.revenue > 0 ? (detail.ebitda / detail.revenue) * 100 : null;
+              const peers = [
+                {
+                  label: "Gross Leverage",
+                  company: detailLev,
+                  median: peerBenchmarks.medianLeverage,
+                  fmt: (v) => `${v.toFixed(1)}x`,
+                  // lower is better for leverage
+                  color: (v, med) => v > med * 1.5 ? "#ef4444" : v > med ? "#f97316" : "#22c55e",
+                  note: detailLev !== null ? (detailLev > peerBenchmarks.medianLeverage ? "above" : "below") + " portfolio median" : "N/M \u2014 negative EBITDA",
+                  maxScale: Math.max((detailLev || 0), peerBenchmarks.medianLeverage) * 1.4 || 10,
+                },
+                {
+                  label: "Interest Coverage",
+                  company: detail.intCov > 0 && detail.intCov < 999 ? detail.intCov : null,
+                  median: peerBenchmarks.medianIntCov,
+                  fmt: (v) => `${v.toFixed(1)}x`,
+                  // higher is better for coverage
+                  color: (v, med) => v < med * 0.5 ? "#ef4444" : v < med ? "#f97316" : "#22c55e",
+                  note: (detail.intCov > 0 && detail.intCov < 999) ? (detail.intCov > peerBenchmarks.medianIntCov ? "above" : "below") + " portfolio median" : "N/M",
+                  maxScale: Math.max((detail.intCov > 0 && detail.intCov < 999 ? detail.intCov : 0), peerBenchmarks.medianIntCov) * 1.4 || 10,
+                },
+                {
+                  label: "EBITDA Margin",
+                  company: detailMargin,
+                  median: peerBenchmarks.medianMargin,
+                  fmt: (v) => `${v.toFixed(1)}%`,
+                  // higher is better for margin
+                  color: (v, med) => v < 0 ? "#ef4444" : v < med * 0.5 ? "#f97316" : "#22c55e",
+                  note: detailMargin !== null ? (detailMargin > peerBenchmarks.medianMargin ? "above" : "below") + " portfolio median" : "N/M",
+                  // support negative margins: scale from min(0, company, median) to max
+                  maxScale: null, // computed inline
+                },
+                {
+                  label: "Current Ratio",
+                  company: detail.currentRatio > 0 ? detail.currentRatio : null,
+                  median: peerBenchmarks.medianCurrentRatio,
+                  fmt: (v) => `${v.toFixed(1)}x`,
+                  // higher is better
+                  color: (v, med) => v < 1 ? "#ef4444" : v < med ? "#f97316" : "#22c55e",
+                  note: detail.currentRatio > 0 ? (detail.currentRatio > peerBenchmarks.medianCurrentRatio ? "above" : "below") + " portfolio median" : "N/M",
+                  maxScale: Math.max((detail.currentRatio || 0), peerBenchmarks.medianCurrentRatio) * 1.4 || 4,
+                },
+              ];
+              return (
+                <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid #1e293b" }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: "#3b82f6", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 10 }}>
+                    vs Portfolio Median <span style={{ fontSize: 9, fontWeight: 400, color: "#64748b", textTransform: "none" }}>({PORTFOLIO.length}-company benchmark)</span>
+                  </div>
+                  {peers.map((p, pi) => {
+                    const hasValue = p.company !== null && p.company !== undefined && isFinite(p.company);
+                    // For margin, compute scale supporting negatives
+                    let scale = p.maxScale;
+                    let lo = 0;
+                    if (p.label === "EBITDA Margin") {
+                      lo = Math.min(0, hasValue ? p.company : 0, p.median);
+                      const hi = Math.max(hasValue ? p.company : 0, p.median) * 1.3 || 20;
+                      scale = (hi - lo) || 1;
+                    }
+                    const companyBarPct = hasValue
+                      ? Math.min(Math.max((p.company - lo) / (scale || 1), 0), 1) * 100
+                      : 0;
+                    const medianBarPct = Math.min(Math.max((p.median - lo) / (scale || 1), 0), 1) * 100;
+                    const barColor = hasValue ? p.color(p.company, p.median) : "#64748b";
+                    return (
+                      <div key={pi} style={{ marginBottom: pi < peers.length - 1 ? 12 : 0 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 3 }}>
+                          <span style={{ fontSize: 10, color: "#94a3b8" }}>{p.label}</span>
+                          <div style={{ display: "flex", gap: 8, alignItems: "baseline" }}>
+                            <span style={{ fontSize: 11, fontWeight: 700, color: barColor }}>{hasValue ? p.fmt(p.company) : "N/M"}</span>
+                            <span style={{ fontSize: 9, color: "#64748b" }}>median: {p.fmt(p.median)}</span>
+                          </div>
+                        </div>
+                        <div style={{ position: "relative", height: 10, background: "#1e293b", borderRadius: 4, overflow: "visible" }}>
+                          {/* Company bar */}
+                          {hasValue && (
+                            <div style={{ height: "100%", width: `${Math.max(companyBarPct, hasValue ? 2 : 0)}%`, background: barColor, borderRadius: 4, opacity: 0.85 }} />
+                          )}
+                          {/* Median marker */}
+                          <div style={{ position: "absolute", top: -2, bottom: -2, left: `${Math.min(medianBarPct, 98)}%`, width: 2, background: "#3b82f6", borderRadius: 1, zIndex: 2 }} />
+                        </div>
+                        <div style={{ fontSize: 8, color: "#64748b", marginTop: 2 }}>{p.note}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </div>
 
           <div style={card}>
@@ -1579,7 +2143,6 @@ return (
                   { l: "FCF", v: fmt(detail.fcf * 1e6), c: detail.fcf < 0 ? "#ef4444" : "#22c55e" },
                 ]),
                 { l: "Mkt Cap", v: detail.mktCap ? `$${detail.mktCap}B` : "Private" },
-                { l: "Portfolio Exposure", v: fmt(detail.exposure) },
               ].map((m, i) => (
                 <div key={i} style={{ padding: "8px 10px", background: "#0a0e1a", borderRadius: 4 }}>
                   <div style={{ fontSize: 14, fontWeight: 700, color: m.c || "#f1f5f9" }}>{m.v}</div>
@@ -1597,20 +2160,41 @@ return (
         <div style={{ display: "grid", gridTemplateColumns: mob ? "1fr" : "1fr 1fr", gap: 16, minWidth: 0 }}>
           <div style={card}>
             <div style={{ fontSize: 12, fontWeight: 700, color: "#94a3b8", marginBottom: 16, textTransform: "uppercase", letterSpacing: "0.5px" }}>Rating Status</div>
+            {/* Agency rating cards — dimmed with note for generated (unrated) companies */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: mob ? 8 : 16 }}>
               {[{ agency: "S&P", rating: detail.sp }, { agency: "Moody's", rating: detail.moodys }, { agency: "Fitch", rating: detail.fitch }].map((r) => (
-                <div key={r.agency} style={{ textAlign: "center", padding: mob ? 10 : 16, background: "#0a0e1a", borderRadius: 6 }}>
+                <div key={r.agency} style={{ textAlign: "center", padding: mob ? 10 : 16, background: r.rating !== "NR" ? "rgba(234,179,8,0.05)" : "#0a0e1a", borderRadius: 6, border: r.rating !== "NR" ? "1px solid rgba(234,179,8,0.15)" : "1px solid rgba(100,116,139,0.1)", opacity: detail._generated && r.rating === "NR" ? 0.5 : 1 }}>
                   <div style={{ fontSize: mob ? 18 : 22, fontWeight: 800, color: ratingColor(r.rating) }}>{r.rating}</div>
                   <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>{r.agency}</div>
+                  {detail._generated && r.rating === "NR" && (
+                    <div style={{ fontSize: 9, color: "#475569", marginTop: 5, lineHeight: 1.4 }}>Not publicly<br />rated</div>
+                  )}
                 </div>
               ))}
             </div>
-            <div style={{ marginTop: 16, padding: 12, background: "#0a0e1a", borderRadius: 6 }}>
+            {detail._generated && (
+              <div style={{ marginTop: 8, padding: "6px 10px", background: "rgba(59,130,246,0.06)", borderRadius: 5, border: "1px solid rgba(59,130,246,0.12)", fontSize: 10, color: "#60a5fa", lineHeight: 1.5 }}>
+                Not publicly rated \u2014 implied rating derived from SEC filings via 5-factor model
+              </div>
+            )}
+
+            {/* Implied rating — large prominent display for generated companies */}
+            <div style={{ marginTop: 16, padding: detail._generated ? 16 : 12, background: "#0a0e1a", borderRadius: 6, border: detail._generated ? `1px solid ${ratingColor(detail.impliedRating)}33` : "none" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-                <span style={{ fontSize: 18, color: ratingColor(detail.impliedRating) }}>{"\u25C6"}</span>
+                <span style={{ fontSize: detail._generated ? 28 : 18, color: ratingColor(detail.impliedRating) }}>{"\u25C6"}</span>
                 <div>
-                  <div style={{ fontSize: 13, fontWeight: 700 }}>Implied Rating: <span style={{ color: ratingColor(detail.impliedRating) }}>{detail.impliedRating}</span></div>
-                  <div style={{ fontSize: 11, color: "#64748b" }}>Based on CDS spreads, financial profile & market signals</div>
+                  {detail._generated ? (
+                    <>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 2 }}>Implied Credit Rating</div>
+                      <div style={{ fontSize: mob ? 28 : 34, fontWeight: 800, color: ratingColor(detail.impliedRating), lineHeight: 1, fontFamily: "'JetBrains Mono', monospace" }}>{detail.impliedRating}</div>
+                      <div style={{ fontSize: 10, color: "#64748b", marginTop: 4 }}>5-factor model{detail._ratingScore != null ? ` \u00B7 composite score\u00A0${detail._ratingScore}` : ""}</div>
+                    </>
+                  ) : (
+                    <>
+                      <div style={{ fontSize: 13, fontWeight: 700 }}>Implied Rating: <span style={{ color: ratingColor(detail.impliedRating) }}>{detail.impliedRating}</span></div>
+                      <div style={{ fontSize: 11, color: "#64748b" }}>Based on CDS spreads, financial profile & market signals</div>
+                    </>
+                  )}
                 </div>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -1642,6 +2226,58 @@ return (
               </tbody>
             </table></div>
           </div>
+
+          {/* 5-factor model breakdown — generated companies only */}
+          {detail._generated && detail._ratingScore != null && (() => {
+            const lev = detail.ebitda > 0 ? detail.totalDebt / detail.ebitda : Infinity;
+            const cov = detail.intCov;
+            const fcfToDebt = detail.totalDebt > 0 ? detail.fcf / detail.totalDebt : 0;
+            const margin = detail.revenue > 0 ? detail.ebitda / detail.revenue : 0;
+            const size = detail.mktCap || 0;
+            const sLev = lev <= 0 || lev < 0.5 ? 6 : lev < 1.5 ? 5 : lev < 2.0 ? 4 : lev < 3.0 ? 3 : lev < 4.0 ? 2 : lev < 5.5 ? 1 : 0;
+            const sCov = cov > 21 ? 6 : cov > 10 ? 5 : cov > 6 ? 4 : cov > 4 ? 3 : cov > 2.5 ? 2 : cov > 1.5 ? 1 : 0;
+            const sFcf = fcfToDebt > 0.50 ? 6 : fcfToDebt > 0.35 ? 5 : fcfToDebt > 0.20 ? 4 : fcfToDebt > 0.10 ? 3 : fcfToDebt > 0.05 ? 2 : fcfToDebt > 0 ? 1 : 0;
+            const sMar = margin > 0.30 ? 6 : margin > 0.20 ? 5 : margin > 0.15 ? 4 : margin > 0.10 ? 3 : margin > 0.08 ? 2 : margin > 0.05 ? 1 : 0;
+            const sSize = size > 100 ? 6 : size > 25 ? 5 : size > 10 ? 4 : size > 5 ? 3 : size > 1 ? 2 : size > 0.3 ? 1 : 0;
+            const factors = [
+              { label: "Leverage", weight: "35%", score: sLev, value: !isFinite(lev) ? "N/M" : `${lev.toFixed(1)}x gross`, desc: "Debt / EBITDA" },
+              { label: "Coverage", weight: "30%", score: sCov, value: `${fmtNum(cov)}x`, desc: "EBITDA / Interest" },
+              { label: "FCF / Debt", weight: "20%", score: sFcf, value: detail.totalDebt > 0 ? `${(fcfToDebt * 100).toFixed(1)}%` : "N/M", desc: "Free cash flow yield on debt" },
+              { label: "Margin", weight: "10%", score: sMar, value: detail.revenue > 0 ? `${(margin * 100).toFixed(1)}%` : "N/M", desc: "EBITDA margin" },
+              { label: "Size", weight: "5%", score: sSize, value: size ? `$${size.toFixed(1)}B mkt cap` : "Private", desc: "Market capitalisation" },
+            ];
+            const scoreColor = (s) => s >= 4 ? "#22c55e" : s >= 2 ? "#eab308" : "#ef4444";
+            return (
+              <div style={{ ...card, gridColumn: "1 / -1", border: "1px solid rgba(59,130,246,0.15)" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, flexWrap: "wrap", gap: 8 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.5px" }}>5-Factor Model Breakdown</div>
+                  <div style={{ fontSize: 11, color: "#64748b" }}>Composite: <span style={{ fontWeight: 700, color: ratingColor(detail.impliedRating) }}>{detail._ratingScore}</span> &rarr; <span style={{ fontWeight: 700, color: ratingColor(detail.impliedRating) }}>{detail.impliedRating}</span></div>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: mob ? "1fr 1fr" : "repeat(5, 1fr)", gap: 10 }}>
+                  {factors.map((f) => (
+                    <div key={f.label} style={{ padding: 12, background: "#0a0e1a", borderRadius: 6, border: `1px solid ${scoreColor(f.score)}22` }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+                        <span style={{ fontSize: 10, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.5px" }}>{f.label}</span>
+                        <span style={{ fontSize: 9, color: "#475569" }}>{f.weight}</span>
+                      </div>
+                      {/* Score bar: 0–6 */}
+                      <div style={{ display: "flex", gap: 2, marginBottom: 8 }}>
+                        {[0, 1, 2, 3, 4, 5].map((i) => (
+                          <div key={i} style={{ flex: 1, height: 4, borderRadius: 2, background: i < f.score ? scoreColor(f.score) : "rgba(148,163,184,0.1)" }} />
+                        ))}
+                      </div>
+                      <div style={{ fontSize: 13, fontWeight: 800, color: scoreColor(f.score), fontFamily: "'JetBrains Mono', monospace" }}>{f.value}</div>
+                      <div style={{ fontSize: 10, color: "#475569", marginTop: 3 }}>{f.desc}</div>
+                      <div style={{ fontSize: 9, color: "#334155", marginTop: 4 }}>Score {f.score}/6</div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ marginTop: 10, fontSize: 10, color: "#475569", lineHeight: 1.5 }}>
+                  Weights: leverage 35% + coverage 30% + FCF/debt 20% + margin 10% + size 5%. Data sourced from SEC EDGAR filings.
+                </div>
+              </div>
+            );
+          })()}
 
           <div style={{ ...card, gridColumn: "1 / -1" }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: "#94a3b8", marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.5px" }}>Credit Assessment Summary</div>
@@ -1721,7 +2357,7 @@ return (
                         <button
                           onClick={() => overrideReason.trim() && toggleOverride(detail.id, !ws.active, overrideReason.trim())}
                           disabled={!overrideReason.trim()}
-                          style={{ padding: "6px 16px", borderRadius: 4, fontSize: 11, fontWeight: 700, border: "none", background: overrideReason.trim() ? (ws.active ? "#052e16" : "#7f1d1d") : "#1e293b", color: overrideReason.trim() ? "#fff" : "#475569", cursor: overrideReason.trim() ? "pointer" : "not-allowed" }}
+                          style={{ padding: "6px 16px", borderRadius: 4, fontSize: 11, fontWeight: 700, border: "none", background: overrideReason.trim() ? (ws.active ? "#052e16" : "#7f1d1d") : "#1e293b", color: overrideReason.trim() ? "#fff" : "#64748b", cursor: overrideReason.trim() ? "pointer" : "not-allowed" }}
                         >
                           {ws.active ? "Remove from Watchlist" : "Add to Watchlist"}
                         </button>
@@ -1764,7 +2400,7 @@ return (
           <div style={{ display: "flex", flexDirection: mob ? "column" : "row", justifyContent: "space-between", alignItems: mob ? "flex-start" : "center", gap: 8, marginBottom: 16 }}>
             <div>
               <div style={{ fontSize: 12, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.5px" }}>SEC Filings {"\u2014"} {detail.name}</div>
-              <div style={{ fontSize: 10, color: "#475569", marginTop: 2 }}>CIK: {{"LCID":"0001811210","RIVN":"0001874178","CENT":"0000887733","IHRT":"0001400891","SMC":"0002024218","UPBD":"0000933036","WSC":"0001647088"}[detail.id] || "Private"}</div>
+              <div style={{ fontSize: 10, color: "#64748b", marginTop: 2 }}>CIK: {{"LCID":"0001811210","RIVN":"0001874178","CENT":"0000887733","IHRT":"0001400891","SMC":"0002024218","UPBD":"0000933036","WSC":"0001647088"}[detail.id] || "Private"}</div>
             </div>
             <button onClick={fetchSecFilings} disabled={dataLoading.sec} style={{ padding: "6px 14px", borderRadius: 4, fontSize: 10, fontWeight: 700, border: "1px solid #334155", background: "transparent", color: "#94a3b8", cursor: "pointer" }}>
               {dataLoading.sec ? "Loading..." : "\u21BB Refresh from EDGAR"}
@@ -1799,16 +2435,32 @@ return (
       {detailTab === "news" && (
         <div style={card}>
           <div style={{ fontSize: 12, fontWeight: 700, color: "#94a3b8", marginBottom: 16, textTransform: "uppercase", letterSpacing: "0.5px" }}>Recent Headlines {"\u2014"} {detail.name}</div>
-          {detail.news.map((n, i) => (
-            <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "12px 0", borderBottom: i < detail.news.length - 1 ? "1px solid #1e293b" : "none" }}>
-              <div style={{ width: 8, height: 8, borderRadius: "50%", background: sentimentColor(n.sentiment), marginTop: 5, flexShrink: 0 }} />
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.5 }}>{n.headline}</div>
-                <div style={{ fontSize: 11, color: "#64748b", marginTop: 3 }}>{n.src} {"\u00B7"} {n.date}</div>
+          {detail.news.map((n, i) => {
+            const newsKey = `${detail.id}-${i}`;
+            const isOpen = expandedNews[newsKey];
+            return (
+            <div key={i} style={{ borderBottom: i < detail.news.length - 1 ? "1px solid #1e293b" : "none" }}>
+              <div onClick={() => n.summary && setExpandedNews(prev => ({ ...prev, [newsKey]: !prev[newsKey] }))} style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "12px 0", cursor: n.summary ? "pointer" : "default", transition: "background .15s ease", borderRadius: 4 }}>
+                <div style={{ width: 8, height: 8, borderRadius: "50%", background: sentimentColor(n.sentiment), marginTop: 5, flexShrink: 0 }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.5 }}>{n.headline}</div>
+                  <div style={{ fontSize: 11, color: "#64748b", marginTop: 3 }}>{n.src} {"\u00B7"} {n.date}</div>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                  <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", color: sentimentColor(n.sentiment), letterSpacing: "0.5px" }}>{n.sentiment}</span>
+                  {n.summary && <span style={{ fontSize: 10, color: "#64748b", transition: "transform .2s ease", transform: isOpen ? "rotate(180deg)" : "rotate(0deg)" }}>{"\u25BC"}</span>}
+                </div>
               </div>
-              <span style={{ marginLeft: "auto", fontSize: 10, fontWeight: 700, textTransform: "uppercase", color: sentimentColor(n.sentiment), letterSpacing: "0.5px", flexShrink: 0 }}>{n.sentiment}</span>
+              {isOpen && n.summary && (
+                <div style={{ padding: "0 0 12px 20px", animation: "fadeIn 0.2s ease forwards" }}>
+                  <div style={{ padding: "10px 14px", background: "#0a0e1a", borderRadius: 6, borderLeft: `3px solid ${sentimentColor(n.sentiment)}`, fontSize: 12, color: "#94a3b8", lineHeight: 1.7 }}>
+                    {n.summary}
+                  </div>
+                </div>
+              )}
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -1852,15 +2504,15 @@ return (
           <div style={card}>
             <div style={{ fontSize: 12, fontWeight: 700, color: "#94a3b8", marginBottom: 16, textTransform: "uppercase", letterSpacing: "0.5px" }}>Last Earnings Result</div>
             <div style={{ padding: mob ? 14 : 20, background: "#0a0e1a", borderRadius: 6, textAlign: "center" }}>
-              <div style={{ fontSize: mob ? 14 : 16, fontWeight: 700, color: detail.lastEarnings.startsWith("Beat") ? "#22c55e" : "#ef4444" }}>{detail.lastEarnings}</div>
+              <div style={{ fontSize: mob ? 14 : 16, fontWeight: 700, color: (detail.lastEarnings || "").startsWith("Beat") ? "#22c55e" : "#ef4444" }}>{detail.lastEarnings}</div>
             </div>
           </div>
-          <div style={{ ...card, gridColumn: "1 / -1" }}>
+          {detail.earningsCallSummary ? <div style={{ ...card, gridColumn: "1 / -1" }}>
             <div style={{ display: "flex", flexDirection: mob ? "column" : "row", justifyContent: "space-between", alignItems: mob ? "flex-start" : "center", gap: mob ? 4 : 0, marginBottom: 16 }}>
               <div style={{ fontSize: 12, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.5px" }}>Earnings Call Summary</div>
               <div style={{ fontSize: 11, color: "#64748b" }}>{detail.earningsCallSummary.quarter} {"\u00B7"} {detail.earningsCallSummary.date}</div>
             </div>
-            <div style={{ fontSize: 10, color: "#475569", marginBottom: 16, fontStyle: "italic" }}>Source: {detail.earningsCallSummary.source}</div>
+            <div style={{ fontSize: 10, color: "#64748b", marginBottom: 16, fontStyle: "italic" }}>Source: {detail.earningsCallSummary.source}</div>
 
             {/* Key Financials */}
             <div style={{ marginBottom: 16 }}>
@@ -1904,7 +2556,10 @@ return (
                 </div>
               ))}
             </div>}
-          </div>
+          </div> : <div style={{ ...card, gridColumn: "1 / -1", textAlign: "center", padding: 32 }}>
+            <div style={{ fontSize: 13, color: "#64748b", marginBottom: 4 }}>Earnings Call Summary</div>
+            <div style={{ fontSize: 11, color: "#475569" }}>Add to portfolio for curated earnings analysis</div>
+          </div>}
           <div style={{ ...card, gridColumn: "1 / -1" }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: "#94a3b8", marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.5px" }}>Earnings Call {"\u2014"} Credit-Relevant Items to Monitor</div>
             <div style={{ fontSize: 12, color: "#94a3b8", lineHeight: 1.8 }}>
@@ -1930,7 +2585,7 @@ return (
 
 // ─── RENDER: PORTFOLIO VIEW ─────────────────────────────────────────────
 return (
-<div style={root}>
+<div style={{ ...root, animation: "fadeIn 0.25s ease forwards" }}>
 <div style={headerBar}>
 <div style={{ display: "flex", alignItems: "center", gap: mob ? 6 : 16, flex: 1, minWidth: 0 }}>
 <div style={{ display: "flex", gap: 3, flexShrink: 0 }}>
@@ -1945,12 +2600,26 @@ return (
 {now.toLocaleDateString("en-US", { weekday: "short", year: "numeric", month: "short", day: "numeric" })} {"\u00B7"} {now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
 </div>}
 </div>
-<div style={{ display: "flex", gap: mob ? 4 : 6, overflowX: "auto", WebkitOverflowScrolling: "touch", width: mob ? "100%" : "auto", marginTop: mob ? 2 : 0, paddingBottom: mob ? 2 : 0 }}>
+<div style={{ position: "relative", width: mob ? "100%" : "auto", marginTop: mob ? 2 : 0 }}>
+{mob && <div style={{ position: "absolute", right: 0, top: 0, bottom: 0, width: 24, background: "linear-gradient(to right, transparent, rgba(15,22,41,0.85))", zIndex: 1, pointerEvents: "none" }} />}
+<div style={{ display: "flex", gap: mob ? 4 : 6, overflowX: "auto", WebkitOverflowScrolling: "touch", paddingBottom: mob ? 2 : 0, scrollbarWidth: "none" }}>
 {["overview", "filings", "news", "analytics", "calendar"].map((t) => (
 <button key={t} onClick={() => setTab(t)} style={pill(tab === t)}>{t === "filings" ? "SEC Filings" : t}</button>
 ))}
 </div>
 </div>
+</div>
+
+  {/* Data Source Indicator */}
+  <div style={{ padding: `8px ${px}px 0`, display: "flex", alignItems: "center", gap: 8 }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 10px", background: portfolioSource === "api" ? "rgba(34,197,94,0.1)" : "rgba(148,163,184,0.08)", borderRadius: 4, border: `1px solid ${portfolioSource === "api" ? "rgba(34,197,94,0.2)" : "rgba(148,163,184,0.1)"}` }}>
+      <div style={{ width: 6, height: 6, borderRadius: "50%", background: portfolioSource === "api" ? "#22c55e" : portfolioSource === "error" ? "#f97316" : "#64748b", boxShadow: portfolioSource === "api" ? "0 0 6px rgba(34,197,94,0.4)" : "none" }} />
+      <span style={{ fontSize: 9, color: portfolioSource === "api" ? "#86efac" : "#94a3b8", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+        {dataLoading.portfolio ? "Connecting..." : portfolioSource === "api" ? "Live Data" : portfolioSource === "error" ? "Static (API unavailable)" : "Static Data"}
+      </span>
+    </div>
+    {lastRefresh && <span style={{ fontSize: 9, color: "#64748b" }}>Last refresh: {lastRefresh.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}</span>}
+  </div>
 
   {/* ALERT */}
   <div style={{ padding: `16px ${px}px 0` }}>
@@ -1961,15 +2630,14 @@ return (
   </div>
 
   {/* KPIs */}
-  <div style={{ display: "grid", gridTemplateColumns: mob ? "repeat(2, 1fr)" : tablet ? "repeat(3, 1fr)" : "repeat(5, 1fr)", gap: mob ? 8 : 12, padding: `0 ${px}px 20px` }}>
+  <div style={{ display: "grid", gridTemplateColumns: mob ? "repeat(2, 1fr)" : tablet ? "repeat(2, 1fr)" : "repeat(4, 1fr)", gap: mob ? 8 : 12, padding: `0 ${px}px 20px` }}>
     {[
-      { l: "Total Exposure", v: fmt(totalExposure), accent: "#3b82f6" },
       { l: "Credits Tracked", v: enrichedPortfolio.length, accent: "#8b5cf6" },
       { l: "Agency Rated", v: `${enrichedPortfolio.filter(c => c.sp !== "NR").length} / ${enrichedPortfolio.length}`, c: enrichedPortfolio.filter(c => c.sp !== "NR").length === enrichedPortfolio.length ? "#22c55e" : "#eab308", accent: "#eab308" },
       { l: "Neg. / Developing Outlook", v: negOutlook, c: "#ef4444", accent: "#ef4444" },
       { l: "Negative FCF", v: `${negFcfCount} / ${enrichedPortfolio.length}`, c: "#ef4444", accent: "#ef4444" },
     ].map((k, i) => (
-      <div key={i} style={{ ...card, position: "relative", overflow: "hidden", transition: "border-color .2s ease, transform .2s ease" }}>
+      <div key={i} style={{ ...card, position: "relative", overflow: "hidden", transition: "border-color .2s ease, transform .2s ease", animation: dataLoading.portfolio ? "shimmer 1.5s ease infinite" : "none", backgroundImage: dataLoading.portfolio ? "linear-gradient(90deg, transparent 25%, rgba(59,130,246,0.04) 50%, transparent 75%)" : "none", backgroundSize: "200% 100%" }}>
         <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: k.accent || "#3b82f6", opacity: 0.6 }} />
         <div style={{ ...kpiVal, color: k.c || "#f1f5f9", marginTop: 4 }}>{k.v}</div>
         <div style={kpiLabel}>{k.l}</div>
@@ -1979,28 +2647,59 @@ return (
 
   {tab === "overview" && (
     <div style={{ padding: `0 ${px}px 24px`, minWidth: 0, maxWidth: "100%" }}>
-      {mob ? (
+      {/* Search bar */}
+      <div style={{ marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ position: "relative", flex: 1, maxWidth: 360 }}>
+          <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "#64748b", fontSize: 13, pointerEvents: "none" }}>{"\u{1F50D}"}</span>
+          <input type="text" placeholder="Search by ticker, name, sector, or rating..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} style={{ width: "100%", padding: "8px 10px 8px 32px", borderRadius: 6, border: "1px solid rgba(148,163,184,0.15)", background: "rgba(15,22,41,0.8)", color: "#e2e8f0", fontSize: 12, outline: "none", fontFamily: "inherit" }} />
+        </div>
+        {searchQuery && <button onClick={() => setSearchQuery("")} style={{ padding: "6px 12px", borderRadius: 4, border: "1px solid rgba(148,163,184,0.15)", background: "transparent", color: "#94a3b8", fontSize: 11, cursor: "pointer", fontFamily: "inherit" }}>Clear</button>}
+        {searchQuery && <span style={{ fontSize: 11, color: "#64748b" }}>{filteredPortfolio.length} of {enrichedPortfolio.length} credits</span>}
+      </div>
+      {filteredPortfolio.length === 0 ? (
+        <div style={{ ...card, textAlign: "center", padding: 40 }}>
+          <div style={{ fontSize: 32, marginBottom: 12, opacity: 0.3 }}>{"\u{1F50D}"}</div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: "#94a3b8", marginBottom: 6 }}>No portfolio credits match "{searchQuery}"</div>
+          {searchQuery.match(/^[A-Za-z]{1,6}$/) ? (
+            <div>
+              <div style={{ fontSize: 12, color: "#64748b", marginBottom: 16 }}>Look up <b style={{ color: "#60a5fa" }}>{searchQuery.toUpperCase()}</b> as a public company?</div>
+              <button onClick={() => lookupTicker(searchQuery)} disabled={adHocLoading} style={{ padding: "8px 20px", borderRadius: 6, fontSize: 12, fontWeight: 700, border: "1px solid rgba(59,130,246,0.4)", background: "linear-gradient(135deg, rgba(59,130,246,0.15) 0%, rgba(37,99,235,0.15) 100%)", color: "#60a5fa", cursor: adHocLoading ? "wait" : "pointer", transition: "all .15s ease" }}>
+                {adHocLoading ? "\u21BB Generating full analysis..." : `\u{1F50D} Look up ${searchQuery.toUpperCase()}`}
+              </button>
+              {dataError.lookup && <div style={{ fontSize: 11, color: "#ef4444", marginTop: 8 }}>{"\u26A0"} {dataError.lookup}</div>}
+            </div>
+          ) : (
+            <div>
+              <div style={{ fontSize: 12, color: "#64748b", marginBottom: 16 }}>Try a ticker symbol (e.g., AAPL, TSLA, MSFT) to look up any public company</div>
+              <button onClick={() => setSearchQuery("")} style={{ padding: "6px 16px", borderRadius: 4, fontSize: 11, fontWeight: 600, border: "1px solid rgba(59,130,246,0.3)", background: "rgba(59,130,246,0.1)", color: "#60a5fa", cursor: "pointer" }}>Clear Search</button>
+            </div>
+          )}
+        </div>
+      ) : mob ? (
         /* ─── MOBILE: Card layout ─── */
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {enrichedPortfolio.map((c) => (
+          {filteredPortfolio.map((c) => (
             <div key={c.id} onClick={() => { navigate(c.id, tab, "financials"); }} style={{ ...card, cursor: "pointer", padding: 16, transition: "border-color .2s ease", borderColor: getWatchlistStatus(c).active ? "rgba(239,68,68,0.15)" : "rgba(148,163,184,0.08)" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
                 <div>
                   <span style={{ fontWeight: 700, fontSize: 16 }}>{c.id}</span>
                   {c.pm && <span style={{ marginLeft: 8, padding: "2px 6px", borderRadius: 8, fontSize: 9, fontWeight: 700, background: "rgba(148,163,184,0.12)", color: "#cbd5e1", border: "1px solid rgba(148,163,184,0.18)" }}>{c.pm}</span>}
                   {getWatchlistStatus(c).active && <span style={{ color: "#ef4444", fontSize: 11, marginLeft: 6 }}>{"\u26A0"}</span>}
+                  {isPubliclyRated(c) ? <span style={{ fontSize: 8, fontWeight: 700, color: "#eab308", background: "rgba(234,179,8,0.1)", border: "1px solid rgba(234,179,8,0.2)", padding: "1px 5px", borderRadius: 3, marginLeft: 6, textTransform: "uppercase", letterSpacing: "0.5px" }}>RATED</span> : <span style={{ fontSize: 8, color: "#64748b", marginLeft: 6 }}>NR</span>}
                   <div style={{ fontSize: 10, color: "#64748b" }}>{c.sector}</div>
                 </div>
                 <div style={{ textAlign: "right" }}>
-                  <span style={{ fontWeight: 700, fontSize: 14, color: ratingColor(c.impliedRating) }}>{c.impliedRating}</span>
-                  <div style={{ fontSize: 9, color: "#475569" }}>implied</div>
+                  {isPubliclyRated(c) ? (<>
+                    <span style={{ fontWeight: 700, fontSize: 14, color: ratingColor(c.sp) }}>{c.sp}</span>
+                    {c.moodys !== "NR" && <span style={{ fontWeight: 600, fontSize: 11, color: ratingColor(c.moodys), marginLeft: 3 }}>/ {c.moodys}</span>}
+                    <div style={{ fontSize: 9, color: "#eab308" }}>agency</div>
+                  </>) : (<>
+                    <span style={{ fontWeight: 700, fontSize: 14, color: ratingColor(c.impliedRating) }}>{c.impliedRating}</span>
+                    <div style={{ fontSize: 9, color: "#64748b" }}>implied</div>
+                  </>)}
                 </div>
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6, fontSize: 11, minWidth: 0 }}>
-                <div style={{ minWidth: 0, overflow: "hidden" }}>
-                  <div style={{ color: "#64748b", fontSize: 9, textTransform: "uppercase" }}>Exposure</div>
-                  <div style={{ fontWeight: 600 }}>{fmt(c.exposure)}</div>
-                </div>
                 <div>
                   <div style={{ color: "#64748b", fontSize: 9, textTransform: "uppercase" }}>LTM Cash Flow</div>
                   <div style={{ fontWeight: 600, color: ltmAdjCashFlow(c) >= 0 ? "#22c55e" : "#ef4444" }}>{ltmAdjCashFlow(c) >= 0 ? "+" : ""}{fmt(ltmAdjCashFlow(c) * 1e6)}</div>
@@ -2032,28 +2731,33 @@ return (
         <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}><table style={{ width: "100%", borderCollapse: "collapse", minWidth: mob ? 380 : "auto" }}>
           <thead>
             <tr>
-              {[["Company","14%"],["PM","6%"],["Exposure","8%"],["Implied Rtg","9%"],["Outlook","8%"],["CDS 5Y","9%"],["Spread","8%"],["LTM Cash Flow","9%"],["Liquidity","9%"],["Equity","8%"],["Rev","6%"],["","2%"]].map(([h,w],i) => (
-                <th key={i} style={{ width: w, padding: "12px 10px", fontSize: 10, color: "#64748b", borderBottom: "1px solid rgba(148,163,184,0.08)", textTransform: "uppercase", fontWeight: 600, letterSpacing: "0.8px", textAlign: "left", background: "rgba(6,10,20,0.5)" }}>{h}</th>
+              {[["Company","12%","company"],["PM","6%","pm"],["Rating","10%","rating"],["Outlook","10%","outlook"],["CDS 5Y","11%","cds"],["Spread","10%","spread"],["LTM Cash Flow","10%","cashflow"],["Liquidity","10%","liquidity"],["Equity","10%","equity"],["Rev","8%","rev"],["","3%",null]].map(([h,w,col],i) => (
+                <th key={i} onClick={col ? () => handleSort(col) : undefined} style={{ width: w, padding: "12px 10px", fontSize: 10, color: sortCol === col ? "#e2e8f0" : "#64748b", borderBottom: "1px solid rgba(148,163,184,0.08)", textTransform: "uppercase", fontWeight: 600, letterSpacing: "0.8px", textAlign: "left", background: "rgba(6,10,20,0.95)", position: "sticky", top: 0, zIndex: 2, cursor: col ? "pointer" : "default", userSelect: "none", transition: "color .15s ease" }}>{h}{sortCol === col ? (sortDir === "asc" ? " \u25B2" : " \u25BC") : ""}</th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {enrichedPortfolio.map((c) => (
-              <tr key={c.id} onClick={() => { navigate(c.id, tab, "financials"); }} style={{ cursor: "pointer", borderBottom: "1px solid rgba(148,163,184,0.06)", transition: "all .15s ease" }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(30,41,59,0.5)"; e.currentTarget.style.transform = "scale(1.002)"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.transform = "scale(1)"; }}
+            {filteredPortfolio.map((c) => (
+              <tr key={c.id} onClick={() => { navigate(c.id, tab, "financials"); }} style={{ cursor: "pointer", borderBottom: "1px solid rgba(148,163,184,0.06)", transition: "background .15s ease" }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(30,41,59,0.5)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
               >
                 <td style={{ padding: "10px 8px" }}>
-                  <div style={{ fontWeight: 700, fontSize: 13 }}>{c.id} {getWatchlistStatus(c).active && <span style={{ color: "#ef4444", fontSize: 11 }}>{"\u26A0"}</span>}</div>
+                  <div style={{ fontWeight: 700, fontSize: 13 }}>{c.id} {getWatchlistStatus(c).active && <span style={{ color: "#ef4444", fontSize: 11 }}>{"\u26A0"}</span>}{isPubliclyRated(c) ? <span style={{ fontSize: 8, fontWeight: 700, color: "#eab308", background: "rgba(234,179,8,0.1)", border: "1px solid rgba(234,179,8,0.2)", padding: "1px 5px", borderRadius: 3, marginLeft: 6, textTransform: "uppercase", letterSpacing: "0.5px" }}>RATED</span> : <span style={{ fontSize: 8, color: "#64748b", marginLeft: 6 }}>NR</span>}</div>
                   <div style={{ fontSize: 10, color: "#64748b" }}>{c.sector}</div>
                 </td>
                 <td style={{ padding: "10px 8px" }}>
                   <span style={{ display: "inline-block", padding: "3px 8px", borderRadius: 10, fontSize: 10, fontWeight: 700, background: "rgba(148,163,184,0.12)", color: "#cbd5e1", border: "1px solid rgba(148,163,184,0.18)", letterSpacing: "0.5px" }}>{c.pm || "\u2014"}</span>
                 </td>
-                <td style={{ padding: "10px 8px", fontWeight: 600, fontSize: 12 }}>{fmt(c.exposure)}</td>
                 <td style={{ padding: "10px 8px" }}>
-                  <span style={{ fontWeight: 700, fontSize: 12, color: ratingColor(c.impliedRating) }}>{c.impliedRating}</span>
-                  <div style={{ fontSize: 9, color: "#475569" }}>implied</div>
+                  {isPubliclyRated(c) ? (<>
+                    <span style={{ fontWeight: 700, fontSize: 12, color: ratingColor(c.sp) }}>{c.sp}</span>
+                    {c.moodys !== "NR" && <span style={{ fontWeight: 600, fontSize: 10, color: ratingColor(c.moodys), marginLeft: 4 }}>/ {c.moodys}</span>}
+                    <div style={{ fontSize: 9, color: "#eab308" }}>agency</div>
+                  </>) : (<>
+                    <span style={{ fontWeight: 700, fontSize: 12, color: ratingColor(c.impliedRating) }}>{c.impliedRating}</span>
+                    <div style={{ fontSize: 9, color: "#64748b" }}>implied</div>
+                  </>)}
                 </td>
                 <td style={{ padding: "10px 8px", fontSize: 12 }}>
                   <span style={{ color: outlookColor(c.outlook) }}>{outlookIcon(c.outlook)} {c.outlook}</span>
@@ -2069,7 +2773,7 @@ return (
                 <td style={{ padding: "10px 8px", fontSize: 12 }}>
                   {c.eqPrice != null ? `$${c.eqPrice}` : "Private"}{c.eqChg != null && <span style={{ color: c.eqChg >= 0 ? "#22c55e" : "#ef4444", marginLeft: 4, fontSize: 10 }}>{pct(c.eqChg)}</span>}
                 </td>
-                <td style={{ padding: "10px 8px" }}><Sparkline data={[...c.financials].reverse().map((f) => f.rev)} color="#3b82f6" /></td>
+                <td style={{ padding: "10px 8px" }}><Sparkline data={[...c.financials].reverse().map((f) => f.rev)} color="#3b82f6" label={`${c.id} Revenue`} /></td>
                 <td style={{ padding: "10px 8px", fontSize: 11, color: "#3b82f6" }}>{"\u2192"}</td>
               </tr>
             ))}
@@ -2086,12 +2790,26 @@ return (
         <div style={{ display: "flex", flexDirection: mob ? "column" : "row", justifyContent: "space-between", alignItems: mob ? "flex-start" : "center", gap: 8, marginBottom: 16 }}>
           <div>
             <div style={{ fontSize: 12, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.5px" }}>SEC Filing Alerts (Last 30 Days)</div>
-            <div style={{ fontSize: 10, color: "#475569", marginTop: 2 }}>Auto-monitored via EDGAR — 8-K, S-3, Form 4, 13D/G, 10-K, 10-Q</div>
+            <div style={{ fontSize: 10, color: "#64748b", marginTop: 2 }}>Auto-monitored via EDGAR — 8-K, S-3, Form 4, 13D/G, 10-K, 10-Q</div>
           </div>
-          <button onClick={fetchSecFilings} disabled={dataLoading.sec} style={{ padding: "6px 14px", borderRadius: 4, fontSize: 10, fontWeight: 700, border: "1px solid #334155", background: dataLoading.sec ? "#1e293b" : "transparent", color: "#94a3b8", cursor: "pointer" }}>
-            {dataLoading.sec ? "Loading..." : "\u21BB Refresh"}
+          <button onClick={fetchSecFilings} disabled={dataLoading.sec} style={{ padding: "6px 14px", borderRadius: 4, fontSize: 10, fontWeight: 700, border: "1px solid #334155", background: dataLoading.sec ? "#1e293b" : "transparent", color: "#94a3b8", cursor: "pointer", transition: "all .15s ease" }}>
+            {dataLoading.sec ? "\u21BB Loading..." : "\u21BB Refresh"}
           </button>
         </div>
+
+        {dataLoading.sec && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 16 }}>
+            {[1,2,3].map(i => (
+              <div key={i} style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                <Skeleton w={60} h={20} />
+                <div style={{ flex: 1 }}>
+                  <Skeleton w="70%" h={12} />
+                  <div style={{ marginTop: 6 }}><Skeleton w="40%" h={10} /></div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Severity summary */}
         <div style={{ display: "flex", gap: mob ? 8 : 16, marginBottom: 16, flexWrap: "wrap" }}>
@@ -2203,6 +2921,27 @@ return (
                   </tr>
                 );
               })}
+              {/* Generated (ad-hoc) company row — shown when user has looked up a ticker not in the portfolio */}
+              {adHocCompany && (() => {
+                const c = adHocCompany;
+                const lev = c.ebitda > 0 ? (c.totalDebt / c.ebitda) : null;
+                const margin = c.revenue > 0 ? (c.ebitda / c.revenue * 100) : null;
+                const cf = c.fcf ?? 0;
+                return (
+                  <tr key={c.id} style={{ borderBottom: "1px solid #1e293b", cursor: "pointer", background: "rgba(59,130,246,0.04)", borderLeft: "3px solid rgba(59,130,246,0.4)" }} onClick={() => { navigate(c.id, tab, "financials"); }}>
+                    <td style={{ padding: "8px 6px", fontSize: 12, fontWeight: 700 }}>
+                      {c.id}
+                      <div style={{ fontSize: 8, color: "#60a5fa", textTransform: "uppercase", letterSpacing: "0.3px" }}>API generated</div>
+                    </td>
+                    <td style={{ padding: "8px 6px", fontSize: 11, textAlign: "right", color: lev === null ? "#64748b" : lev > peerBenchmarks.medianLeverage * 1.5 ? "#ef4444" : "#e2e8f0" }}>{lev !== null ? `${lev.toFixed(1)}x` : "N/M"}</td>
+                    <td style={{ padding: "8px 6px", fontSize: 11, textAlign: "right", color: (c.intCov ?? 0) < 2 ? "#ef4444" : "#e2e8f0" }}>{fmtNum(c.intCov ?? 0)}x</td>
+                    <td style={{ padding: "8px 6px", fontSize: 11, textAlign: "right", color: margin !== null && margin < 0 ? "#ef4444" : "#e2e8f0" }}>{margin !== null ? `${margin.toFixed(1)}%` : "N/M"}</td>
+                    <td style={{ padding: "8px 6px", fontSize: 11, textAlign: "right", color: (c.currentRatio ?? 0) < 1 ? "#ef4444" : "#e2e8f0" }}>{fmtNum(c.currentRatio ?? 0)}x</td>
+                    <td style={{ padding: "8px 6px", fontSize: 11, textAlign: "right", fontWeight: 700, color: cf >= 0 ? "#22c55e" : "#ef4444" }}>{cf >= 0 ? "+" : ""}{fmt(cf * 1e6)}</td>
+                    <td style={{ padding: "8px 6px", fontSize: 11, textAlign: "right", color: "#64748b" }}>{"\u2014"}</td>
+                  </tr>
+                );
+              })()}
               {/* Median row */}
               <tr style={{ borderTop: "2px solid #334155", background: "#0a0e1a" }}>
                 <td style={{ padding: "8px 6px", fontSize: 11, fontWeight: 800, color: "#3b82f6" }}>MEDIAN</td>
@@ -2285,7 +3024,7 @@ return (
               </div>
               <div style={{ textAlign: "right" }}>
                 <div style={{ fontSize: 11, color: "#64748b" }}>Last result</div>
-                <div style={{ fontSize: 12, fontWeight: 600, color: c.lastEarnings.startsWith("Beat") ? "#22c55e" : "#ef4444" }}>{c.lastEarnings.split("\u2014")[0]}</div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: (c.lastEarnings || "").startsWith("Beat") ? "#22c55e" : "#ef4444" }}>{c.lastEarnings.split("\u2014")[0]}</div>
               </div>
               <div style={{ fontSize: 11, color: "#3b82f6" }}>{"\u2192"}</div>
             </div>

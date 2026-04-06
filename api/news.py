@@ -196,11 +196,16 @@ class handler(BaseHTTPRequestHandler):
 
         results = {}
 
-        if ticker and ticker.upper() in COMPANY_SEARCH:
+        if ticker:
             t = ticker.upper()
-            info = COMPANY_SEARCH[t]
+            if t in COMPANY_SEARCH:
+                info = COMPANY_SEARCH[t]
+                queries = info["queries"]
+            else:
+                # Unknown ticker — fall back to generic search using the ticker symbol
+                queries = [t]
             all_headlines = []
-            for q in info["queries"]:
+            for q in queries:
                 all_headlines.extend(fetch_google_news(q, max_per))
             # Deduplicate by headline similarity
             seen = set()

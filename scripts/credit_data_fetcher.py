@@ -191,7 +191,7 @@ class EdgarFetcher:
         """Fetch all XBRL facts for a company."""
         url = f"{EDGAR_COMPANY_FACTS}/CIK{cik}.json"
         log.info(f"EDGAR: Fetching company facts from {url}")
-        resp = self.session.get(url)
+        resp = self.session.get(url, timeout=(5, 30))
         resp.raise_for_status()
         return resp.json()
 
@@ -391,7 +391,7 @@ class FMPFetcher:
         params["apikey"] = self.api_key
         url = f"{FMP_BASE}/{endpoint}"
         log.info(f"FMP: Fetching {url}")
-        resp = self.session.get(url, params=params)
+        resp = self.session.get(url, params=params, timeout=(5, 15))
         resp.raise_for_status()
         return resp.json()
 
@@ -436,10 +436,16 @@ class FMPFetcher:
 
             if cf_fy:
                 fill("operating_cash_flow", cf_fy.get("operatingCashFlow"), "cash-flow-statement")
-                fill("total_capex", abs(cf_fy.get("capitalExpenditure", 0)), "cash-flow-statement")
+                capex_val = cf_fy.get("capitalExpenditure")
+                if capex_val is not None:
+                    fill("total_capex", abs(capex_val), "cash-flow-statement")
                 fill("free_cash_flow", cf_fy.get("freeCashFlow"), "cash-flow-statement")
-                fill("cash_interest_paid", abs(cf_fy.get("interestPaid", 0)), "cash-flow-statement supplemental")
-                fill("cash_taxes_paid", abs(cf_fy.get("incomeTaxesPaid", 0)), "cash-flow-statement supplemental")
+                interest_val = cf_fy.get("interestPaid")
+                if interest_val is not None:
+                    fill("cash_interest_paid", abs(interest_val), "cash-flow-statement supplemental")
+                taxes_val = cf_fy.get("incomeTaxesPaid")
+                if taxes_val is not None:
+                    fill("cash_taxes_paid", abs(taxes_val), "cash-flow-statement supplemental")
 
             if bs_fy:
                 fill("cash_and_equivalents", bs_fy.get("cashAndCashEquivalents"), "balance-sheet")
@@ -566,8 +572,12 @@ class YahooFetcher:
                 if capex_val is not None:
                     fill("total_capex", abs(capex_val), "cashflow")
                 fill("free_cash_flow", safe_get(cf, "Free Cash Flow", cf_col), "cashflow")
-                fill("cash_interest_paid", abs(safe_get(cf, "Interest Paid Supplemental Data", cf_col) or 0), "cashflow supplemental")
-                fill("cash_taxes_paid", abs(safe_get(cf, "Income Tax Paid Supplemental Data", cf_col) or 0), "cashflow supplemental")
+                interest_val = safe_get(cf, "Interest Paid Supplemental Data", cf_col)
+                if interest_val is not None:
+                    fill("cash_interest_paid", abs(interest_val), "cashflow supplemental")
+                taxes_val = safe_get(cf, "Income Tax Paid Supplemental Data", cf_col)
+                if taxes_val is not None:
+                    fill("cash_taxes_paid", abs(taxes_val), "cashflow supplemental")
 
             # Balance sheet
             bs_col = None

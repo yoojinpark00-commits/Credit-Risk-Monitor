@@ -30,6 +30,9 @@ CIK_MAP = {
     "WSC":  "0001647088",
 }
 
+# Module-level cache for dynamically resolved CIKs
+_cik_cache = {}
+
 # Filing types we care about and their credit significance
 FILING_TYPES = {
     "8-K":   {"severity": "material",  "label": "Material Event",           "desc": "Current report — could signal M&A, executive changes, covenant breach, credit agreement amendments"},
@@ -52,6 +55,25 @@ FILING_TYPES = {
 }
 
 USER_AGENT = os.environ.get("EDGAR_USER_AGENT", "CreditRiskMonitor/1.0 (creditrisk@monitor.app)")
+
+def ticker_to_cik(ticker):
+    """Resolve a ticker to a 10-digit zero-padded CIK via EDGAR company_tickers.json.
+    Falls back to the hardcoded CIK_MAP first for speed, then hits EDGAR dynamically.
+    Returns None if the ticker cannot be resolved.
+    """
+    ticker = ticker.upper()
+    if ticker in CIK_MAP:
+        return CIK_MAP[ticker]
+    if ticker in _cik_cache:
+        return _cik_cache[ticker]
+    data = fetch_edgar("https://www.sec.gov/files/company_tickers.json")
+    if "error" in data:
+        return None
+    for entry in data.values():
+        t = entry["ticker"].upper()
+        c = str(entry["cik_str"]).zfill(10)
+        _cik_cache[t] = c
+    return _cik_cache.get(ticker)
 
 def fetch_edgar(url):
     """Fetch from EDGAR with proper headers."""
@@ -136,9 +158,11 @@ class handler(BaseHTTPRequestHandler):
 
         results = []
 
-        if ticker and ticker.upper() in CIK_MAP:
+        if ticker:
             t = ticker.upper()
-            results = get_filings_for_cik(CIK_MAP[t], t, days)
+            cik = ticker_to_cik(t)
+            if cik:
+                results = get_filings_for_cik(cik, t, days)
         elif fetch_all:
             for t, cik in CIK_MAP.items():
                 filings = get_filings_for_cik(cik, t, days)
