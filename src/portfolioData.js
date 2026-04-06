@@ -6,6 +6,7 @@
 export const PORTFOLIO = [
 {
 id: "LCID",
+pm: "YP",
 name: "Lucid Group Inc.",
 sector: "EV / Automotive",
 exposure: 25000000,
@@ -167,6 +168,7 @@ research: [
 },
 {
 id: "RIVN",
+pm: "YP",
 name: "Rivian Automotive Inc.",
 sector: "EV / Automotive",
 exposure: 35000000,
@@ -325,6 +327,7 @@ research: [
 // ─── NEW PORTFOLIO ADDITIONS ─────────────────────────────────────────────
 {
 id: "CENT",
+pm: "YP",
 name: "Central Garden & Pet Co.",
 sector: "Consumer Products",
 exposure: 15000000,
@@ -464,6 +467,7 @@ items: [
 },
 {
 id: "IHRT",
+pm: "YP",
 name: "iHeartMedia Inc.",
 sector: "Media / Broadcasting",
 exposure: 20000000,
@@ -605,6 +609,7 @@ items: [
 },
 {
 id: "BEUSA",
+pm: "YP",
 name: "Beusa Investments LLC",
 sector: "Energy / Oilfield Services",
 exposure: 10000000,
@@ -719,6 +724,7 @@ debtMaturities: { items: [] },
 },
 {
 id: "SMC",
+pm: "YP",
 name: "Summit Midstream Corp.",
 sector: "Midstream / Energy",
 exposure: 12000000,
@@ -858,6 +864,7 @@ items: [
 },
 {
 id: "UPBD",
+pm: "YP",
 name: "Upbound Group Inc.",
 sector: "Consumer Finance / RTO",
 exposure: 18000000,
@@ -996,6 +1003,7 @@ items: [
 },
 {
 id: "WSC",
+pm: "YP",
 name: "WillScot Holdings Corp.",
 sector: "Industrial Services / Modular Space",
 exposure: 22000000,
@@ -1138,6 +1146,7 @@ items: [
 },
 {
 id: "JSWUSA",
+pm: "YP",
 name: "JSW Steel USA Inc.",
 sector: "Steel / Metals",
 exposure: 8000000,

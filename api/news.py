@@ -31,7 +31,48 @@ COMPANY_SEARCH = {
     "WSC":  {"name": "WillScot Holdings",      "queries": ["WillScot Mobile Mini WSC"]},
     "BEUSA": {"name": "Beusa Energy",          "queries": ["Beusa Energy electric frac"]},
     "JSWUSA": {"name": "JSW Steel USA",        "queries": ["JSW Steel USA", "JSW Steel Ohio"]},
+    "GT":   {"name": "Goodyear Tire & Rubber", "queries": ['"Goodyear Tire" earnings', '"Goodyear Rubber" stock', "Goodyear NASDAQ GT"]},
+    "VSCO": {"name": "Victoria's Secret",      "queries": ['"Victoria\'s Secret" earnings', '"VS&Co" stock', "VSCO Victoria Secret"]},
+    "URI":  {"name": "United Rentals",         "queries": ['"United Rentals" earnings', '"United Rentals" NYSE', "URI equipment rental"]},
+    "CLF":  {"name": "Cleveland-Cliffs",       "queries": ['"Cleveland-Cliffs" earnings', '"Cleveland Cliffs" steel', "CLF NYSE steel"]},
+    "HLMN": {"name": "Hillman Solutions",      "queries": ['"Hillman Solutions" earnings', '"Hillman Solutions" hardware', "HLMN NASDAQ"]},
+    "KSS":  {"name": "Kohl's",                 "queries": ['"Kohl\'s Corporation" earnings', '"Kohls" department store', "KSS NYSE retail"]},
+    "NGL":  {"name": "NGL Energy Partners",    "queries": ['"NGL Energy Partners" earnings', '"NGL Energy" MLP', "NGL NYSE water"]},
 }
+
+_NAME_SUFFIX_RE = re.compile(
+    r'\b(inc\.?|corp\.?|corporation|co\.?|company|llc|holdings|limited|ltd\.?|l\.p\.?|lp)\b',
+    re.IGNORECASE,
+)
+
+def _normalize_name(name):
+    """Strip common corporate suffixes/punctuation and lowercase."""
+    if not name:
+        return ""
+    n = name.replace("&", " ")
+    n = _NAME_SUFFIX_RE.sub(" ", n)
+    n = re.sub(r'[,\.\-\'"]', ' ', n)
+    n = re.sub(r'\s+', ' ', n).strip().lower()
+    return n
+
+def _is_relevant(headline, summary, ticker, name=None):
+    """Protect against common-word ticker false positives.
+
+    Returns True if the combined text mentions the ticker as a whole word
+    or contains the normalized company name.
+    """
+    if not ticker and not name:
+        return True
+    text = f"{headline or ''} {summary or ''}"
+    if ticker:
+        if re.search(rf'\b{re.escape(ticker)}\b', text, re.IGNORECASE):
+            return True
+    norm_name = _normalize_name(name)
+    if norm_name:
+        norm_text = _normalize_name(text)
+        if norm_name and norm_name in norm_text:
+            return True
+    return False
 
 # Credit-relevant keyword scoring
 CREDIT_POSITIVE = [
@@ -157,7 +198,12 @@ class handler(BaseHTTPRequestHandler):
                     seen.add(key)
                     h["ticker"] = t
                     unique.append(h)
-            results[t] = unique[:max_per]
+            # Universal post-filter: guard against common-word ticker false positives
+            filtered = [
+                h for h in unique
+                if _is_relevant(h.get("headline", ""), h.get("raw_title", ""), t, info.get("name"))
+            ]
+            results[t] = filtered[:max_per]
 
         elif fetch_all:
             for t, info in COMPANY_SEARCH.items():
@@ -172,7 +218,12 @@ class handler(BaseHTTPRequestHandler):
                         seen.add(key)
                         h["ticker"] = t
                         unique.append(h)
-                results[t] = unique[:max_per]
+                # Universal post-filter: guard against common-word ticker false positives
+                filtered = [
+                    h for h in unique
+                    if _is_relevant(h.get("headline", ""), h.get("raw_title", ""), t, info.get("name"))
+                ]
+                results[t] = filtered[:max_per]
 
         # Flatten for portfolio-wide view
         all_news = []

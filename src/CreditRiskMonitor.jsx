@@ -421,6 +421,7 @@ return (
 </div>
 {getWatchlistStatus(detail).active && <span style={{ background: "rgba(127,29,29,0.5)", color: "#fca5a5", fontSize: 10, fontWeight: 700, padding: "4px 10px", borderRadius: 20, textTransform: "uppercase", letterSpacing: "0.5px", flexShrink: 0, border: "1px solid rgba(220,38,38,0.2)" }}>{"\u26A0"} WATCHLIST</span>}
 {!getWatchlistStatus(detail).active && <span style={{ background: "rgba(5,46,22,0.5)", color: "#86efac", fontSize: 10, fontWeight: 700, padding: "4px 10px", borderRadius: 20, textTransform: "uppercase", letterSpacing: "0.5px", flexShrink: 0, border: "1px solid rgba(34,197,94,0.2)" }}>{"\u2713"} ACTIVE</span>}
+{detail.pm && <span style={{ background: "rgba(30,41,59,0.6)", color: "#cbd5e1", fontSize: 10, fontWeight: 700, padding: "4px 10px", borderRadius: 20, textTransform: "uppercase", letterSpacing: "0.5px", flexShrink: 0, border: "1px solid rgba(148,163,184,0.18)" }}>PM {detail.pm}</span>}
 </div>
 <div style={{ display: "flex", gap: mob ? 4 : 6, overflowX: "auto", WebkitOverflowScrolling: "touch", width: mob ? "100%" : "auto", marginTop: mob ? 2 : 0, paddingBottom: mob ? 2 : 0 }}>
 {["financials", "ratings", "filings", "news", "research", "earnings"].map((t) => (
@@ -1912,6 +1913,7 @@ return (
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
                 <div>
                   <span style={{ fontWeight: 700, fontSize: 16 }}>{c.id}</span>
+                  {c.pm && <span style={{ marginLeft: 8, padding: "2px 6px", borderRadius: 8, fontSize: 9, fontWeight: 700, background: "rgba(148,163,184,0.12)", color: "#cbd5e1", border: "1px solid rgba(148,163,184,0.18)" }}>{c.pm}</span>}
                   {getWatchlistStatus(c).active && <span style={{ color: "#ef4444", fontSize: 11, marginLeft: 6 }}>{"\u26A0"}</span>}
                   <div style={{ fontSize: 10, color: "#64748b" }}>{c.sector}</div>
                 </div>
@@ -1956,7 +1958,7 @@ return (
         <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}><table style={{ width: "100%", borderCollapse: "collapse", minWidth: mob ? 380 : "auto" }}>
           <thead>
             <tr>
-              {[["Company","16%"],["Exposure","10%"],["Implied Rtg","9%"],["Outlook","9%"],["CDS 5Y","10%"],["Spread","9%"],["LTM Cash Flow","9%"],["Liquidity","9%"],["Equity","9%"],["Rev","7%"],["","3%"]].map(([h,w],i) => (
+              {[["Company","14%"],["PM","6%"],["Exposure","8%"],["Implied Rtg","9%"],["Outlook","8%"],["CDS 5Y","9%"],["Spread","8%"],["LTM Cash Flow","9%"],["Liquidity","9%"],["Equity","8%"],["Rev","6%"],["","2%"]].map(([h,w],i) => (
                 <th key={i} style={{ width: w, padding: "12px 10px", fontSize: 10, color: "#64748b", borderBottom: "1px solid rgba(148,163,184,0.08)", textTransform: "uppercase", fontWeight: 600, letterSpacing: "0.8px", textAlign: "left", background: "rgba(6,10,20,0.5)" }}>{h}</th>
               ))}
             </tr>
@@ -1970,6 +1972,9 @@ return (
                 <td style={{ padding: "10px 8px" }}>
                   <div style={{ fontWeight: 700, fontSize: 13 }}>{c.id} {getWatchlistStatus(c).active && <span style={{ color: "#ef4444", fontSize: 11 }}>{"\u26A0"}</span>}</div>
                   <div style={{ fontSize: 10, color: "#64748b" }}>{c.sector}</div>
+                </td>
+                <td style={{ padding: "10px 8px" }}>
+                  <span style={{ display: "inline-block", padding: "3px 8px", borderRadius: 10, fontSize: 10, fontWeight: 700, background: "rgba(148,163,184,0.12)", color: "#cbd5e1", border: "1px solid rgba(148,163,184,0.18)", letterSpacing: "0.5px" }}>{c.pm || "\u2014"}</span>
                 </td>
                 <td style={{ padding: "10px 8px", fontWeight: 600, fontSize: 12 }}>{fmt(c.exposure)}</td>
                 <td style={{ padding: "10px 8px" }}>
