@@ -23,14 +23,24 @@ return this.props.children;
 const safeDiv = (a, b, fallback = 0) => { const r = a / b; return (isFinite(r) && !isNaN(r)) ? r : fallback; };
 
 // ─── UTILITIES ──────────────────────────────────────────────────────────────
+const _loc = (v, d) => v.toLocaleString(undefined, { minimumFractionDigits: d, maximumFractionDigits: d });
 const fmt = (n, d = 0) => {
 if (n === null || n === undefined) return "\u2014";
-if (Math.abs(n) >= 1e9) return `$${(n / 1e9).toFixed(1)}B`;
-if (Math.abs(n) >= 1e6) return `$${(n / 1e6).toFixed(d)}M`;
-if (Math.abs(n) >= 1e3) return `$${(n / 1e3).toFixed(d)}K`;
-return `$${n.toFixed(d)}`;
+const a = Math.abs(n);
+if (a >= 1e9) return `$${_loc(n / 1e9, 1)}B`;
+if (a >= 1e6) return `$${_loc(n / 1e6, d)}M`;
+if (a >= 1e3) return `$${_loc(n / 1e3, d)}K`;
+return `$${_loc(n, d)}`;
 };
-const fmtNum = (n, d = 1) => (n === null || n === undefined ? "\u2014" : n.toFixed(d));
+const fmtNum = (n, d = 1) => (n === null || n === undefined ? "\u2014" : _loc(n, d));
+// fmtM: values already denominated in $M (as stored in portfolioData facilities / credit agreements).
+// Adds thousands separators to $M values and rolls up to $X.XB once the $M value reaches 1,000.
+const fmtM = (n) => {
+  if (n === null || n === undefined) return "\u2014";
+  const r = Math.round(n);
+  if (Math.abs(r) >= 1000) return `$${_loc(r / 1000, 1)}B`;
+  return `$${r.toLocaleString()}M`;
+};
 const pct = (n) => (n === null || n === undefined ? "\u2014" : `${n > 0 ? "+" : ""}${n.toFixed(1)}%`);
 const bps = (n) => (n === null || n === undefined ? "\u2014" : `${n > 0 ? "+" : ""}${n}`);
 
@@ -454,11 +464,16 @@ return (
     <div style={{ padding: `0 ${px}px 24px`, minWidth: 0, maxWidth: "100%" }}>
       <ErrorBoundary>
       {detailTab === "financials" && (() => {
-        // ─── LTM ADJUSTED CASH BURN COMPUTATION ─────────────────────
+        // ─── LTM ADJUSTED CASH FLOW COMPUTATION ─────────────────────
+        // Signed value preserves direction (positive = cash generator, negative = burner);
+        // ltmAdjBurn carries the magnitude used by downstream coverage math.
         const ab = detail.adjBurn;
         const capexUsed = ab ? (ab.maintCapex !== null ? ab.maintCapex : ab.totalCapex) : 0;
-        const ltmAdjBurn = ab ? Math.abs(ab.adjEBITDA - ab.incomeTaxes - ab.prefDividends - capexUsed - ab.currentLTD - ab.intExpCash) : Math.abs(detail.fcf);
-        const isNetCashGenerator = ab ? (ab.adjEBITDA - ab.incomeTaxes - ab.prefDividends - capexUsed - ab.currentLTD - ab.intExpCash) > 0 : detail.fcf > 0;
+        const ltmCashFlow = ab
+          ? (ab.adjEBITDA - ab.incomeTaxes - ab.prefDividends - capexUsed - ab.currentLTD - ab.intExpCash)
+          : (detail.fcf || 0);
+        const ltmAdjBurn = Math.abs(ltmCashFlow);
+        const isNetCashGenerator = ltmCashFlow > 0;
         const ltmBurnMonthly = ltmAdjBurn / 12;
         const ltmBurnQtr = ltmAdjBurn / 4;
 
@@ -467,7 +482,8 @@ return (
         const ltmCovMonths = isNetCashGenerator ? 999 : (ltmBurnMonthly > 0 ? totalLiq / ltmBurnMonthly : 999);
         const meets18mo = ltmCovMonths >= 18;
         const qBurn = ltmBurnQtr;
-        const annBurn = ltmAdjBurn;
+        const annBurn = ltmAdjBurn;          // magnitude (unsigned) — existing callers
+        const annCashFlow = ltmCashFlow;     // signed — used by scenario block
         const cashCov = qBurn > 0 ? detail.cash / qBurn : 999;
         const liqCov = annBurn > 0 ? detail.cash / annBurn : 999;
         const netCash = detail.cash - detail.totalDebt;
@@ -545,7 +561,7 @@ return (
                   return (
                     <div key={idx} style={{ flex: 1, textAlign: "center" }}>
                       <div style={{ fontSize: 9, fontWeight: 600, color, marginBottom: 2 }}>
-                        {Math.abs(item.v) >= 1000 ? `${(item.v / 1000).toFixed(1)}B` : `${item.v.toFixed(0)}M`}
+                        {fmtM(item.v)}
                       </div>
                       <div style={{ height: h, background: color, borderRadius: "3px 3px 0 0", opacity: 0.8, margin: "0 4px" }} />
                     </div>
@@ -673,7 +689,7 @@ return (
                   })}
                   {ab.maintCapex === null && (
                     <div style={{ marginTop: 10, padding: 8, background: "#431407", borderRadius: 4, border: "1px solid #78350f", fontSize: 9, color: "#fbbf24", lineHeight: 1.5 }}>
-                      {"\u26A0"} <b>Note:</b> Maintenance CapEx is not separately disclosed. Full CapEx (${ab.totalCapex.toLocaleString()}M) used as proxy, which includes growth CapEx. This overstates the adjusted burn {"\u2014"} true maintenance-only CapEx would yield a lower adjusted burn figure.
+                      {"\u26A0"} <b>Note:</b> Maintenance CapEx is not separately disclosed. Full CapEx ({fmtM(ab.totalCapex)}) used as proxy, which includes growth CapEx. This overstates the adjusted burn {"\u2014"} true maintenance-only CapEx would yield a lower adjusted burn figure.
                     </div>
                   )}
                 </div>
@@ -715,9 +731,9 @@ return (
                 ref: "OCC ABL Handbook: Evaluating Borrower Liquidity \u2014 Cash Burn Coverage",
                 desc: "Total available liquidity must cover \u226518 months of LTM adjusted cash burn. For net cash generators, test is automatically satisfied.",
                 finding: isCashGen
-                  ? `Net cash generator: LTM adjusted cash flow is positive at $${(adjBurnAnnualOcc).toLocaleString()}M. The 18-month coverage test is automatically satisfied \u2014 the borrower generates rather than consumes cash. Total available liquidity of $${(totalAvailLiq/1000).toFixed(1)}B provides additional cushion.`
+                  ? `Net cash generator: LTM adjusted cash flow is positive at ${fmtM(adjBurnAnnualOcc)}. The 18-month coverage test is automatically satisfied \u2014 the borrower generates rather than consumes cash. Total available liquidity of ${fmtM(totalAvailLiq)} provides additional cushion.`
                   : (() => {
-                    const histLine = `Historical (LTM): $${(totalAvailLiq >= 1000 ? (totalAvailLiq/1000).toFixed(1)+"B" : totalAvailLiq+"M")} total liquidity \u00F7 $${adjBurnMonthlyOcc.toFixed(0)}M/mo adj. burn = ${histBurnMonths.toFixed(1)} months ${meetsHistorical18 ? "\u2705 \u226518 mo." : "\u274C <18 mo."}`;
+                    const histLine = `Historical (LTM): ${fmtM(totalAvailLiq)} total liquidity \u00F7 ${fmtM(adjBurnMonthlyOcc)}/mo adj. burn = ${histBurnMonths.toFixed(1)} months ${meetsHistorical18 ? "\u2705 \u226518 mo." : "\u274C <18 mo."}`;
                     const fwdLine = `Forward (est.): Assuming ${((1 - fwdBurnImprovement) * 100).toFixed(0)}% burn improvement = ${fwdBurnMonths.toFixed(1)} months ${meetsForward18 ? "\u2705 \u226518 mo." : "\u274C <18 mo."}`;
                     return `${histLine}\n${fwdLine}\n\n${meetsBoth ? "Both tests satisfied \u2014 supports Pass rating." : meetsHistorical18 ? "Historical test passed; forward marginal \u2014 Special Mention." : `Neither test fully satisfied at ${histBurnMonths.toFixed(1)} months.`}`;
                   })(),
@@ -817,7 +833,7 @@ return (
                       <span>{Math.max(Math.ceil(histBurnMonths), 24)} mo.</span>
                     </div>
                     <div style={{ fontSize: 9, color: "#94a3b8", marginTop: 6 }}>
-                      ${(totalAvailLiq/1000).toFixed(1)}B liquidity {"\u00F7"} ${adjBurnMonthlyOcc.toFixed(0)}M/mo. burn = <b style={{ color: meetsHistorical18 ? "#22c55e" : "#ef4444" }}>{meetsHistorical18 ? "\u2705 PASS" : "\u274C FAIL"}</b>
+                      {fmtM(totalAvailLiq)} liquidity {"\u00F7"} {fmtM(adjBurnMonthlyOcc)}/mo. burn = <b style={{ color: meetsHistorical18 ? "#22c55e" : "#ef4444" }}>{meetsHistorical18 ? "\u2705 PASS" : "\u274C FAIL"}</b>
                     </div>
                   </div>
                   {/* Forward */}
@@ -834,7 +850,7 @@ return (
                       <span>{Math.max(Math.ceil(fwdBurnMonths), 24)} mo.</span>
                     </div>
                     <div style={{ fontSize: 9, color: "#94a3b8", marginTop: 6 }}>
-                      ${(totalAvailLiq/1000).toFixed(1)}B liquidity {"\u00F7"} ${fwdBurnMonthly.toFixed(0)}M/mo. proj. burn ({((1 - fwdBurnImprovement) * 100).toFixed(0)}% improvement) = <b style={{ color: meetsForward18 ? "#22c55e" : "#ef4444" }}>{meetsForward18 ? "\u2705 PASS" : "\u274C FAIL"}</b>
+                      {fmtM(totalAvailLiq)} liquidity {"\u00F7"} {fmtM(fwdBurnMonthly)}/mo. proj. burn ({((1 - fwdBurnImprovement) * 100).toFixed(0)}% improvement) = <b style={{ color: meetsForward18 ? "#22c55e" : "#ef4444" }}>{meetsForward18 ? "\u2705 PASS" : "\u274C FAIL"}</b>
                     </div>
                   </div>
                 </div>
@@ -953,18 +969,30 @@ return (
 
           {/* ═══ CREDIT FACILITIES — COMMITTED / DRAWN / AVAILABLE ═══ */}
           {detail.liquidityBreakdown && <div style={{ ...card, gridColumn: "1 / -1", border: "1px solid #f97316" }}>
-            <div style={{ fontSize: mob ? 11 : 13, fontWeight: 800, color: "#fdba74", marginBottom: 16, textTransform: "uppercase", letterSpacing: mob ? "0.5px" : "1px", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <div style={{ fontSize: mob ? 11 : 13, fontWeight: 800, color: "#fdba74", textTransform: "uppercase", letterSpacing: mob ? "0.5px" : "1px", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
               {"\u25C6"} Credit Facilities
             </div>
+            <div style={{ fontSize: 9, color: "#64748b", marginTop: 2, marginBottom: 16, fontWeight: 400, lineHeight: 1.5 }}>
+              Drawn = revolver outstandings {"\u00B7"} Available = mgmt-disclosed undrawn {"\u00B7"} Gross Avail = Drawn + Available {"\u00B7"} BB Restricted = Committed {"\u2212"} Gross Avail (when borrowing base &lt; commitment)
+            </div>
 
-            {/* Horizontal stacked bars per facility */}
+            {/* Horizontal stacked bars per facility — each bar fills 100% of its row. */}
             {detail.liquidityBreakdown.facilities.map((fac, fi) => {
-              const maxBar = Math.max(...detail.liquidityBreakdown.facilities.map(f => f.committed));
-              const barScale = maxBar > 0 ? 100 / maxBar : 0;
-              const drawnPct = fac.drawn * barScale;
-              const availPct = fac.available * barScale;
-              const unusablePct = (fac.committed - fac.drawn - fac.available) * barScale;
-              const hasAvailability = fac.available > 0;
+              // ABL model: drawn + available = gross availability (collateral-supported capacity).
+              // If gross availability >= commitment, bar shows drawn+available covering 100% of the row.
+              // If gross availability <  commitment, residual is borrowing-base restricted (striped).
+              const committed    = fac.committed || 0;
+              const drawn        = fac.drawn || 0;
+              const availability = fac.available || 0;
+              const grossAvail   = drawn + availability;
+              const bbRestricted = Math.max(0, committed - grossAvail);
+              const isBBConstrained = committed > 0 && grossAvail < committed;
+              // Denominator = commitment when committed > 0, otherwise gross avail (handles private / committed=0 facilities).
+              const denom = committed > 0 ? committed : grossAvail;
+              const drawnPct        = denom > 0 ? (drawn        / denom) * 100 : 0;
+              const availPct        = denom > 0 ? (availability / denom) * 100 : 0;
+              const bbRestrictedPct = denom > 0 && isBBConstrained ? (bbRestricted / denom) * 100 : 0;
+              const hasAvailability = availability > 0;
               return (
                 <div key={fi} style={{ marginBottom: fi < detail.liquidityBreakdown.facilities.length - 1 ? 20 : 0 }}>
                   {/* Facility header */}
@@ -974,29 +1002,32 @@ return (
                       <div style={{ fontSize: 9, color: "#64748b", marginTop: 1 }}>{fac.secured} {"\u00B7"} {fac.rate} {"\u00B7"} Matures {fac.maturity}</div>
                     </div>
                     <div style={{ textAlign: "right" }}>
-                      <div style={{ fontSize: 14, fontWeight: 800, color: hasAvailability ? "#22c55e" : "#64748b" }}>{hasAvailability ? fmt(fac.available * 1e6) : "$0"} <span style={{ fontSize: 9, fontWeight: 500, color: "#64748b" }}>available</span></div>
-                      <div style={{ fontSize: 9, color: "#64748b" }}>of {fmt(fac.committed * 1e6)} committed</div>
+                      <div style={{ fontSize: 14, fontWeight: 800, color: hasAvailability ? "#22c55e" : "#64748b" }}>{hasAvailability ? fmtM(availability) : "$0"} <span style={{ fontSize: 9, fontWeight: 500, color: "#64748b" }}>available</span></div>
+                      <div style={{ fontSize: 9, color: "#64748b" }}>of {fmtM(committed)} committed</div>
+                      {isBBConstrained && grossAvail > 0 && (
+                        <div style={{ fontSize: 9, color: "#94a3b8", marginTop: 1 }}>Gross Avail: {fmtM(grossAvail)}</div>
+                      )}
                     </div>
                   </div>
 
-                  {/* Stacked bar: Drawn | Available | Unavailable */}
+                  {/* Stacked bar: Drawn | Available | BB Restricted — fills 100% of the row per facility */}
                   <div style={{ display: "flex", height: 24, borderRadius: 4, overflow: "hidden", border: "1px solid #334155", background: "#1e293b" }}>
-                    {fac.drawn > 0 && (
+                    {drawn > 0 && (
                       <div style={{ width: `${drawnPct}%`, background: "#ef4444", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 700, color: "#fff", minWidth: drawnPct > 5 ? "auto" : 0 }}>
-                        {drawnPct > 8 ? `$${fac.drawn}M drawn` : ""}
+                        {drawnPct > 12 ? `${fmtM(drawn)} drawn` : ""}
                       </div>
                     )}
-                    {fac.available > 0 && (
+                    {availability > 0 && (
                       <div style={{ width: `${availPct}%`, background: "linear-gradient(90deg, #22c55e, #16a34a)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 700, color: "#fff", minWidth: availPct > 5 ? "auto" : 0 }}>
-                        {availPct > 8 ? `$${fac.available >= 1000 ? (fac.available/1000).toFixed(1) + "B" : fac.available + "M"} avail` : ""}
+                        {availPct > 12 ? `${fmtM(availability)} avail` : ""}
                       </div>
                     )}
-                    {unusablePct > 0.5 && (
-                      <div style={{ width: `${unusablePct}%`, background: "repeating-linear-gradient(45deg, #1e293b, #1e293b 4px, #334155 4px, #334155 8px)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 8, color: "#64748b", minWidth: unusablePct > 10 ? "auto" : 0 }}>
-                        {unusablePct > 15 ? "unavailable" : ""}
+                    {bbRestrictedPct > 0.5 && (
+                      <div style={{ width: `${bbRestrictedPct}%`, background: "repeating-linear-gradient(45deg, #1e293b, #1e293b 4px, #334155 4px, #334155 8px)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 8, color: "#64748b", minWidth: bbRestrictedPct > 10 ? "auto" : 0 }}>
+                        {bbRestrictedPct > 15 ? "BB restricted" : ""}
                       </div>
                     )}
-                    {fac.available === 0 && fac.drawn === 0 && (
+                    {drawn === 0 && availability === 0 && (
                       <div style={{ width: "100%", background: "repeating-linear-gradient(45deg, #1e293b, #1e293b 4px, #334155 4px, #334155 8px)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, color: "#64748b" }}>
                         Not yet available {"\u2014"} conditional / pending
                       </div>
@@ -1005,12 +1036,15 @@ return (
 
                   {/* Amounts row */}
                   <div style={{ display: "flex", gap: mob ? 8 : 16, marginTop: 4, fontSize: 9, flexWrap: "wrap" }}>
-                    <span style={{ color: "#ef4444" }}>{"\u25A0"} Drawn: ${fac.drawn}M</span>
-                    <span style={{ color: "#22c55e" }}>{"\u25A0"} Available: {fac.available >= 1000 ? `$${(fac.available/1000).toFixed(1)}B` : `$${fac.available}M`}</span>
-                    {(fac.committed - fac.drawn - fac.available) > 0 && (
-                      <span style={{ color: "#64748b" }}>{"\u25A8"} Unavailable: ${fac.committed - fac.drawn - fac.available >= 1000 ? `${((fac.committed - fac.drawn - fac.available)/1000).toFixed(1)}B` : `${fac.committed - fac.drawn - fac.available}M`} (conditional / collateral limited)</span>
+                    <span style={{ color: "#ef4444" }}>{"\u25A0"} Drawn: {fmtM(drawn)}</span>
+                    <span style={{ color: "#22c55e" }}>{"\u25A0"} Available: {fmtM(availability)}</span>
+                    {grossAvail > 0 && isBBConstrained && (
+                      <span style={{ color: "#94a3b8" }}>Gross Avail: {fmtM(grossAvail)}</span>
                     )}
-                    <span style={{ color: "#475569", marginLeft: "auto" }}>Committed: {fac.committed >= 1000 ? `$${(fac.committed/1000).toFixed(1)}B` : `$${fac.committed}M`}</span>
+                    {isBBConstrained && bbRestricted > 0 && (
+                      <span style={{ color: "#64748b" }}>{"\u25A8"} BB Restricted: {fmtM(bbRestricted)} (borrowing base &lt; commitment)</span>
+                    )}
+                    <span style={{ color: "#475569", marginLeft: "auto" }}>Committed: {fmtM(committed)}</span>
                   </div>
 
                   {/* Notes */}
@@ -1024,28 +1058,44 @@ return (
               <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}><table style={{ width: "100%", borderCollapse: "collapse", minWidth: mob ? 380 : "auto" }}>
                 <thead>
                   <tr>
-                    {["Facility", "Committed", "Drawn", "Available", "Unavailable"].map(h => (
+                    {["Facility", "Committed", "Drawn", "Available", "Gross Avail", "BB Restricted"].map(h => (
                       <th key={h} style={{ padding: "6px 8px", fontSize: 10, color: "#64748b", textAlign: h === "Facility" ? "left" : "right", borderBottom: "1px solid #1e293b", textTransform: "uppercase" }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {detail.liquidityBreakdown.facilities.map((fac, fi) => (
+                  {detail.liquidityBreakdown.facilities.map((fac, fi) => {
+                    const gross = (fac.drawn || 0) + (fac.available || 0);
+                    const restricted = Math.max(0, (fac.committed || 0) - gross);
+                    return (
                     <tr key={fi} style={{ borderBottom: "1px solid #1e293b" }}>
                       <td style={{ padding: "6px 8px", fontSize: 11, color: "#e2e8f0", fontWeight: 600 }}>{fac.name}</td>
-                      <td style={{ padding: "6px 8px", fontSize: 11, textAlign: "right", color: "#94a3b8" }}>{fac.committed >= 1000 ? `$${(fac.committed/1000).toFixed(1)}B` : `$${fac.committed}M`}</td>
-                      <td style={{ padding: "6px 8px", fontSize: 11, textAlign: "right", color: fac.drawn > 0 ? "#ef4444" : "#334155", fontWeight: fac.drawn > 0 ? 700 : 400 }}>{fac.drawn > 0 ? `$${fac.drawn}M` : "\u2014"}</td>
-                      <td style={{ padding: "6px 8px", fontSize: 11, textAlign: "right", color: fac.available > 0 ? "#22c55e" : "#475569", fontWeight: 700 }}>{fac.available > 0 ? (fac.available >= 1000 ? `$${(fac.available/1000).toFixed(1)}B` : `$${fac.available}M`) : "$0"}</td>
-                      <td style={{ padding: "6px 8px", fontSize: 11, textAlign: "right", color: "#64748b" }}>{(fac.committed - fac.drawn - fac.available) > 0 ? (fac.committed - fac.drawn - fac.available >= 1000 ? `$${((fac.committed - fac.drawn - fac.available)/1000).toFixed(1)}B` : `$${fac.committed - fac.drawn - fac.available}M`) : "\u2014"}</td>
+                      <td style={{ padding: "6px 8px", fontSize: 11, textAlign: "right", color: "#94a3b8" }}>{fmtM(fac.committed)}</td>
+                      <td style={{ padding: "6px 8px", fontSize: 11, textAlign: "right", color: fac.drawn > 0 ? "#ef4444" : "#334155", fontWeight: fac.drawn > 0 ? 700 : 400 }}>{fac.drawn > 0 ? fmtM(fac.drawn) : "\u2014"}</td>
+                      <td style={{ padding: "6px 8px", fontSize: 11, textAlign: "right", color: fac.available > 0 ? "#22c55e" : "#475569", fontWeight: 700 }}>{fac.available > 0 ? fmtM(fac.available) : "$0"}</td>
+                      <td style={{ padding: "6px 8px", fontSize: 11, textAlign: "right", color: gross > 0 ? "#94a3b8" : "#475569" }}>{gross > 0 ? fmtM(gross) : "\u2014"}</td>
+                      <td style={{ padding: "6px 8px", fontSize: 11, textAlign: "right", color: "#64748b" }}>{restricted > 0 ? fmtM(restricted) : "\u2014"}</td>
                     </tr>
-                  ))}
-                  <tr style={{ borderTop: "2px solid #475569" }}>
-                    <td style={{ padding: "8px", fontSize: 11, fontWeight: 800, color: "#f1f5f9" }}>Total</td>
-                    <td style={{ padding: "8px", fontSize: 11, textAlign: "right", fontWeight: 800, color: "#f1f5f9" }}>{fmt(detail.liquidityBreakdown.facilities.reduce((s,f) => s + f.committed, 0) * 1e6)}</td>
-                    <td style={{ padding: "8px", fontSize: 11, textAlign: "right", fontWeight: 800, color: "#ef4444" }}>{fmt(detail.liquidityBreakdown.facilities.reduce((s,f) => s + f.drawn, 0) * 1e6)}</td>
-                    <td style={{ padding: "8px", fontSize: 11, textAlign: "right", fontWeight: 800, color: "#22c55e" }}>{fmt(detail.liquidityBreakdown.facilities.reduce((s,f) => s + f.available, 0) * 1e6)}</td>
-                    <td style={{ padding: "8px", fontSize: 11, textAlign: "right", fontWeight: 800, color: "#64748b" }}>{fmt(detail.liquidityBreakdown.facilities.reduce((s,f) => s + (f.committed - f.drawn - f.available), 0) * 1e6)}</td>
-                  </tr>
+                    );
+                  })}
+                  {(() => {
+                    const facs = detail.liquidityBreakdown.facilities;
+                    const totCom = facs.reduce((s,f) => s + (f.committed || 0), 0);
+                    const totDr  = facs.reduce((s,f) => s + (f.drawn || 0), 0);
+                    const totAv  = facs.reduce((s,f) => s + (f.available || 0), 0);
+                    const totGross = totDr + totAv;
+                    const totRestricted = facs.reduce((s,f) => s + Math.max(0, (f.committed || 0) - (f.drawn || 0) - (f.available || 0)), 0);
+                    return (
+                      <tr style={{ borderTop: "2px solid #475569" }}>
+                        <td style={{ padding: "8px", fontSize: 11, fontWeight: 800, color: "#f1f5f9" }}>Total</td>
+                        <td style={{ padding: "8px", fontSize: 11, textAlign: "right", fontWeight: 800, color: "#f1f5f9" }}>{fmtM(totCom)}</td>
+                        <td style={{ padding: "8px", fontSize: 11, textAlign: "right", fontWeight: 800, color: "#ef4444" }}>{fmtM(totDr)}</td>
+                        <td style={{ padding: "8px", fontSize: 11, textAlign: "right", fontWeight: 800, color: "#22c55e" }}>{fmtM(totAv)}</td>
+                        <td style={{ padding: "8px", fontSize: 11, textAlign: "right", fontWeight: 800, color: "#94a3b8" }}>{fmtM(totGross)}</td>
+                        <td style={{ padding: "8px", fontSize: 11, textAlign: "right", fontWeight: 800, color: "#64748b" }}>{fmtM(totRestricted)}</td>
+                      </tr>
+                    );
+                  })()}
                 </tbody>
               </table></div>
             </div>
@@ -1082,10 +1132,10 @@ return (
               {/* Key Terms Grid */}
               <div style={{ display: "grid", gridTemplateColumns: mob ? "1fr 1fr" : "repeat(4, 1fr)", gap: 8, marginBottom: 16, minWidth: 0 }}>
                 {[
-                  { l: "Committed", v: `$${ca.committed}M`, c: "#8b5cf6" },
-                  { l: "Accordion", v: ca.accordion > 0 ? `+$${ca.accordion}M` : "None", c: ca.accordion > 0 ? "#22c55e" : "#64748b" },
+                  { l: "Committed", v: fmtM(ca.committed), c: "#8b5cf6" },
+                  { l: "Accordion", v: ca.accordion > 0 ? `+${fmtM(ca.accordion)}` : "None", c: ca.accordion > 0 ? "#22c55e" : "#64748b" },
                   { l: "Maturity", v: ca.maturity, c: "#f1f5f9" },
-                  { l: "Availability", v: ca.availCurrent > 0 ? `$${ca.availCurrent}M` : "N/A", c: ca.availCurrent > 0 ? "#22c55e" : "#64748b" },
+                  { l: "Availability", v: ca.availCurrent > 0 ? fmtM(ca.availCurrent) : "N/A", c: ca.availCurrent > 0 ? "#22c55e" : "#64748b" },
                 ].map((k, i) => (
                   <div key={i} style={{ padding: "8px 10px", background: "#0a0e1a", borderRadius: 4 }}>
                     <div style={{ fontSize: 15, fontWeight: 800, color: k.c }}>{k.v}</div>
@@ -1181,7 +1231,7 @@ return (
                 <div style={{ padding: 12, background: "#0a0e1a", borderRadius: 6 }}>
                   <div style={{ fontSize: 10, fontWeight: 700, color: "#a78bfa", textTransform: "uppercase", marginBottom: 6 }}>Security & Collateral</div>
                   <div style={{ fontSize: 11, color: "#94a3b8", lineHeight: 1.6, marginBottom: 6 }}>{ca.security}</div>
-                  {ca.lcSublimit > 0 && <div style={{ fontSize: 10, color: "#64748b", marginBottom: 8 }}>LC Sublimit: ${ca.lcSublimit}M {ca.swinglineSublimit > 0 ? `| Swingline: $${ca.swinglineSublimit}M` : ""}</div>}
+                  {ca.lcSublimit > 0 && <div style={{ fontSize: 10, color: "#64748b", marginBottom: 8 }}>LC Sublimit: {fmtM(ca.lcSublimit)} {ca.swinglineSublimit > 0 ? `| Swingline: ${fmtM(ca.swinglineSublimit)}` : ""}</div>}
 
                   {ca.securityDetail && (
                     <>
@@ -1269,7 +1319,7 @@ return (
                 return (
                   <div key={i} style={{ flex: 1, textAlign: "center" }}>
                     <div style={{ fontSize: 10, fontWeight: 700, color: m.amount > 0 ? (isNear ? "#ef4444" : "#f97316") : "#334155", marginBottom: 2 }}>
-                      {m.amount > 0 ? `$${m.amount}M` : "\u2014"}
+                      {m.amount > 0 ? fmtM(m.amount) : "\u2014"}
                     </div>
                     <div style={{ height: h, background: m.amount > 0 ? `linear-gradient(180deg, ${isNear ? "#ef4444" : "#f97316"} 0%, ${isNear ? "#7f1d1d" : "#431407"} 100%)` : "#1e293b", borderRadius: "3px 3px 0 0", margin: "0 6px", opacity: m.amount > 0 ? 0.85 : 0.3 }} />
                   </div>
@@ -1302,7 +1352,7 @@ return (
                 ))}
                 <tr style={{ borderTop: "2px solid #334155" }}>
                   <td style={{ padding: "8px", fontSize: 12, fontWeight: 800, color: "#f1f5f9" }}>Total</td>
-                  <td style={{ padding: "8px", fontSize: 12, fontWeight: 800, color: "#ef4444" }}>${detail.liquidityBreakdown.debtMaturities.reduce((s, m) => s + m.amount, 0).toLocaleString()}M</td>
+                  <td style={{ padding: "8px", fontSize: 12, fontWeight: 800, color: "#ef4444" }}>{fmtM(detail.liquidityBreakdown.debtMaturities.reduce((s, m) => s + m.amount, 0))}</td>
                   <td colSpan={2} style={{ padding: "8px", fontSize: 10, color: "#64748b" }}>
                     Wtd. avg. maturity: {(() => {
                       const mats = detail.liquidityBreakdown.debtMaturities.filter(m => m.amount > 0 && m.year !== "Other");
@@ -1325,7 +1375,7 @@ return (
                 const h = (f.cash / maxC) * 80;
                 return (
                   <div key={i} style={{ flex: 1, textAlign: "center" }}>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: "#22c55e", marginBottom: 2 }}>{f.cash >= 1000 ? `${(f.cash / 1000).toFixed(1)}B` : `$${f.cash}M`}</div>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: "#22c55e", marginBottom: 2 }}>{fmtM(f.cash)}</div>
                     <div style={{ height: h, background: "linear-gradient(180deg, #22c55e 0%, #065f46 100%)", borderRadius: "3px 3px 0 0", margin: "0 6px", opacity: 0.85 }} />
                     <div style={{ fontSize: 9, color: "#64748b", marginTop: 4 }}>{f.period.replace("FY", "")}</div>
                   </div>
@@ -1336,7 +1386,7 @@ return (
               <b style={{ color: "#f97316" }}>YoY Cash Change:</b>{" "}
               {detail.financials[0] && detail.financials[1] ? (() => {
                 const chg = detail.financials[0].cash - detail.financials[1].cash;
-                const chgStr = Math.abs(chg) >= 1000 ? `${(chg / 1000).toFixed(2)}B` : `$${chg}M`;
+                const chgStr = fmtM(chg);
                 const pctChg = detail.financials[1].cash > 0 ? ((chg / detail.financials[1].cash) * 100).toFixed(1) : "N/A";
                 return <span style={{ color: chg >= 0 ? "#22c55e" : "#ef4444", fontWeight: 700 }}>{chg >= 0 ? "+" : ""}{chgStr} ({pctChg}%)</span>;
               })() : "\u2014"}
@@ -1352,11 +1402,11 @@ return (
                     <div style={{ fontSize: 9, color: "#64748b", marginBottom: 2 }}>{f.period}</div>
                     <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
                       <div style={{ height: 6, borderRadius: 3, background: "#22c55e", width: `${(f.cash / maxVal) * 100}%`, opacity: 0.8 }} />
-                      <span style={{ fontSize: 8, color: "#22c55e", flexShrink: 0 }}>{f.cash >= 1000 ? `${(f.cash/1000).toFixed(1)}B` : `$${f.cash}M`}</span>
+                      <span style={{ fontSize: 8, color: "#22c55e", flexShrink: 0 }}>{fmtM(f.cash)}</span>
                     </div>
                     <div style={{ display: "flex", gap: 4, alignItems: "center", marginTop: 1 }}>
                       <div style={{ height: 6, borderRadius: 3, background: "#ef4444", width: `${(f.debt / maxVal) * 100}%`, opacity: 0.6 }} />
-                      <span style={{ fontSize: 8, color: "#ef4444", flexShrink: 0 }}>{f.debt >= 1000 ? `${(f.debt/1000).toFixed(1)}B` : `$${f.debt}M`}</span>
+                      <span style={{ fontSize: 8, color: "#ef4444", flexShrink: 0 }}>{fmtM(f.debt)}</span>
                     </div>
                   </div>
                 );
@@ -1368,40 +1418,60 @@ return (
             </div>
           </div>
 
-          {/* ═══ BURN COVERAGE SCENARIO ANALYSIS ═══ */}
+          {/* ═══ CASH FLOW / BURN SCENARIO ANALYSIS ═══ */}
           <div style={card}>
             <div style={{ fontSize: 12, fontWeight: 700, color: "#94a3b8", marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.5px" }}>{isNetCashGenerator ? "Cash Flow Scenario Analysis" : "Burn Coverage Scenario Analysis"}</div>
             <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}><table style={{ width: "100%", borderCollapse: "collapse", minWidth: mob ? 380 : "auto" }}>
               <thead>
                 <tr>
-                  {["Scenario", "Qtr Burn", "Runway", "Flag"].map(h => (
+                  {["Scenario", isNetCashGenerator ? "Qtr CF" : "Qtr Burn", "Runway", "Flag"].map(h => (
                     <th key={h} style={{ padding: "8px 4px", fontSize: 10, color: "#64748b", textAlign: "left", borderBottom: "1px solid #1e293b", textTransform: "uppercase" }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {[
-                  { sc: "Current Run-Rate", burn: qBurn, note: "Based on LTM adjusted burn" },
-                  { sc: "Burn +25% (Stress)", burn: qBurn * 1.25, note: "Operational deterioration / cost overruns" },
-                  { sc: "Burn +50% (Severe)", burn: qBurn * 1.5, note: "Major operational disruption" },
-                  { sc: "Burn -25% (Improved)", burn: qBurn * 0.75, note: "Margin improvement / cost cuts" },
-                  { sc: "Burn -50% (Optimistic)", burn: qBurn * 0.5, note: "Significant cost reduction + volume" },
-                ].map((s, i) => {
-                  const rw = s.burn > 0 ? detail.cash / s.burn : 999;
-                  const rwDisplay = rw >= 99 ? "\u221E" : fmtNum(rw);
-                  const rwColor = isNetCashGenerator ? "#22c55e" : rw >= 8 ? "#22c55e" : rw >= 5 ? "#eab308" : "#ef4444";
+                {(isNetCashGenerator
+                  ? [
+                      { sc: "LTM Run-Rate",         mult: 1.00, note: "Trailing 12-month adjusted cash flow" },
+                      { sc: "CF -25% (Stress)",     mult: 0.75, note: "Margin pressure / operational slippage" },
+                      { sc: "CF -50% (Severe)",     mult: 0.50, note: "Major deterioration" },
+                      { sc: "CF +25% (Improved)",   mult: 1.25, note: "Cost cuts / margin expansion" },
+                      { sc: "CF +50% (Optimistic)", mult: 1.50, note: "Significant improvement" },
+                    ]
+                  : [
+                      { sc: "LTM Run-Rate",          mult: 1.00, note: "Based on LTM adjusted burn" },
+                      { sc: "Burn +25% (Stress)",    mult: 1.25, note: "Operational deterioration / cost overruns" },
+                      { sc: "Burn +50% (Severe)",    mult: 1.50, note: "Major operational disruption" },
+                      { sc: "Burn -25% (Improved)",  mult: 0.75, note: "Margin improvement / cost cuts" },
+                      { sc: "Burn -50% (Optimistic)",mult: 0.50, note: "Significant cost reduction + volume" },
+                    ]
+                ).map((s, i) => {
+                  // Signed quarterly figure: positive = generated, negative = burned.
+                  const scenarioQtrCF = (annCashFlow / 4) * s.mult;
+                  const scenarioAbs = Math.abs(scenarioQtrCF);
+                  const scenarioGenerating = scenarioQtrCF > 0;
+                  const rw = scenarioGenerating
+                    ? 999
+                    : (scenarioAbs > 0 ? detail.cash / scenarioAbs : 999);
+                  const rwColor = scenarioGenerating
+                    ? "#22c55e"
+                    : rw >= 8 ? "#22c55e" : rw >= 5 ? "#eab308" : "#ef4444";
+                  const cfColor = scenarioGenerating ? "#22c55e" : "#ef4444";
+                  const cfLabel = scenarioAbs > 0
+                    ? `${scenarioGenerating ? "+" : "-"}${fmt(scenarioAbs * 1e6)}`
+                    : "\u2014";
                   return (
                     <tr key={i} style={{ borderBottom: "1px solid #1e293b" }}>
                       <td style={{ padding: "8px 4px", fontSize: 12, fontWeight: i === 0 ? 700 : 400, color: i === 0 ? "#f1f5f9" : "#94a3b8" }}>{s.sc}</td>
-                      <td style={{ padding: "8px 4px", fontSize: 12, color: "#ef4444", fontWeight: 600 }}>{fmt(s.burn * 1e6)}</td>
+                      <td style={{ padding: "8px 4px", fontSize: 12, color: cfColor, fontWeight: 600 }}>{cfLabel}</td>
                       <td style={{ padding: "8px 4px" }}>
-                        <span style={{ fontSize: 13, fontWeight: 800, color: rwColor }}>{rwDisplay} qtrs</span>
+                        <span style={{ fontSize: 13, fontWeight: 800, color: rwColor }}>{scenarioGenerating ? "Self-funding" : rw >= 99 ? "\u221E" : `${fmtNum(rw)} qtrs`}</span>
                         <div style={{ marginTop: 2, background: "#1e293b", borderRadius: 3, height: 4, width: 80 }}>
-                          <div style={{ height: "100%", borderRadius: 3, width: `${Math.min((rw >= 99 ? 12 : rw) / 12, 1) * 100}%`, background: rwColor }} />
+                          <div style={{ height: "100%", borderRadius: 3, width: `${scenarioGenerating ? 100 : Math.min((rw >= 99 ? 12 : rw) / 12, 1) * 100}%`, background: rwColor }} />
                         </div>
                       </td>
                       <td style={{ padding: "8px 4px", fontSize: 10, color: "#64748b" }}>
-                        {rw >= 99 ? "\u2713 N/A" : rw < 4 ? "\u26A0\u26A0 Critical" : rw < 6 ? "\u26A0 Warning" : "OK"}
+                        {scenarioGenerating ? "\u2713 Self-funding" : rw >= 99 ? "\u2713 N/A" : rw < 4 ? "\u26A0\u26A0 Critical" : rw < 6 ? "\u26A0 Warning" : "OK"}
                       </td>
                     </tr>
                   );
@@ -1409,7 +1479,7 @@ return (
               </tbody>
             </table></div>
             <div style={{ marginTop: 12, padding: "8px 10px", background: "#0a0e1a", borderRadius: 4, fontSize: 10, color: "#64748b", lineHeight: 1.6 }}>
-              <b style={{ color: "#94a3b8" }}>Methodology:</b> Cash runway = Total Liquidity ({fmt(detail.cash * 1e6)}) / Scenario Quarterly Burn. Does not account for potential capital raises, asset sales, or credit facility draws. Stress scenarios model operational deterioration; improvement scenarios assume delivery ramp traction.
+              <b style={{ color: "#94a3b8" }}>Methodology:</b> Scenarios apply multipliers to LTM adjusted {isNetCashGenerator ? "cash flow" : "cash burn"} ({annBurn > 0 ? `${isNetCashGenerator ? "+" : "-"}${fmt(annBurn * 1e6)}` : "N/A"}). Cash runway = Total Liquidity ({fmt(detail.cash * 1e6)}) / Scenario Quarterly Burn; scenarios that remain cash-generative are marked Self-funding. Does not account for potential capital raises, asset sales, or credit facility draws.
             </div>
           </div>
 
@@ -1426,7 +1496,11 @@ return (
               </thead>
               <tbody>
                 {detail.financials.map((f, i) => {
-                  const fmtB = (v) => v >= 1000 || v <= -1000 ? `${(v/1000).toFixed(1)}B` : `${v}M`;
+                  const fmtB = (v) => {
+                    if (v === null || v === undefined) return "\u2014";
+                    if (Math.abs(v) >= 1000) return `${_loc(v / 1000, 1)}B`;
+                    return `${Math.round(v).toLocaleString()}M`;
+                  };
                   const ebitdaMargin = ((f.ebitda / f.rev) * 100).toFixed(1);
                   const nc = f.cash - f.debt;
                   return (
