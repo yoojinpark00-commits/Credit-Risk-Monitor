@@ -2113,7 +2113,8 @@ news: [
 { date: "2025-11-05", src: "WSJ", headline: "Kohl's bonds rally as Q3 beat and inventory discipline calm credit concerns", sentiment: "positive" },
 ],
 ratingHistory: [
-{ date: "2025-05", sp: "BB-", moodys: "B2", fitch: "BB-", event: "Moody's downgraded CFR to B2 from Ba3 on weakening operating performance and CEO turmoil; S&P and Fitch maintained BB- with negative outlook" },
+{ date: "2025-11", sp: "B+", moodys: "B2", fitch: "BB-", event: "S&P downgraded to B+ from BB- on continued comp sales deterioration and leadership instability; Fitch maintained BB- with negative outlook" },
+{ date: "2025-05", sp: "BB-", moodys: "B2", fitch: "BB-", event: "Moody's downgraded CFR to B2 from Ba3 on weakening operating performance and CEO turmoil" },
 { date: "2025-04", sp: "BB-", moodys: "Ba3", fitch: "BB-", event: "Fitch downgraded to BB- from BB on operational challenges and margin deterioration" },
 { date: "2024-12", sp: "BB-", moodys: "Ba3", fitch: "BB", event: "S&P downgraded to BB- from BB on Q3 miss and negative outlook" },
 { date: "2024-03", sp: "BB", moodys: "Ba2", fitch: "BB", event: "Kohl's fallen from investment grade over 2022-2024 period; formerly BBB- rated" },
@@ -2153,7 +2154,7 @@ mktCap: 1.56,           // ~134M common units * $11.65
 ltDebt: 2945,           // Senior secured notes + TL-B, excluding current portion
 totalDebt: 3060,        // Incl. ~$109M ABL draw + TL-B current + finance leases at 3/31/2025
 cash: 6,                // De minimis cash at MLP level; relies on ABL
-ebitda: 596,            // FY2025 GAAP EBITDA per 10-K (Adj. EBITDA $622.9M)
+ebitda: 623,            // FY2025 Adj. EBITDA $622.9M per 10-K (GAAP EBITDA $596M)
 intExp: 275,            // FY2025 interest expense — high coupons on 2024 refi
 revenue: 3500,          // FY2025 revenue; -16.5% YoY (non-core asset sales)
 netIncome: 55,          // FY2025 net income (continuing ops, positive after refi)
