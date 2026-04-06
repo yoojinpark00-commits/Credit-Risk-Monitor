@@ -774,17 +774,24 @@ return (
           </div>
 
           {/* ═══ EBITDA RECONCILIATION: GAAP → ADJUSTED ═══ */}
-          {detail.adjBurn && detail.adjBurn.gaapEbitda != null && (() => {
+          {detail.adjBurn && (() => {
             const ab = detail.adjBurn;
-            const totalAdj = ab.sbc + ab.restructuring + ab.otherNonCash;
+            // Default any unprovided recon fields to 0 / derive GAAP from Adjusted so the card
+            // still renders for credits whose 10-K does not separately disclose the walk.
+            const sbc           = ab.sbc ?? 0;
+            const restructuring = ab.restructuring ?? 0;
+            const otherNonCash  = ab.otherNonCash ?? 0;
+            const totalAdj      = sbc + restructuring + otherNonCash;
+            const gaapEbitda    = ab.gaapEbitda != null ? ab.gaapEbitda : (ab.adjEBITDA - totalAdj);
+            const noReconDisclosed = ab.gaapEbitda == null && totalAdj === 0;
             const reconItems = [
-              { label: "GAAP EBITDA", amount: ab.gaapEbitda, isSubtotal: true, color: "#60a5fa" },
-              { label: "Stock-Based Compensation", amount: ab.sbc, color: "#a78bfa" },
-              ...(ab.restructuring ? [{ label: "Restructuring & Impairments", amount: ab.restructuring, color: "#f97316" }] : []),
-              ...(ab.otherNonCash ? [{ label: "Other Non-Cash Items", amount: ab.otherNonCash, color: ab.otherNonCash >= 0 ? "#94a3b8" : "#64748b" }] : []),
+              { label: "GAAP EBITDA", amount: gaapEbitda, isSubtotal: true, color: "#60a5fa" },
+              ...(sbc ? [{ label: "Stock-Based Compensation", amount: sbc, color: "#a78bfa" }] : []),
+              ...(restructuring ? [{ label: "Restructuring & Impairments", amount: restructuring, color: "#f97316" }] : []),
+              ...(otherNonCash ? [{ label: "Other Non-Cash Items", amount: otherNonCash, color: otherNonCash >= 0 ? "#94a3b8" : "#64748b" }] : []),
               { label: "Adjusted EBITDA", amount: ab.adjEBITDA, isSubtotal: true, color: ab.adjEBITDA >= 0 ? "#22c55e" : "#ef4444" },
             ];
-            const maxRecon = Math.max(...reconItems.map(r => Math.abs(r.amount)));
+            const maxRecon = Math.max(...reconItems.map(r => Math.abs(r.amount)), 1);
 
             return (
             <div style={{ ...card, gridColumn: "1 / -1" }}>
@@ -793,11 +800,13 @@ return (
                   EBITDA Reconciliation {"\u2014"} GAAP to Adjusted
                 </div>
                 <div style={{ fontSize: 9, color: "#64748b", textAlign: "right" }}>
-                  Total Adjustments: <span style={{ color: totalAdj >= 0 ? "#22c55e" : "#ef4444", fontWeight: 700 }}>{totalAdj >= 0 ? "+" : ""}{totalAdj.toLocaleString()}M</span>
+                  Total Adjustments: <span style={{ color: totalAdj >= 0 ? "#22c55e" : "#ef4444", fontWeight: 700 }}>{totalAdj >= 0 ? "+" : ""}{fmtM(totalAdj).replace("$", "")}</span>
                 </div>
               </div>
               <div style={{ fontSize: mob ? 9 : 10, color: "#64748b", marginBottom: 16 }}>
-                Reconciles reported GAAP EBITDA to company-reported Non-GAAP Adjusted EBITDA by adding back non-cash and non-recurring items.
+                {noReconDisclosed
+                  ? "Issuer's 10-K does not separately disclose a GAAP-to-Adjusted EBITDA walk; reported figure is shown as both GAAP and Adjusted."
+                  : "Reconciles reported GAAP EBITDA to company-reported Non-GAAP Adjusted EBITDA by adding back non-cash and non-recurring items."}
               </div>
               <div style={{ display: "grid", gridTemplateColumns: sectionGrid, gap: mob ? 16 : 24, minWidth: 0 }}>
                 {/* Waterfall bars */}
@@ -1573,14 +1582,33 @@ return (
                       </tr>
                     </thead>
                     <tbody>
-                      {ca.financialCovenants.map((fc, i) => (
+                      {ca.financialCovenants.map((fc, i) => {
+                        // Defensive: some data sources store covenants as plain strings
+                        // (legacy format) instead of {covenant,test,status,notes} objects,
+                        // and others use {name,level,current,headroom} alternates. Normalize
+                        // so the table never crashes on missing fields and surfaces
+                        // whatever detail the source provides.
+                        const norm = typeof fc === "string"
+                          ? { covenant: fc, test: "\u2014", status: "\u2014", notes: "" }
+                          : {
+                              covenant: fc.covenant ?? fc.name    ?? "\u2014",
+                              test:     fc.test     ?? fc.level   ?? "\u2014",
+                              status:   fc.status   ?? fc.current ?? fc.cur ?? "\u2014",
+                              notes:    fc.notes    ?? [fc.current, fc.headroom].filter(Boolean).join(" \u00B7 ") ?? "",
+                            };
+                        const statusStr = String(norm.status);
+                        const statusColor = statusStr.includes("Pass") || statusStr === "Active"
+                          ? "#22c55e"
+                          : statusStr.includes("Not") ? "#eab308" : "#64748b";
+                        return (
                         <tr key={i} style={{ borderBottom: "1px solid #1e293b" }}>
-                          <td style={{ padding: "6px 8px", fontSize: 11, fontWeight: 600, color: "#e2e8f0" }}>{fc.covenant}</td>
-                          <td style={{ padding: "6px 8px", fontSize: 11, color: "#94a3b8" }}>{fc.test}</td>
-                          <td style={{ padding: "6px 8px", fontSize: 10, fontWeight: 700, color: fc.status.includes("Pass") || fc.status === "Active" ? "#22c55e" : fc.status.includes("Not") ? "#eab308" : "#64748b" }}>{fc.status}</td>
-                          <td style={{ padding: "6px 8px", fontSize: 10, color: "#64748b" }}>{fc.notes}</td>
+                          <td style={{ padding: "6px 8px", fontSize: 11, fontWeight: 600, color: "#e2e8f0" }}>{norm.covenant}</td>
+                          <td style={{ padding: "6px 8px", fontSize: 11, color: "#94a3b8" }}>{norm.test}</td>
+                          <td style={{ padding: "6px 8px", fontSize: 10, fontWeight: 700, color: statusColor }}>{norm.status}</td>
+                          <td style={{ padding: "6px 8px", fontSize: 10, color: "#64748b" }}>{norm.notes}</td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
