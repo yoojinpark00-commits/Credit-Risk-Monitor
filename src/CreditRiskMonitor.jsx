@@ -450,6 +450,7 @@ const filteredPortfolio = useMemo(() => {
     const getSortVal = (c) => {
       switch (sortCol) {
         case "company": return c.id;
+        case "pm": return c.pm || "";
         case "rating": return isPubliclyRated(c) ? ratingScore(c.sp) : ratingScore(c.impliedRating);
         case "outlook": return c.outlook;
         case "cds": return c.cds5y ?? 99999;
@@ -614,6 +615,7 @@ return (
 {!getWatchlistStatus(detail).active && <span style={{ background: "rgba(5,46,22,0.5)", color: "#86efac", fontSize: 10, fontWeight: 700, padding: "4px 10px", borderRadius: 20, textTransform: "uppercase", letterSpacing: "0.5px", flexShrink: 0, border: "1px solid rgba(34,197,94,0.2)" }}>{"\u2713"} ACTIVE</span>}
 {isPubliclyRated(detail) ? <span style={{ background: "rgba(234,179,8,0.15)", color: "#fcd34d", fontSize: 10, fontWeight: 700, padding: "4px 10px", borderRadius: 20, textTransform: "uppercase", letterSpacing: "0.5px", flexShrink: 0, border: "1px solid rgba(234,179,8,0.2)" }}>RATED</span> : <span style={{ background: "rgba(100,116,139,0.15)", color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "4px 10px", borderRadius: 20, textTransform: "uppercase", letterSpacing: "0.5px", flexShrink: 0, border: "1px solid rgba(100,116,139,0.2)" }}>NOT RATED</span>}
 {detail._generated && <span style={{ background: "rgba(59,130,246,0.15)", color: "#60a5fa", fontSize: 10, fontWeight: 700, padding: "4px 10px", borderRadius: 20, textTransform: "uppercase", letterSpacing: "0.5px", flexShrink: 0, border: "1px solid rgba(59,130,246,0.2)" }}>API Generated {detail._zScore ? `\u00B7 Z=${detail._zScore}` : ""}</span>}
+{detail.pm && <span style={{ background: "rgba(30,41,59,0.6)", color: "#cbd5e1", fontSize: 10, fontWeight: 700, padding: "4px 10px", borderRadius: 20, textTransform: "uppercase", letterSpacing: "0.5px", flexShrink: 0, border: "1px solid rgba(148,163,184,0.18)" }}>PM {detail.pm}</span>}
 </div>
 <div style={{ position: "relative", width: mob ? "100%" : "auto", marginTop: mob ? 2 : 0 }}>
 {mob && <div style={{ position: "absolute", right: 0, top: 0, bottom: 0, width: 24, background: "linear-gradient(to right, transparent, rgba(15,22,41,0.85))", zIndex: 1, pointerEvents: "none" }} />}
@@ -2604,6 +2606,7 @@ return (
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
                 <div>
                   <span style={{ fontWeight: 700, fontSize: 16 }}>{c.id}</span>
+                  {c.pm && <span style={{ marginLeft: 8, padding: "2px 6px", borderRadius: 8, fontSize: 9, fontWeight: 700, background: "rgba(148,163,184,0.12)", color: "#cbd5e1", border: "1px solid rgba(148,163,184,0.18)" }}>{c.pm}</span>}
                   {getWatchlistStatus(c).active && <span style={{ color: "#ef4444", fontSize: 11, marginLeft: 6 }}>{"\u26A0"}</span>}
                   {isPubliclyRated(c) ? <span style={{ fontSize: 8, fontWeight: 700, color: "#eab308", background: "rgba(234,179,8,0.1)", border: "1px solid rgba(234,179,8,0.2)", padding: "1px 5px", borderRadius: 3, marginLeft: 6, textTransform: "uppercase", letterSpacing: "0.5px" }}>RATED</span> : <span style={{ fontSize: 8, color: "#64748b", marginLeft: 6 }}>NR</span>}
                   <div style={{ fontSize: 10, color: "#64748b" }}>{c.sector}</div>
@@ -2651,7 +2654,7 @@ return (
         <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}><table style={{ width: "100%", borderCollapse: "collapse", minWidth: mob ? 380 : "auto" }}>
           <thead>
             <tr>
-              {[["Company","18%","company"],["Rating","10%","rating"],["Outlook","10%","outlook"],["CDS 5Y","11%","cds"],["Spread","10%","spread"],["LTM Cash Flow","10%","cashflow"],["Liquidity","10%","liquidity"],["Equity","10%","equity"],["Rev","8%","rev"],["","3%",null]].map(([h,w,col],i) => (
+              {[["Company","12%","company"],["PM","6%","pm"],["Rating","10%","rating"],["Outlook","10%","outlook"],["CDS 5Y","11%","cds"],["Spread","10%","spread"],["LTM Cash Flow","10%","cashflow"],["Liquidity","10%","liquidity"],["Equity","10%","equity"],["Rev","8%","rev"],["","3%",null]].map(([h,w,col],i) => (
                 <th key={i} onClick={col ? () => handleSort(col) : undefined} style={{ width: w, padding: "12px 10px", fontSize: 10, color: sortCol === col ? "#e2e8f0" : "#64748b", borderBottom: "1px solid rgba(148,163,184,0.08)", textTransform: "uppercase", fontWeight: 600, letterSpacing: "0.8px", textAlign: "left", background: "rgba(6,10,20,0.95)", position: "sticky", top: 0, zIndex: 2, cursor: col ? "pointer" : "default", userSelect: "none", transition: "color .15s ease" }}>{h}{sortCol === col ? (sortDir === "asc" ? " \u25B2" : " \u25BC") : ""}</th>
               ))}
             </tr>
@@ -2665,6 +2668,9 @@ return (
                 <td style={{ padding: "10px 8px" }}>
                   <div style={{ fontWeight: 700, fontSize: 13 }}>{c.id} {getWatchlistStatus(c).active && <span style={{ color: "#ef4444", fontSize: 11 }}>{"\u26A0"}</span>}{isPubliclyRated(c) ? <span style={{ fontSize: 8, fontWeight: 700, color: "#eab308", background: "rgba(234,179,8,0.1)", border: "1px solid rgba(234,179,8,0.2)", padding: "1px 5px", borderRadius: 3, marginLeft: 6, textTransform: "uppercase", letterSpacing: "0.5px" }}>RATED</span> : <span style={{ fontSize: 8, color: "#64748b", marginLeft: 6 }}>NR</span>}</div>
                   <div style={{ fontSize: 10, color: "#64748b" }}>{c.sector}</div>
+                </td>
+                <td style={{ padding: "10px 8px" }}>
+                  <span style={{ display: "inline-block", padding: "3px 8px", borderRadius: 10, fontSize: 10, fontWeight: 700, background: "rgba(148,163,184,0.12)", color: "#cbd5e1", border: "1px solid rgba(148,163,184,0.18)", letterSpacing: "0.5px" }}>{c.pm || "\u2014"}</span>
                 </td>
                 <td style={{ padding: "10px 8px" }}>
                   {isPubliclyRated(c) ? (<>
