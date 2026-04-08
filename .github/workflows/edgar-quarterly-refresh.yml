@@ -1,0 +1,54 @@
+name: EDGAR Quarterly Refresh
+
+# Quarterly refresh of data/edgar_facts/*.json from SEC EDGAR companyfacts API.
+#
+# Cron: 20th of Feb/May/Aug/Nov at noon UTC. This timing gives 10-Qs (~45 days
+# after quarter end) and 10-Ks (for Dec-year filers, typically mid-Feb) enough
+# time to actually land on EDGAR before we try to fetch them.
+#
+# Opens a PR on branch `data/edgar-refresh` for human review — never auto-merges.
+# Humans decide whether to then port the verified values from
+# data/edgar_facts/*.json into src/portfolioData.js in a follow-up commit.
+
+on:
+  schedule:
+    - cron: "0 12 20 2,5,8,11 *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Run EDGAR refresh
+        run: node scripts/fetch-edgar.mjs --all
+
+      - name: Open pull request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          branch: data/edgar-refresh
+          title: "data: quarterly EDGAR refresh"
+          body: |
+            Automated quarterly refresh of `data/edgar_facts/*.json` from the
+            SEC EDGAR companyfacts API.
+
+            See `data/edgar_facts/_index.json` for per-ticker status (fy_covered,
+            missing_concepts, last_refreshed).
+
+            **Review before merging.** This PR only updates the EDGAR facts
+            cache. Porting verified values into `src/portfolioData.js` is a
+            separate manual step.
+          labels: data-refresh
+          commit-message: "data: refresh edgar facts cache"
+          delete-branch: true

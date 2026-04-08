@@ -19,6 +19,7 @@ Requirements:
 import argparse
 import json
 import logging
+import pathlib
 import sys
 from dataclasses import dataclass, field, asdict
 from datetime import datetime, date
@@ -34,16 +35,12 @@ EDGAR_HEADERS = {
     "Accept": "application/json",
 }
 
-# CIK mapping for our portfolio companies
-CIK_MAP = {
-    "LCID": "0001811210",
-    "RIVN": "0001874178",
-    "CENT": "0000887733",
-    "IHRT": "0001400891",
-    "SMC":  "0002024218",
-    "UPBD": "0000933036",
-    "WSC":  "0001647088",
-}
+# CIK mapping for our portfolio companies — loaded from data/cik_map.json so
+# this Python daily fetcher and scripts/fetch-edgar.mjs (the Node quarterly
+# refresh) share a single source of truth. To add a new ticker, edit
+# data/cik_map.json; no code changes needed here.
+_CIK_MAP_PATH = pathlib.Path(__file__).resolve().parent.parent / "data" / "cik_map.json"
+CIK_MAP: Dict[str, str] = json.loads(_CIK_MAP_PATH.read_text())
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger(__name__)
