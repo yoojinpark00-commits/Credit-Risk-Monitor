@@ -4,9 +4,16 @@ Vercel Serverless Function: GET /api/company?ticker=AAPL
 Primary: SEC EDGAR XBRL companyfacts API (free, no key, all financials)
 Price:   Yahoo Finance v8/chart (free, no auth needed)
 Rating:  5-factor S&P-style implied credit rating model
+
+Persistence: When SUPABASE_URL + SUPABASE_ANON_KEY are configured, the
+generated profile is also written to Supabase (company_registry as
+is_portfolio=FALSE, portfolio_data as a fresh row) so the search history
+view and recently_searched view in supabase_schema_v2.sql pick it up.
+Persistence is best-effort and never blocks the API response.
 """
 import json
 import math
+import os
 import urllib.request
 import urllib.error
 from http.server import BaseHTTPRequestHandler
@@ -17,6 +24,9 @@ from concurrent.futures import ThreadPoolExecutor
 _company_cache = {}
 CACHE_TTL_HOURS = 6
 _cik_cache = {}
+
+SUPABASE_URL = os.environ.get('SUPABASE_URL')
+SUPABASE_KEY = os.environ.get('SUPABASE_ANON_KEY')
 
 EDGAR_UA = "CreditRiskMonitor/1.0 (creditrisk@monitor.app)"
 EDGAR_HEADERS = {"User-Agent": EDGAR_UA, "Accept": "application/json"}
@@ -1140,6 +1150,81 @@ def generate_company_profile(ticker):
     }
 
 
+def _persist_to_supabase(ticker, profile):
+    """Best-effort persistence of an /api/company profile to Supabase.
+
+    Writes two rows:
+    1. company_registry: upserts the ticker with is_portfolio=FALSE so it
+       appears in the search_history / recently_searched views without
+       polluting the curated portfolio. Existing rows (e.g. portfolio
+       tickers re-fetched ad-hoc) are not flipped to is_portfolio=FALSE.
+    2. portfolio_data: appends a fresh fiscal-year row with the full
+       generated JSON so the latest_portfolio view returns it.
+
+    Schema reference: scripts/supabase_schema_v2.sql.
+
+    Failures are logged and swallowed — never blocks the API response.
+    """
+    if not (SUPABASE_URL and SUPABASE_KEY):
+        return
+    try:
+        import requests
+    except ImportError:
+        return
+
+    headers = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Content-Type": "application/json",
+        "Prefer": "return=minimal,resolution=ignore-duplicates",
+    }
+    fy = None
+    if profile.get("financials") and len(profile["financials"]) > 0:
+        period = profile["financials"][0].get("period", "")
+        try:
+            fy = int(period.replace("FY", ""))
+        except (ValueError, AttributeError):
+            fy = None
+    if fy is None:
+        fy = datetime.now(timezone.utc).year
+
+    try:
+        # Register the ticker (idempotent — ignore-duplicates means existing
+        # portfolio rows are NOT downgraded to is_portfolio=FALSE).
+        requests.post(
+            f"{SUPABASE_URL}/rest/v1/company_registry",
+            json={
+                "ticker": ticker,
+                "name": profile.get("name", ""),
+                "sector": profile.get("sector", ""),
+                "cik": profile.get("_cik", ""),
+                "is_portfolio": False,
+                "is_public": True,
+                "added_by": "api/company",
+            },
+            headers=headers,
+            timeout=5,
+        )
+    except Exception:
+        pass
+
+    try:
+        # Append a fresh portfolio_data row for this fiscal year.
+        requests.post(
+            f"{SUPABASE_URL}/rest/v1/portfolio_data",
+            json={
+                "ticker": ticker,
+                "fiscal_year": fy,
+                "data_json": json.dumps(profile, default=str),
+                "fetched_at": datetime.now(timezone.utc).isoformat(),
+            },
+            headers={**headers, "Prefer": "return=minimal"},
+            timeout=5,
+        )
+    except Exception:
+        pass
+
+
 class handler(BaseHTTPRequestHandler):
     def do_OPTIONS(self):
         self.send_response(204)
@@ -1175,6 +1260,11 @@ class handler(BaseHTTPRequestHandler):
             return
 
         _company_cache[ticker] = {'data': data, 'fetched_at': datetime.now()}
+        # Best-effort persistence to Supabase (no-op when env vars are unset)
+        try:
+            _persist_to_supabase(ticker, data)
+        except Exception:
+            pass
         self._respond(200, data)
 
     def _respond(self, code, data):

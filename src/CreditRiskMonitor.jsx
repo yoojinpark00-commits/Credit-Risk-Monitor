@@ -153,7 +153,27 @@ const [sortDir, setSortDir] = useState("asc");
 const [dbPortfolio, setDbPortfolio] = useState(null);
 const [portfolioSource, setPortfolioSource] = useState("static");
 const [expandedNews, setExpandedNews] = useState({});
-const [adHocCompany, setAdHocCompany] = useState(null);
+// Ad-hoc lookup state. Persisted to localStorage with a 24-hour TTL so a
+// page reload after `lookupTicker("MSFT")` re-shows the same generated
+// dashboard instead of dropping the user back into the static portfolio.
+const AD_HOC_STORAGE_KEY = "crm.adHocCompany.v1";
+const AD_HOC_TTL_MS = 24 * 60 * 60 * 1000;
+const [adHocCompany, setAdHocCompany] = useState(() => {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(AD_HOC_STORAGE_KEY);
+    if (!raw) return null;
+    const { data, savedAt } = JSON.parse(raw);
+    if (!data || !savedAt) return null;
+    if (Date.now() - savedAt > AD_HOC_TTL_MS) {
+      window.localStorage.removeItem(AD_HOC_STORAGE_KEY);
+      return null;
+    }
+    return data;
+  } catch {
+    return null;
+  }
+});
 const [adHocLoading, setAdHocLoading] = useState(false); // "static" | "api" | "error"
 
 // ─── NAVIGATION HISTORY ───────────────────────────────────────────────
@@ -550,6 +570,13 @@ const lookupTicker = useCallback(async (ticker) => {
       if (newsData.news) company.news = newsData.news;
     } catch(e) { /* news fetch is non-critical */ }
     setAdHocCompany(company);
+    // Persist to localStorage so page reloads survive (TTL: 24h)
+    try {
+      window.localStorage.setItem(
+        AD_HOC_STORAGE_KEY,
+        JSON.stringify({ data: company, savedAt: Date.now() })
+      );
+    } catch { /* localStorage may be unavailable in private mode */ }
     navigate(ticker, tab, "financials");
   } catch (e) {
     setDataError(prev => ({ ...prev, lookup: e.message }));
