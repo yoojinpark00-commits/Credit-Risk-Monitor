@@ -564,7 +564,7 @@ const lookupTicker = useCallback(async (ticker) => {
 
   setAdHocLoading(true);
   try {
-    const resp = await fetch(`/api/company?ticker=${ticker}`);
+    const resp = await fetch(`/api/company?ticker=${ticker}&_walk=v2`);
     if (!resp.ok) {
       const err = await resp.json().catch(() => ({}));
       throw new Error(err.error || `HTTP ${resp.status}`);
@@ -609,7 +609,7 @@ useEffect(() => {
     try {
       // Cache-bust the URL so stale Vercel/edge responses (from before the
       // reconciliationWalk was added to the API) are bypassed.
-      const resp = await fetch(`/api/company?ticker=${selected}&_walk=v1`);
+      const resp = await fetch(`/api/company?ticker=${selected}&_walk=v2`);
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const company = await resp.json();
       const ab = company && company.adjBurn;
@@ -629,6 +629,10 @@ useEffect(() => {
             acquisitionCosts: ab.acquisitionCosts,
             gainLossDisposal: ab.gainLossDisposal,
             otherNonOp: ab.otherNonOp,
+            interestIncome: ab.interestIncome,
+            nonOpTotal: ab.nonOpTotal,
+            nonOpReversal: ab.nonOpReversal,
+            nonOpReversalMethod: ab.nonOpReversalMethod,
             _fetchedAt: Date.now(),
           },
         }));
@@ -675,6 +679,10 @@ const detail = useMemo(() => {
         acquisitionCosts: liveRecon.acquisitionCosts,
         gainLossDisposal: liveRecon.gainLossDisposal,
         otherNonOp: liveRecon.otherNonOp,
+        interestIncome: liveRecon.interestIncome,
+        nonOpTotal: liveRecon.nonOpTotal,
+        nonOpReversal: liveRecon.nonOpReversal,
+        nonOpReversalMethod: liveRecon.nonOpReversalMethod,
       },
     };
   }
@@ -905,6 +913,7 @@ return (
                 case "tax":          return "#fbbf24";
                 case "interest":     return "#f59e0b";
                 case "da":           return "#38bdf8";
+                case "nonop_reversal": return "#c084fc";
                 case "sbc":          return "#a78bfa";
                 case "restructuring":return "#f97316";
                 case "impairment":   return "#ef4444";

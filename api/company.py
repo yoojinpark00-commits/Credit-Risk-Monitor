@@ -82,6 +82,18 @@ CONCEPT_MAP = {
     "other_nonop": [
         "OtherNonoperatingIncomeExpense",
     ],
+    # Net non-operating income/expense — the single XBRL line that aggregates
+    # interest income, investment gains/losses, FX, and "other" non-op. Used
+    # to reverse non-op contribution out of the bottom-up EBITDA bridge so
+    # the resulting "GAAP EBITDA" reflects operating performance only.
+    "nonop_total": [
+        "NonoperatingIncomeExpense",
+    ],
+    "interest_income": [
+        "InvestmentIncomeInterest",
+        "InterestIncomeOperating",
+        "InterestAndDividendIncomeOperating",
+    ],
     "gross_profit": ["GrossProfit"],
     "cogs": ["CostOfGoodsAndServicesSold", "CostOfRevenue", "CostOfGoodsSold"],
     "rd_expense": ["ResearchAndDevelopmentExpense"],
@@ -554,6 +566,9 @@ def generate_company_profile(ticker):
     acq_cost_s = _get_field(facts, "acquisition_costs")
     gain_disp_s = _get_field(facts, "gain_loss_disposal")
     other_nonop_s = _get_field(facts, "other_nonop")
+    # Net non-op reversal (preferred single line)
+    nonop_total_s = _get_field(facts, "nonop_total")
+    int_income_s = _get_field(facts, "interest_income")
     ltd_s = _get_field(facts, "total_debt_lt")
     cd_s = _get_field(facts, "current_debt")
     cash_s = _get_field(facts, "cash")
@@ -606,6 +621,9 @@ def generate_company_profile(ticker):
     gain_loss_disposal = latest_val_m(gain_disp_s)
     # Other non-operating: typically signed; reverse for an EBITDA bridge.
     other_nonop = latest_val_m(other_nonop_s)
+    # Net non-operating income/expense (signed): positive = net income from non-op
+    nonop_total = latest_val_m(nonop_total_s)
+    interest_income = latest_val_m(int_income_s)
     lt_debt = latest_val_m(ltd_s)
     current_debt = latest_val_m(cd_s)
     total_debt = lt_debt + current_debt
@@ -650,13 +668,62 @@ def generate_company_profile(ticker):
     if da_s:
         ebitda_walk.append({"label": "+ Depreciation & Amortization", "amount": da, "isSubtotal": False, "category": "da", "source": _xbrl_src(da_s)})
 
-    # GAAP EBITDA: prefer the bottom-up walk (NI + Tax + Int + D&A); fall back to
-    # OpInc + D&A if any building-block is missing. The walk is more transparent
-    # because each component ties to a specific XBRL concept.
-    gaap_ebitda_bottomup = net_income + tax_exp + int_exp + da
+    # ─── Non-operating reversal ──────────────────────────────────────────────
+    # The bottom-up bridge (NI + Tax + Int + D&A) carries every non-operating
+    # income/expense item that hit net income (interest income, investment
+    # gains/losses, FX, "other" non-op). To surface a clean *operating* EBITDA
+    # we reverse the net non-op line back out. Preferred: the single aggregate
+    # us-gaap:NonoperatingIncomeExpense concept. Fallback: sum of the component
+    # concepts (interest income + other non-op + disposal gain/loss), used when
+    # the issuer's filing doesn't emit the aggregate tag.
+    #
+    # Sign convention: `nonop_total` is positive when non-op is net INCOME
+    # (inflating NI → inflating bottom-up EBITDA). Subtracting it neutralizes
+    # the effect. Negative nonop_total (net expense) gets added back.
+    if nonop_total_s:
+        nonop_reversal = -nonop_total
+        nonop_source = _xbrl_src(nonop_total_s)
+        nonop_method = "aggregate us-gaap:NonoperatingIncomeExpense"
+    else:
+        # Fallback: reconstruct from components. Interest income and "other
+        # non-op" are the common cases. Gains on disposal are non-op at some
+        # issuers; include when NonoperatingIncomeExpense is absent.
+        nonop_fallback = interest_income + other_nonop + gain_loss_disposal
+        nonop_reversal = -nonop_fallback
+        nonop_source = {
+            "label": (
+                f"Fallback sum: InvestmentIncomeInterest ({interest_income}M) "
+                f"+ OtherNonoperatingIncomeExpense ({other_nonop}M) "
+                f"+ GainLossOnDispositionOfAssets ({gain_loss_disposal}M)"
+            ),
+            "concept": "us-gaap:(InvestmentIncomeInterest + OtherNonoperatingIncomeExpense + GainLossOnDispositionOfAssets)",
+            "fy": None,
+            "period_end": "",
+        }
+        nonop_method = "component sum (aggregate concept unavailable)"
+
+    if nonop_reversal:
+        # Label reflects direction: a reversal of net non-op *income* shows
+        # up as a negative line ("− Net Non-Op Income"); reversal of net
+        # non-op *expense* shows up as a positive add-back.
+        ebitda_walk.append({
+            "label": ("− Net Non-Operating Income" if nonop_reversal < 0 else "+ Net Non-Operating Expense"),
+            "amount": nonop_reversal,
+            "isSubtotal": False,
+            "category": "nonop_reversal",
+            "source": nonop_source,
+        })
+
+    # GAAP EBITDA: bottom-up (NI + Tax + Int + D&A − NonOp) when the 4 core
+    # building-blocks are available; fall back to OpInc + D&A otherwise. The
+    # bottom-up result now equals Operating Income + D&A when the non-op
+    # reversal lines up cleanly, which is the textbook definition.
+    gaap_ebitda_bottomup = net_income + tax_exp + int_exp + da + nonop_reversal
     if ni_s and tx_s and ie_s and da_s:
         gaap_ebitda = gaap_ebitda_bottomup
-        gaap_ebitda_method = "bottom-up: NI + Tax + Interest + D&A (4 XBRL concepts)"
+        gaap_ebitda_method = (
+            f"bottom-up: NI + Tax + Interest + D&A − NonOp ({nonop_method})"
+        )
     elif oper_income and da:
         gaap_ebitda = oper_income + da
         gaap_ebitda_method = "top-down: Operating Income + D&A (2 XBRL concepts)"
@@ -671,7 +738,11 @@ def generate_company_profile(ticker):
         "source": {"label": f"Computed ({gaap_ebitda_method})"},
     })
 
-    # Non-GAAP add-backs — each from a distinct SEC XBRL concept
+    # Non-GAAP add-backs — each from a distinct SEC XBRL concept.
+    # NOTE: `other_nonop` and `gain_loss_disposal` are intentionally NOT added
+    # here. They were already reversed above via the non-op reversal line
+    # (either through the aggregate NonoperatingIncomeExpense concept or the
+    # component-sum fallback). Adding them again would double-count.
     addbacks = []
     if sbc:
         addbacks.append({"label": "+ Stock-Based Compensation", "amount": sbc, "isSubtotal": False, "category": "sbc", "source": _xbrl_src(sbc_s)})
@@ -683,19 +754,6 @@ def generate_company_profile(ticker):
         addbacks.append({"label": "+ Asset / Intangible Impairment", "amount": asset_impairment, "isSubtotal": False, "category": "impairment", "source": _xbrl_src(asset_imp_s)})
     if acquisition_costs:
         addbacks.append({"label": "+ Acquisition-Related Costs", "amount": acquisition_costs, "isSubtotal": False, "category": "acquisition", "source": _xbrl_src(acq_cost_s)})
-    if gain_loss_disposal:
-        # Gain (positive) is a non-recurring benefit → subtract from EBITDA add-backs.
-        addbacks.append({
-            "label": ("− Gain on Asset Disposal" if gain_loss_disposal > 0 else "+ Loss on Asset Disposal"),
-            "amount": -gain_loss_disposal,
-            "isSubtotal": False, "category": "disposal", "source": _xbrl_src(gain_disp_s),
-        })
-    if other_nonop:
-        addbacks.append({
-            "label": ("− Other Non-Op Income" if other_nonop > 0 else "+ Other Non-Op Expense"),
-            "amount": -other_nonop,
-            "isSubtotal": False, "category": "other_nonop", "source": _xbrl_src(other_nonop_s),
-        })
 
     ebitda_walk.extend(addbacks)
     total_addbacks = sum(item["amount"] for item in addbacks)
@@ -708,10 +766,13 @@ def generate_company_profile(ticker):
         "source": {"label": f"Computed: GAAP EBITDA + {len(addbacks)} XBRL-sourced adjustments"},
     })
 
-    # Aggregated bucket for the legacy compact view (kept for backwards-compat)
+    # Aggregated bucket for the legacy compact view (kept for backwards-compat).
+    # Only the clean non-cash / non-recurring items are included here; the
+    # non-op reversal is surfaced separately via adjBurn.nonOpReversal so the
+    # compact card doesn't double-count items that were already removed above
+    # the GAAP EBITDA subtotal.
     other_non_cash_total = (
         goodwill_impairment + asset_impairment + acquisition_costs
-        - gain_loss_disposal - other_nonop
     )
 
     # Ratios
@@ -970,6 +1031,10 @@ def generate_company_profile(ticker):
         "acquisitionCosts": acquisition_costs,
         "gainLossDisposal": gain_loss_disposal,
         "otherNonOp": other_nonop,
+        "interestIncome": interest_income,
+        "nonOpTotal": nonop_total,
+        "nonOpReversal": nonop_reversal,
+        "nonOpReversalMethod": nonop_method,
         # Granular GAAP→Adjusted EBITDA bridge sourced live from SEC XBRL.
         # Each entry carries the exact us-gaap concept and 10-K period.
         "reconciliationWalk": ebitda_walk,
