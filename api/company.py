@@ -10,10 +10,18 @@ generated profile is also written to Supabase (company_registry as
 is_portfolio=FALSE, portfolio_data as a fresh row) so the search history
 view and recently_searched view in supabase_schema_v2.sql pick it up.
 Persistence is best-effort and never blocks the API response.
+
+Narrative enrichment: When data/narrative_cache/<TICKER>/<accession>.json
+exists (produced by scripts/extract-filing-narrative.mjs via the quarterly
+GitHub Actions workflow), the response is enriched with LLM-extracted
+reconciliationItems, debtMaturities, and earningsCallSummary that XBRL
+companyfacts cannot capture. This is the wiring for Phase 3 of the scaling
+effort.
 """
 import json
 import math
 import os
+import pathlib
 import urllib.request
 import urllib.error
 from http.server import BaseHTTPRequestHandler
@@ -27,6 +35,10 @@ _cik_cache = {}
 
 SUPABASE_URL = os.environ.get('SUPABASE_URL')
 SUPABASE_KEY = os.environ.get('SUPABASE_ANON_KEY')
+
+# Narrative cache populated by scripts/extract-filing-narrative.mjs
+_NARRATIVE_DIR = pathlib.Path(__file__).parent.parent / "data" / "narrative_cache"
+_NARRATIVE_INDEX_PATH = _NARRATIVE_DIR / "_index.json"
 
 EDGAR_UA = "CreditRiskMonitor/1.0 (creditrisk@monitor.app)"
 EDGAR_HEADERS = {"User-Agent": EDGAR_UA, "Accept": "application/json"}
@@ -1150,6 +1162,109 @@ def generate_company_profile(ticker):
     }
 
 
+def _load_narrative_cache(ticker):
+    """Read the latest LLM-extracted narrative cache for a ticker, if any.
+
+    Looks up the ticker in data/narrative_cache/_index.json (managed by
+    scripts/extract-filing-narrative.mjs), then loads the per-accession
+    JSON file. Returns the parsed dict or None if no cache exists.
+
+    Schema reference: scripts/extract-filing-narrative.mjs payload shape.
+    """
+    try:
+        index = json.loads(_NARRATIVE_INDEX_PATH.read_text())
+    except (FileNotFoundError, json.JSONDecodeError):
+        return None
+    entry = index.get(ticker.upper())
+    if not entry or not entry.get("cache_path"):
+        return None
+    cache_file = pathlib.Path(__file__).parent.parent / entry["cache_path"]
+    try:
+        return json.loads(cache_file.read_text())
+    except (FileNotFoundError, json.JSONDecodeError):
+        return None
+
+
+def _enrich_with_narrative(profile, ticker):
+    """Merge LLM-extracted narrative fields into a generated profile.
+
+    Best-effort: only fills in fields that the narrative cache actually has.
+    Never blanks out structured XBRL data. Adds an `_enriched_by_narrative`
+    sentinel + accession provenance so the frontend can render a
+    "narrative-enriched" badge if desired.
+    """
+    cache = _load_narrative_cache(ticker)
+    if not cache:
+        return profile
+
+    accession = cache.get("accession", "")
+    src_tag = f"LLM-extracted from {cache.get('form', '10-K')} (accession {accession}) by {cache.get('model', 'claude')}"
+
+    # 1. reconciliationItems → adjBurn.reconciliationItems
+    recon = cache.get("reconciliationItems") or []
+    if recon:
+        profile.setdefault("adjBurn", {})
+        profile["adjBurn"]["reconciliationItems"] = recon
+        # Also bucket into restructuring + otherNonCash so the existing UI
+        # reconciliation card renders the LLM-extracted items. Mirrors the
+        # GT data quality fix bucketing convention.
+        restructuring_keywords = (
+            "impair", "rationalization", "restructur", "severance",
+            "pension", "forward", "transformation",
+        )
+        restructuring_total = 0
+        other_total = 0
+        for item in recon:
+            label = (item.get("label") or "").lower()
+            amt = item.get("amount") or 0
+            if any(k in label for k in restructuring_keywords):
+                restructuring_total += amt
+            else:
+                other_total += amt
+        if restructuring_total:
+            profile["adjBurn"]["restructuring"] = restructuring_total
+            profile["adjBurn"]["restructuring_src"] = src_tag
+        if other_total:
+            profile["adjBurn"]["otherNonCash"] = other_total
+            profile["adjBurn"]["otherNonCash_src"] = src_tag
+
+    # 2. debtMaturities → liquidityBreakdown.debtMaturities (only if XBRL gave us nothing)
+    nb_maturities = cache.get("debtMaturities") or []
+    if nb_maturities:
+        lb = profile.setdefault("liquidityBreakdown", {})
+        existing_maturities = lb.get("debtMaturities") or []
+        # Only override if the structured pipeline didn't find anything.
+        # The LLM-extracted version usually has richer descriptions.
+        if not existing_maturities:
+            lb["debtMaturities"] = nb_maturities
+            lb["debtMaturities_src"] = src_tag
+
+    # 3. earningsCallSummary — overlay only when XBRL-derived summary is sparse
+    ecs = cache.get("earningsCallSummary")
+    if ecs:
+        existing = profile.get("earningsCallSummary") or {}
+        # Prefer LLM bullets when the auto-generated ones are empty
+        merged = {
+            "quarter": existing.get("quarter") or ecs.get("quarter", ""),
+            "date": existing.get("date") or "",
+            "source": ecs.get("source", "10-K MD&A (LLM-extracted)"),
+            "keyFinancials": existing.get("keyFinancials") or ecs.get("keyFinancials") or [],
+            "production": existing.get("production") or [],
+            "creditRelevant": existing.get("creditRelevant") or ecs.get("creditRelevant") or [],
+            "strategicItems": existing.get("strategicItems") or ecs.get("strategicItems") or [],
+            "analystQA": existing.get("analystQA") or ecs.get("analystQA") or [],
+        }
+        profile["earningsCallSummary"] = merged
+
+    profile["_enriched_by_narrative"] = {
+        "accession": accession,
+        "form": cache.get("form", ""),
+        "model": cache.get("model", ""),
+        "extracted_at": cache.get("extracted_at", ""),
+    }
+    return profile
+
+
 def _persist_to_supabase(ticker, profile):
     """Best-effort persistence of an /api/company profile to Supabase.
 
@@ -1258,6 +1373,13 @@ class handler(BaseHTTPRequestHandler):
         if data is None:
             self._respond(404, {"error": f"No SEC filings found for '{ticker}'. Verify the ticker symbol."})
             return
+
+        # Phase 3: enrich with LLM-extracted narrative cache when available
+        try:
+            data = _enrich_with_narrative(data, ticker)
+        except Exception:
+            # Never let narrative enrichment break the API response
+            pass
 
         _company_cache[ticker] = {'data': data, 'fetched_at': datetime.now()}
         # Best-effort persistence to Supabase (no-op when env vars are unset)

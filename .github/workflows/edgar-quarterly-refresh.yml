@@ -1,14 +1,20 @@
 name: EDGAR Quarterly Refresh
 
-# Quarterly refresh of data/edgar_facts/*.json from SEC EDGAR companyfacts API.
+# Quarterly refresh of:
+#   1. data/edgar_facts/*.json    — structured XBRL companyfacts (fetch-edgar.mjs)
+#   2. data/narrative_cache/*.json — LLM-extracted reconciliation tables, debt
+#                                    schedules, and earnings summaries from
+#                                    10-K filing HTML (extract-filing-narrative.mjs)
 #
 # Cron: 20th of Feb/May/Aug/Nov at noon UTC. This timing gives 10-Qs (~45 days
 # after quarter end) and 10-Ks (for Dec-year filers, typically mid-Feb) enough
 # time to actually land on EDGAR before we try to fetch them.
 #
-# Opens a PR on branch `data/edgar-refresh` for human review — never auto-merges.
-# Humans decide whether to then port the verified values from
-# data/edgar_facts/*.json into src/portfolioData.js in a follow-up commit.
+# Opens a single PR on branch `data/edgar-refresh` containing both caches for
+# human review — never auto-merges. Humans decide whether to then port the
+# verified values from data/edgar_facts/*.json into src/portfolioData.js in a
+# follow-up commit. The narrative cache is auto-merged into /api/company
+# responses at request time, so it doesn't need manual porting.
 
 on:
   schedule:
@@ -31,8 +37,19 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Run EDGAR refresh
+      - name: Run EDGAR XBRL refresh
         run: node scripts/fetch-edgar.mjs --all
+
+      - name: Run narrative extraction
+        # Pulls 10-K HTML for every ticker in data/cik_map.json and uses Claude
+        # to extract reconciliation tables / debt schedules / call summaries
+        # into data/narrative_cache/<TICKER>/<accession>.json. Skipped if the
+        # ANTHROPIC_API_KEY secret isn't configured (the workflow still produces
+        # the XBRL refresh PR in that case).
+        if: env.ANTHROPIC_API_KEY != ''
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: node scripts/extract-filing-narrative.mjs --all
 
       - name: Open pull request
         uses: peter-evans/create-pull-request@v6
@@ -40,15 +57,23 @@ jobs:
           branch: data/edgar-refresh
           title: "data: quarterly EDGAR refresh"
           body: |
-            Automated quarterly refresh of `data/edgar_facts/*.json` from the
-            SEC EDGAR companyfacts API.
+            Automated quarterly refresh of:
 
-            See `data/edgar_facts/_index.json` for per-ticker status (fy_covered,
-            missing_concepts, last_refreshed).
+            1. **`data/edgar_facts/*.json`** — SEC EDGAR companyfacts XBRL cache.
+               See `data/edgar_facts/_index.json` for per-ticker status
+               (fy_covered, missing_concepts, last_refreshed).
 
-            **Review before merging.** This PR only updates the EDGAR facts
-            cache. Porting verified values into `src/portfolioData.js` is a
-            separate manual step.
+            2. **`data/narrative_cache/<TICKER>/<accession>.json`** — LLM-extracted
+               reconciliation tables, debt maturity schedules, and earnings call
+               summaries from each ticker's most recent 10-K. See
+               `data/narrative_cache/_index.json` for per-ticker accession
+               coverage. Only present if `ANTHROPIC_API_KEY` was configured.
+
+            **Review before merging.** Porting verified XBRL values into
+            `src/portfolioData.js` remains a separate manual step. The narrative
+            cache is auto-merged into `/api/company` responses at request time
+            via `_enrich_with_narrative` in `api/company.py`, so it doesn't
+            require manual porting.
           labels: data-refresh
-          commit-message: "data: refresh edgar facts cache"
+          commit-message: "data: refresh edgar facts and narrative caches"
           delete-branch: true
