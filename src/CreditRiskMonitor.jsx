@@ -803,21 +803,63 @@ return (
           {/* ═══ EBITDA RECONCILIATION: GAAP → ADJUSTED ═══ */}
           {detail.adjBurn && (() => {
             const ab = detail.adjBurn;
-            // Default any unprovided recon fields to 0 / derive GAAP from Adjusted so the card
-            // still renders for credits whose 10-K does not separately disclose the walk.
-            const sbc           = ab.sbc ?? 0;
-            const restructuring = ab.restructuring ?? 0;
-            const otherNonCash  = ab.otherNonCash ?? 0;
-            const totalAdj      = sbc + restructuring + otherNonCash;
-            const gaapEbitda    = ab.gaapEbitda != null ? ab.gaapEbitda : (ab.adjEBITDA - totalAdj);
-            const noReconDisclosed = ab.gaapEbitda == null && totalAdj === 0;
-            const reconItems = [
-              { label: "GAAP EBITDA", amount: gaapEbitda, isSubtotal: true, color: "#60a5fa" },
-              ...(sbc ? [{ label: "Stock-Based Compensation", amount: sbc, color: "#a78bfa" }] : []),
-              ...(restructuring ? [{ label: "Restructuring & Impairments", amount: restructuring, color: "#f97316" }] : []),
-              ...(otherNonCash ? [{ label: "Other Non-Cash Items", amount: otherNonCash, color: otherNonCash >= 0 ? "#94a3b8" : "#64748b" }] : []),
-              { label: "Adjusted EBITDA", amount: ab.adjEBITDA, isSubtotal: true, color: ab.adjEBITDA >= 0 ? "#22c55e" : "#ef4444" },
-            ];
+            // Prefer the granular bottom-up walk built by api/company.py from individual
+            // SEC XBRL concepts. Falls back to the legacy 3-bucket view when the backend
+            // didn't provide a walk (older cached responses or static portfolioData entries).
+            const walk = Array.isArray(ab.reconciliationWalk) ? ab.reconciliationWalk : null;
+            const reconSource = ab.reconciliationSource || null;
+
+            const colorForCategory = (cat, amount, isSubtotal) => {
+              if (isSubtotal) return amount >= 0 ? "#22c55e" : "#ef4444";
+              switch (cat) {
+                case "starting":     return "#60a5fa";
+                case "tax":          return "#fbbf24";
+                case "interest":     return "#f59e0b";
+                case "da":           return "#38bdf8";
+                case "sbc":          return "#a78bfa";
+                case "restructuring":return "#f97316";
+                case "impairment":   return "#ef4444";
+                case "acquisition":  return "#ec4899";
+                case "disposal":     return "#14b8a6";
+                case "other_nonop":  return "#94a3b8";
+                default:             return "#94a3b8";
+              }
+            };
+
+            let reconItems;
+            let totalAdj;
+            let gaapEbitda;
+            let noReconDisclosed = false;
+
+            if (walk && walk.length > 0) {
+              // Granular path — render the full bridge straight from SEC XBRL.
+              reconItems = walk.map(w => ({
+                label: w.label,
+                amount: w.amount,
+                isSubtotal: !!w.isSubtotal,
+                color: colorForCategory(w.category, w.amount, w.isSubtotal),
+                source: w.source || null,
+                category: w.category,
+              }));
+              const gaapItem = walk.find(w => w.category === "subtotal");
+              gaapEbitda = gaapItem ? gaapItem.amount : (ab.gaapEbitda ?? 0);
+              totalAdj = (ab.adjEBITDA ?? 0) - gaapEbitda;
+            } else {
+              // Legacy fallback (no walk available)
+              const sbc           = ab.sbc ?? 0;
+              const restructuring = ab.restructuring ?? 0;
+              const otherNonCash  = ab.otherNonCash ?? 0;
+              totalAdj            = sbc + restructuring + otherNonCash;
+              gaapEbitda          = ab.gaapEbitda != null ? ab.gaapEbitda : (ab.adjEBITDA - totalAdj);
+              noReconDisclosed    = ab.gaapEbitda == null && totalAdj === 0;
+              reconItems = [
+                { label: "GAAP EBITDA", amount: gaapEbitda, isSubtotal: true, color: "#60a5fa" },
+                ...(sbc ? [{ label: "Stock-Based Compensation", amount: sbc, color: "#a78bfa" }] : []),
+                ...(restructuring ? [{ label: "Restructuring & Impairments", amount: restructuring, color: "#f97316" }] : []),
+                ...(otherNonCash ? [{ label: "Other Non-Cash Items", amount: otherNonCash, color: otherNonCash >= 0 ? "#94a3b8" : "#64748b" }] : []),
+                { label: "Adjusted EBITDA", amount: ab.adjEBITDA, isSubtotal: true, color: ab.adjEBITDA >= 0 ? "#22c55e" : "#ef4444" },
+              ];
+            }
             const maxRecon = Math.max(...reconItems.map(r => Math.abs(r.amount)), 1);
 
             return (
@@ -833,15 +875,26 @@ return (
               <div style={{ fontSize: mob ? 9 : 10, color: "#64748b", marginBottom: 16 }}>
                 {noReconDisclosed
                   ? "Issuer's 10-K does not separately disclose a GAAP-to-Adjusted EBITDA walk; reported figure is shown as both GAAP and Adjusted."
-                  : "Reconciles reported GAAP EBITDA to company-reported Non-GAAP Adjusted EBITDA by adding back non-cash and non-recurring items."}
+                  : walk
+                    ? "Bottom-up bridge built from individual us-gaap XBRL concepts pulled live from SEC EDGAR companyfacts. Hover any line for the exact concept and 10-K period."
+                    : "Reconciles reported GAAP EBITDA to company-reported Non-GAAP Adjusted EBITDA by adding back non-cash and non-recurring items."}
               </div>
+              {reconSource && (
+                <div style={{ fontSize: 9, color: "#475569", marginBottom: 12, fontFamily: "'JetBrains Mono', monospace", wordBreak: "break-all" }}>
+                  Source: {reconSource.provider}
+                  {reconSource.endpoint && <> — <a href={reconSource.endpoint} target="_blank" rel="noopener noreferrer" style={{ color: "#60a5fa", textDecoration: "none" }}>{reconSource.endpoint}</a></>}
+                  {reconSource.fy && <> · FY{reconSource.fy}</>}
+                  {reconSource.method && <> · {reconSource.method}</>}
+                </div>
+              )}
               <div style={{ display: "grid", gridTemplateColumns: sectionGrid, gap: mob ? 16 : 24, minWidth: 0 }}>
                 {/* Waterfall bars */}
                 <div>
                   {reconItems.map((r, ri) => {
                     const barPct = (maxRecon > 0 && isFinite(r.amount)) ? (Math.abs(r.amount) / maxRecon * 100) : 0;
+                    const tooltip = r.source && r.source.label ? r.source.label : (r.source && r.source.concept ? `${r.source.concept} · FY${r.source.fy ?? "?"}` : "");
                     return (
-                      <div key={ri} style={{ marginBottom: ri < reconItems.length - 1 ? 8 : 0 }}>
+                      <div key={ri} style={{ marginBottom: ri < reconItems.length - 1 ? 8 : 0 }} title={tooltip || undefined}>
                         {r.isSubtotal && ri > 0 && <div style={{ borderTop: "2px dashed rgba(148,163,184,0.2)", margin: "10px 0" }} />}
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                           <div style={{ width: mob ? 80 : 110, fontSize: mob ? 9 : 10, color: r.isSubtotal ? "#e2e8f0" : "#94a3b8", fontWeight: r.isSubtotal ? 700 : 400, textAlign: "right", flexShrink: 0, lineHeight: 1.2 }}>{r.label}</div>
@@ -861,14 +914,28 @@ return (
                   <div style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.5px" }}>Reconciliation Summary ($M)</div>
                   <table style={{ width: "100%", borderCollapse: "collapse", fontSize: mob ? 11 : 12 }}>
                     <tbody>
-                      {reconItems.map((r, ri) => (
-                        <tr key={ri} style={{ borderTop: r.isSubtotal && ri > 0 ? "2px solid rgba(148,163,184,0.15)" : "none" }}>
-                          <td style={{ padding: "6px 0", color: r.isSubtotal ? "#e2e8f0" : "#94a3b8", fontWeight: r.isSubtotal ? 700 : 400 }}>{r.isSubtotal && ri > 0 ? "= " : ri > 0 && !r.isSubtotal ? "+ " : ""}{r.label}</td>
+                      {reconItems.map((r, ri) => {
+                        const conceptShort = r.source && r.source.concept ? r.source.concept : "";
+                        const periodShort = r.source && r.source.period_end ? r.source.period_end : "";
+                        const tipFull = r.source && r.source.label ? r.source.label : conceptShort;
+                        // For walks the labels already include their own +/=/− prefix.
+                        const labelText = walk ? r.label : `${r.isSubtotal && ri > 0 ? "= " : ri > 0 && !r.isSubtotal ? "+ " : ""}${r.label}`;
+                        return (
+                        <tr key={ri} style={{ borderTop: r.isSubtotal && ri > 0 ? "2px solid rgba(148,163,184,0.15)" : "none" }} title={tipFull || undefined}>
+                          <td style={{ padding: "6px 0", color: r.isSubtotal ? "#e2e8f0" : "#94a3b8", fontWeight: r.isSubtotal ? 700 : 400 }}>
+                            <div>{labelText}</div>
+                            {conceptShort && (
+                              <div style={{ fontSize: 8, color: "#475569", fontFamily: "'JetBrains Mono', monospace", marginTop: 1 }}>
+                                {conceptShort}{periodShort ? ` · ${periodShort}` : ""}
+                              </div>
+                            )}
+                          </td>
                           <td style={{ padding: "6px 0", textAlign: "right", fontWeight: r.isSubtotal ? 800 : 600, color: r.isSubtotal ? r.color : "#e2e8f0", fontFamily: "'JetBrains Mono', monospace" }}>
                             {r.amount === 0 ? "\u2014" : r.amount < 0 ? `(${Math.abs(r.amount).toLocaleString()})` : `${r.amount.toLocaleString()}`}
                           </td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                   <div style={{ marginTop: 12, padding: 8, background: "rgba(96,165,250,0.05)", borderRadius: 4, border: "1px solid rgba(96,165,250,0.1)", fontSize: 9, color: "#64748b", lineHeight: 1.5 }}>

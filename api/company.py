@@ -60,6 +60,28 @@ CONCEPT_MAP = {
     ],
     "sbc": ["ShareBasedCompensation", "AllocatedShareBasedCompensationExpense"],
     "restructuring": ["RestructuringCharges", "RestructuringSettlementAndImpairmentProvisions"],
+    # Granular EBITDA reconciliation add-backs (each pulled live from SEC XBRL)
+    "goodwill_impairment": [
+        "GoodwillImpairmentLoss",
+        "GoodwillAndIntangibleAssetImpairment",
+    ],
+    "asset_impairment": [
+        "AssetImpairmentCharges",
+        "ImpairmentOfLongLivedAssetsHeldForUse",
+        "ImpairmentOfIntangibleAssetsExcludingGoodwill",
+        "ImpairmentOfIntangibleAssetsFinitelived",
+    ],
+    "acquisition_costs": [
+        "BusinessCombinationAcquisitionRelatedCosts",
+    ],
+    "gain_loss_disposal": [
+        "GainLossOnDispositionOfAssets",
+        "GainLossOnDispositionOfAssetsNet",
+        "GainLossOnSaleOfBusiness",
+    ],
+    "other_nonop": [
+        "OtherNonoperatingIncomeExpense",
+    ],
     "gross_profit": ["GrossProfit"],
     "cogs": ["CostOfGoodsAndServicesSold", "CostOfRevenue", "CostOfGoodsSold"],
     "rd_expense": ["ResearchAndDevelopmentExpense"],
@@ -526,6 +548,12 @@ def generate_company_profile(ticker):
     da_s = _get_field(facts, "depreciation")
     sbc_s = _get_field(facts, "sbc")
     restr_s = _get_field(facts, "restructuring")
+    # Granular EBITDA reconciliation series (live from SEC XBRL companyfacts)
+    gw_imp_s = _get_field(facts, "goodwill_impairment")
+    asset_imp_s = _get_field(facts, "asset_impairment")
+    acq_cost_s = _get_field(facts, "acquisition_costs")
+    gain_disp_s = _get_field(facts, "gain_loss_disposal")
+    other_nonop_s = _get_field(facts, "other_nonop")
     ltd_s = _get_field(facts, "total_debt_lt")
     cd_s = _get_field(facts, "current_debt")
     cash_s = _get_field(facts, "cash")
@@ -570,6 +598,14 @@ def generate_company_profile(ticker):
     da = latest_val_m(da_s)
     sbc = latest_val_m(sbc_s)
     restructuring = abs(latest_val_m(restr_s))
+    # Granular reconciliation add-backs ($M, signed where meaningful)
+    goodwill_impairment = abs(latest_val_m(gw_imp_s))
+    asset_impairment = abs(latest_val_m(asset_imp_s))
+    acquisition_costs = abs(latest_val_m(acq_cost_s))
+    # Disposal: a *gain* (positive XBRL value) reduces EBITDA add-backs; a loss increases.
+    gain_loss_disposal = latest_val_m(gain_disp_s)
+    # Other non-operating: typically signed; reverse for an EBITDA bridge.
+    other_nonop = latest_val_m(other_nonop_s)
     lt_debt = latest_val_m(ltd_s)
     current_debt = latest_val_m(cd_s)
     total_debt = lt_debt + current_debt
@@ -589,9 +625,94 @@ def generate_company_profile(ticker):
     dividends_common = abs(latest_val_m(div_common_s))
     buybacks = abs(latest_val_m(buybacks_s))
 
-    # EBITDA
-    gaap_ebitda = oper_income + da if (oper_income and da) else net_income + int_exp + tax_exp + da
-    adj_ebitda = gaap_ebitda + sbc + restructuring
+    # ─── Granular EBITDA Reconciliation (sourced live from SEC EDGAR XBRL) ────
+    # Build a textbook bottom-up EBITDA bridge from the individual us-gaap concepts
+    # already fetched above. Each line records the exact XBRL tag and 10-K period
+    # so the UI can surface provenance and prove the figure came from SEC filings.
+    def _xbrl_src(series):
+        if not series:
+            return None
+        e = series[0]
+        return {
+            "concept": f"us-gaap:{e.get('tag', '?')}",
+            "fy": e.get("fy"),
+            "period_end": e.get("end", ""),
+            "label": f"SEC EDGAR XBRL — us-gaap:{e.get('tag','?')} (FY{e.get('fy','?')} 10-K, period ending {e.get('end','?')})",
+        }
+
+    ebitda_walk = []
+    if ni_s:
+        ebitda_walk.append({"label": "Net Income", "amount": net_income, "isSubtotal": False, "category": "starting", "source": _xbrl_src(ni_s)})
+    if tx_s:
+        ebitda_walk.append({"label": "+ Income Tax Expense", "amount": tax_exp, "isSubtotal": False, "category": "tax", "source": _xbrl_src(tx_s)})
+    if ie_s:
+        ebitda_walk.append({"label": "+ Interest Expense", "amount": int_exp, "isSubtotal": False, "category": "interest", "source": _xbrl_src(ie_s)})
+    if da_s:
+        ebitda_walk.append({"label": "+ Depreciation & Amortization", "amount": da, "isSubtotal": False, "category": "da", "source": _xbrl_src(da_s)})
+
+    # GAAP EBITDA: prefer the bottom-up walk (NI + Tax + Int + D&A); fall back to
+    # OpInc + D&A if any building-block is missing. The walk is more transparent
+    # because each component ties to a specific XBRL concept.
+    gaap_ebitda_bottomup = net_income + tax_exp + int_exp + da
+    if ni_s and tx_s and ie_s and da_s:
+        gaap_ebitda = gaap_ebitda_bottomup
+        gaap_ebitda_method = "bottom-up: NI + Tax + Interest + D&A (4 XBRL concepts)"
+    elif oper_income and da:
+        gaap_ebitda = oper_income + da
+        gaap_ebitda_method = "top-down: Operating Income + D&A (2 XBRL concepts)"
+    else:
+        gaap_ebitda = gaap_ebitda_bottomup
+        gaap_ebitda_method = "best-effort from available XBRL fields"
+    ebitda_walk.append({
+        "label": "= GAAP EBITDA",
+        "amount": gaap_ebitda,
+        "isSubtotal": True,
+        "category": "subtotal",
+        "source": {"label": f"Computed ({gaap_ebitda_method})"},
+    })
+
+    # Non-GAAP add-backs — each from a distinct SEC XBRL concept
+    addbacks = []
+    if sbc:
+        addbacks.append({"label": "+ Stock-Based Compensation", "amount": sbc, "isSubtotal": False, "category": "sbc", "source": _xbrl_src(sbc_s)})
+    if restructuring:
+        addbacks.append({"label": "+ Restructuring Charges", "amount": restructuring, "isSubtotal": False, "category": "restructuring", "source": _xbrl_src(restr_s)})
+    if goodwill_impairment:
+        addbacks.append({"label": "+ Goodwill Impairment", "amount": goodwill_impairment, "isSubtotal": False, "category": "impairment", "source": _xbrl_src(gw_imp_s)})
+    if asset_impairment:
+        addbacks.append({"label": "+ Asset / Intangible Impairment", "amount": asset_impairment, "isSubtotal": False, "category": "impairment", "source": _xbrl_src(asset_imp_s)})
+    if acquisition_costs:
+        addbacks.append({"label": "+ Acquisition-Related Costs", "amount": acquisition_costs, "isSubtotal": False, "category": "acquisition", "source": _xbrl_src(acq_cost_s)})
+    if gain_loss_disposal:
+        # Gain (positive) is a non-recurring benefit → subtract from EBITDA add-backs.
+        addbacks.append({
+            "label": ("− Gain on Asset Disposal" if gain_loss_disposal > 0 else "+ Loss on Asset Disposal"),
+            "amount": -gain_loss_disposal,
+            "isSubtotal": False, "category": "disposal", "source": _xbrl_src(gain_disp_s),
+        })
+    if other_nonop:
+        addbacks.append({
+            "label": ("− Other Non-Op Income" if other_nonop > 0 else "+ Other Non-Op Expense"),
+            "amount": -other_nonop,
+            "isSubtotal": False, "category": "other_nonop", "source": _xbrl_src(other_nonop_s),
+        })
+
+    ebitda_walk.extend(addbacks)
+    total_addbacks = sum(item["amount"] for item in addbacks)
+    adj_ebitda = gaap_ebitda + total_addbacks
+    ebitda_walk.append({
+        "label": "= Adjusted EBITDA",
+        "amount": adj_ebitda,
+        "isSubtotal": True,
+        "category": "final",
+        "source": {"label": f"Computed: GAAP EBITDA + {len(addbacks)} XBRL-sourced adjustments"},
+    })
+
+    # Aggregated bucket for the legacy compact view (kept for backwards-compat)
+    other_non_cash_total = (
+        goodwill_impairment + asset_impairment + acquisition_costs
+        - gain_loss_disposal - other_nonop
+    )
 
     # Ratios
     gross_leverage = round(safe_div(total_debt, adj_ebitda), 1)
@@ -837,8 +958,28 @@ def generate_company_profile(ticker):
     fy_label = str(rev_s[0]["fy"]) if rev_s else "LTM"
     adj_burn = {
         "adjEBITDA": adj_ebitda,
-        "adjEBITDA_src": f"FY{fy_label} SEC 10-K: OpInc ({oper_income}M) + D&A ({da}M) + SBC ({sbc}M) + Restructuring ({restructuring}M)",
-        "gaapEbitda": gaap_ebitda, "sbc": sbc, "restructuring": restructuring, "otherNonCash": 0,
+        "adjEBITDA_src": (
+            f"SEC EDGAR XBRL companyfacts (CIK{cik}) — FY{fy_label}: "
+            f"GAAP EBITDA via {gaap_ebitda_method} ({gaap_ebitda}M) "
+            f"+ {len(addbacks)} non-GAAP add-backs = {adj_ebitda}M"
+        ),
+        "gaapEbitda": gaap_ebitda, "sbc": sbc, "restructuring": restructuring,
+        "otherNonCash": other_non_cash_total,
+        "goodwillImpairment": goodwill_impairment,
+        "assetImpairment": asset_impairment,
+        "acquisitionCosts": acquisition_costs,
+        "gainLossDisposal": gain_loss_disposal,
+        "otherNonOp": other_nonop,
+        # Granular GAAP→Adjusted EBITDA bridge sourced live from SEC XBRL.
+        # Each entry carries the exact us-gaap concept and 10-K period.
+        "reconciliationWalk": ebitda_walk,
+        "reconciliationSource": {
+            "provider": "SEC EDGAR XBRL companyfacts API",
+            "endpoint": f"https://data.sec.gov/api/xbrl/companyfacts/CIK{cik}.json",
+            "cik": cik,
+            "fy": fy_label,
+            "method": gaap_ebitda_method,
+        },
         "incomeTaxes": tax_exp, "incomeTaxes_src": f"FY{fy_label} 10-K",
         "prefDividends": 0, "prefDividends_src": "N/A",
         "maintCapex": None, "totalCapex": capex, "totalCapex_src": f"FY{fy_label} 10-K",
