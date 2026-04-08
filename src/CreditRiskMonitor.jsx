@@ -176,9 +176,12 @@ const [adHocCompany, setAdHocCompany] = useState(() => {
 });
 const [adHocLoading, setAdHocLoading] = useState(false); // "static" | "api" | "error"
 // Cache of live SEC-XBRL EBITDA reconciliation walks for portfolio companies.
-// Keyed by ticker → { reconciliationWalk, reconciliationSource, gaapEbitda, adjEBITDA, sbc, restructuring, otherNonCash, goodwillImpairment, assetImpairment, acquisitionCosts, gainLossDisposal, otherNonOp, _fetchedAt }
+// Keyed by ticker → { reconciliationWalk, reconciliationSource, ...headline EBITDA fields }
 const [portfolioReconCache, setPortfolioReconCache] = useState({});
-const [portfolioReconLoading, setPortfolioReconLoading] = useState({});
+// Ref tracks in-flight tickers without triggering effect re-runs (important:
+// if we stored this in state, every flip would re-run the fetch effect and
+// cancel the in-flight request via its cleanup function).
+const portfolioReconInflightRef = useRef({});
 
 // ─── NAVIGATION HISTORY ───────────────────────────────────────────────
 const [navHistory, setNavHistory] = useState([{ selected: null, tab: "overview", detailTab: "financials" }]);
@@ -598,16 +601,17 @@ useEffect(() => {
   if (!selected) return;
   const inPortfolio = enrichedPortfolio.some(c => c.id === selected);
   if (!inPortfolio) return; // ad-hoc tickers already carry the walk from lookupTicker
-  if (portfolioReconCache[selected] || portfolioReconLoading[selected]) return;
+  if (portfolioReconCache[selected]) return; // already fetched
+  if (portfolioReconInflightRef.current[selected]) return; // in-flight
+  portfolioReconInflightRef.current[selected] = true;
 
-  let cancelled = false;
-  setPortfolioReconLoading(prev => ({ ...prev, [selected]: true }));
   (async () => {
     try {
-      const resp = await fetch(`/api/company?ticker=${selected}`);
+      // Cache-bust the URL so stale Vercel/edge responses (from before the
+      // reconciliationWalk was added to the API) are bypassed.
+      const resp = await fetch(`/api/company?ticker=${selected}&_walk=v1`);
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const company = await resp.json();
-      if (cancelled) return;
       const ab = company && company.adjBurn;
       if (ab && Array.isArray(ab.reconciliationWalk) && ab.reconciliationWalk.length > 0) {
         setPortfolioReconCache(prev => ({
@@ -630,13 +634,15 @@ useEffect(() => {
         }));
       }
     } catch (e) {
-      // Non-critical: portfolio still renders with static reconciliation
-    } finally {
-      if (!cancelled) setPortfolioReconLoading(prev => ({ ...prev, [selected]: false }));
+      // Non-critical: portfolio still renders with static reconciliation.
+      // Clear the in-flight flag so a subsequent re-selection can retry.
+      delete portfolioReconInflightRef.current[selected];
     }
   })();
-  return () => { cancelled = true; };
-}, [selected, enrichedPortfolio, portfolioReconCache, portfolioReconLoading]);
+  // Intentionally depend only on `selected` + portfolio identity. Cache reads
+  // happen inline at effect time; we don't want state mutations inside the
+  // effect to re-trigger it and cancel the in-flight fetch.
+}, [selected, enrichedPortfolio]);
 
 // ─── DETAIL LOOKUP (portfolio + ad-hoc) ────────────────────────────────
 const rawDetail = selected ? (enrichedPortfolio.find((c) => c.id === selected) || adHocCompany) : null;
