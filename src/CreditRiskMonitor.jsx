@@ -175,6 +175,10 @@ const [adHocCompany, setAdHocCompany] = useState(() => {
   }
 });
 const [adHocLoading, setAdHocLoading] = useState(false); // "static" | "api" | "error"
+// Cache of live SEC-XBRL EBITDA reconciliation walks for portfolio companies.
+// Keyed by ticker → { reconciliationWalk, reconciliationSource, gaapEbitda, adjEBITDA, sbc, restructuring, otherNonCash, goodwillImpairment, assetImpairment, acquisitionCosts, gainLossDisposal, otherNonOp, _fetchedAt }
+const [portfolioReconCache, setPortfolioReconCache] = useState({});
+const [portfolioReconLoading, setPortfolioReconLoading] = useState({});
 
 // ─── NAVIGATION HISTORY ───────────────────────────────────────────────
 const [navHistory, setNavHistory] = useState([{ selected: null, tab: "overview", detailTab: "financials" }]);
@@ -584,14 +588,93 @@ const lookupTicker = useCallback(async (ticker) => {
   setAdHocLoading(false);
 }, [enrichedPortfolio, navigate, tab]);
 
+// ─── LAZY FETCH: live SEC-XBRL EBITDA walk for portfolio companies ───
+// When the user opens a portfolio company's detail view, fetch the same
+// /api/company endpoint that ad-hoc tickers use so portfolio entries get the
+// granular reconciliationWalk built from individual us-gaap concepts. Cached
+// per-ticker for the session; falls back silently to the static portfolio
+// numbers if the API call fails (e.g., offline, rate-limited).
+useEffect(() => {
+  if (!selected) return;
+  const inPortfolio = enrichedPortfolio.some(c => c.id === selected);
+  if (!inPortfolio) return; // ad-hoc tickers already carry the walk from lookupTicker
+  if (portfolioReconCache[selected] || portfolioReconLoading[selected]) return;
+
+  let cancelled = false;
+  setPortfolioReconLoading(prev => ({ ...prev, [selected]: true }));
+  (async () => {
+    try {
+      const resp = await fetch(`/api/company?ticker=${selected}`);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const company = await resp.json();
+      if (cancelled) return;
+      const ab = company && company.adjBurn;
+      if (ab && Array.isArray(ab.reconciliationWalk) && ab.reconciliationWalk.length > 0) {
+        setPortfolioReconCache(prev => ({
+          ...prev,
+          [selected]: {
+            reconciliationWalk: ab.reconciliationWalk,
+            reconciliationSource: ab.reconciliationSource || null,
+            gaapEbitda: ab.gaapEbitda,
+            adjEBITDA: ab.adjEBITDA,
+            sbc: ab.sbc,
+            restructuring: ab.restructuring,
+            otherNonCash: ab.otherNonCash,
+            goodwillImpairment: ab.goodwillImpairment,
+            assetImpairment: ab.assetImpairment,
+            acquisitionCosts: ab.acquisitionCosts,
+            gainLossDisposal: ab.gainLossDisposal,
+            otherNonOp: ab.otherNonOp,
+            _fetchedAt: Date.now(),
+          },
+        }));
+      }
+    } catch (e) {
+      // Non-critical: portfolio still renders with static reconciliation
+    } finally {
+      if (!cancelled) setPortfolioReconLoading(prev => ({ ...prev, [selected]: false }));
+    }
+  })();
+  return () => { cancelled = true; };
+}, [selected, enrichedPortfolio, portfolioReconCache, portfolioReconLoading]);
+
 // ─── DETAIL LOOKUP (portfolio + ad-hoc) ────────────────────────────────
 const rawDetail = selected ? (enrichedPortfolio.find((c) => c.id === selected) || adHocCompany) : null;
 // Normalize: default all required fields so generated/partial objects render safely
 const detail = useMemo(() => {
   if (!rawDetail) return null;
+  // If this is a portfolio company and we've fetched its live SEC walk, merge
+  // the granular reconciliation into adjBurn so the same renderer shows the
+  // detailed bridge that ad-hoc tickers get. Static portfolio numbers stay as
+  // a fallback (e.g., maintCapex, prefDividends, currentLTD aren't on the API).
+  let mergedRaw = rawDetail;
+  const liveRecon = portfolioReconCache[rawDetail.id];
+  if (liveRecon && rawDetail.adjBurn) {
+    mergedRaw = {
+      ...rawDetail,
+      adjBurn: {
+        ...rawDetail.adjBurn,
+        // Live walk + provenance
+        reconciliationWalk: liveRecon.reconciliationWalk,
+        reconciliationSource: liveRecon.reconciliationSource,
+        // Replace headline EBITDA figures with the live SEC-sourced values so
+        // the bridge ties to the same totals shown above it.
+        gaapEbitda: liveRecon.gaapEbitda ?? rawDetail.adjBurn.gaapEbitda,
+        adjEBITDA: liveRecon.adjEBITDA ?? rawDetail.adjBurn.adjEBITDA,
+        sbc: liveRecon.sbc ?? rawDetail.adjBurn.sbc,
+        restructuring: liveRecon.restructuring ?? rawDetail.adjBurn.restructuring,
+        otherNonCash: liveRecon.otherNonCash ?? rawDetail.adjBurn.otherNonCash,
+        goodwillImpairment: liveRecon.goodwillImpairment,
+        assetImpairment: liveRecon.assetImpairment,
+        acquisitionCosts: liveRecon.acquisitionCosts,
+        gainLossDisposal: liveRecon.gainLossDisposal,
+        otherNonOp: liveRecon.otherNonOp,
+      },
+    };
+  }
   return {
-    ...rawDetail,
-    news: rawDetail.news || [],
+    ...mergedRaw,
+    news: mergedRaw.news || [],
     financials: rawDetail.financials || [],
     ratingHistory: rawDetail.ratingHistory || [{ date: "N/A", sp: "NR", moodys: "NR", fitch: "NR", event: "No rating history available" }],
     research: rawDetail.research || [{ date: "", firm: "N/A", action: "N/A", pt: 0, summary: "No analyst coverage data available" }],
@@ -621,7 +704,7 @@ const detail = useMemo(() => {
     currentAssets: rawDetail.currentAssets ?? 0,
     currentLiab: rawDetail.currentLiab ?? 0,
   };
-}, [rawDetail]);
+}, [rawDetail, portfolioReconCache]);
 
 // ─── STYLES ─────────────────────────────────────────────────────────────
 const root = { fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", background: "#060a14", color: "#e2e8f0", minHeight: "100vh", fontSize: mob ? 13 : 14, WebkitFontSmoothing: "antialiased", MozOsxFontSmoothing: "grayscale", maxWidth: "100vw", overflowX: "clip", wordWrap: "break-word", overflowWrap: "break-word" };
