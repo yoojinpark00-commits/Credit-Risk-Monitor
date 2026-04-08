@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'scripts'))
 
 # Public tickers fetched from SEC EDGAR / FMP / Yahoo
-PUBLIC_TICKERS = ['LCID', 'RIVN', 'CENT', 'IHRT', 'SMC', 'UPBD', 'WSC']
+PUBLIC_TICKERS = ['LCID', 'RIVN', 'CENT', 'IHRT', 'SMC', 'UPBD', 'WSC', 'GT']
 # Private companies — skip automated fetch (use manual overrides)
 PRIVATE_TICKERS = ['BEUSA', 'JSWUSA']
 

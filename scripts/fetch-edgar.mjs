@@ -17,6 +17,10 @@
 //   node scripts/fetch-edgar.mjs --dry-run --tickers GT   # parse, write none
 //
 // ─── Adding a new ticker ─────────────────────────────────────────────────────
+// Tickers not present in data/cik_map.json are resolved on-the-fly via the
+// EDGAR `company_tickers.json` directory and the resolved CIK is written back
+// to the cik_map cache so subsequent runs (and the Python fetcher, which reads
+// the same file) hit the cache directly. To pre-seed a ticker manually:
 // 1. Append the ticker → 10-digit zero-padded CIK to data/cik_map.json
 // 2. Run:  npm run fetch-edgar -- --tickers NEW
 // 3. Inspect data/edgar_facts/NEW.json and commit.
@@ -103,8 +107,10 @@ function printHelp() {
   node scripts/fetch-edgar.mjs --dry-run --tickers GT
 
 Flags:
-  --tickers <T1> <T2> ...   Tickers to refresh (must be in data/cik_map.json)
-  --all                     Refresh every ticker in data/cik_map.json
+  --tickers <T1> <T2> ...   Tickers to refresh. Unknown tickers are resolved
+                            via the SEC EDGAR company_tickers.json directory
+                            and the resolved CIK is cached back into cik_map.
+  --all                     Refresh every ticker currently in data/cik_map.json
   --dry-run                 Fetch and parse only; do not write any files
   -h, --help                Show this help message`);
 }
@@ -122,6 +128,42 @@ async function fetchCompanyFacts(cik) {
     throw new Error(`EDGAR returned ${res.status} ${res.statusText} for CIK ${cik}`);
   }
   return res.json();
+}
+
+// ─── Dynamic ticker → CIK resolution ─────────────────────────────────────────
+// Falls back to EDGAR's company_tickers.json directory when a ticker isn't in
+// the local cik_map.json. Mirrors api/sec_filings.py:ticker_to_cik so the .mjs
+// pipeline supports arbitrary SEC-registered US issuers, not just the curated
+// portfolio. Resolved CIKs are written back to data/cik_map.json so the next
+// run (and the Python fetcher) skip the directory lookup.
+let _tickerDirectoryCache = null;
+async function fetchTickerDirectory() {
+  if (_tickerDirectoryCache) return _tickerDirectoryCache;
+  const res = await fetch("https://www.sec.gov/files/company_tickers.json", {
+    headers: { "User-Agent": USER_AGENT, "Accept": "application/json" },
+  });
+  if (!res.ok) {
+    throw new Error(`EDGAR ticker directory returned ${res.status} ${res.statusText}`);
+  }
+  const data = await res.json();
+  // Build ticker → 10-digit-padded CIK lookup
+  const directory = {};
+  for (const entry of Object.values(data)) {
+    if (!entry?.ticker || entry.cik_str == null) continue;
+    directory[entry.ticker.toUpperCase()] = String(entry.cik_str).padStart(10, "0");
+  }
+  _tickerDirectoryCache = directory;
+  return directory;
+}
+
+async function resolveCik(ticker, cikMap) {
+  if (cikMap[ticker]) return { cik: cikMap[ticker], source: "cik_map" };
+  const directory = await fetchTickerDirectory();
+  const cik = directory[ticker];
+  if (!cik) {
+    throw new Error(`ticker not found in EDGAR directory: ${ticker}`);
+  }
+  return { cik, source: "edgar_directory" };
 }
 
 // ─── Concept extraction ──────────────────────────────────────────────────────
@@ -266,16 +308,32 @@ async function main() {
     process.exit(1);
   }
 
-  const unknown = targets.filter((t) => !cikMap[t]);
-  if (unknown.length > 0) {
-    console.error(`ERROR: tickers not found in cik_map.json: ${unknown.join(", ")}`);
+  console.log(`EDGAR refresh: ${targets.length} ticker(s)${args.dryRun ? " [DRY RUN]" : ""}`);
+
+  // Resolve any tickers missing from cik_map.json via the EDGAR directory.
+  // Newly-resolved CIKs are written back to cik_map.json so the next run
+  // (and the Python fetcher that reads the same file) hit the cache directly.
+  const resolvedNewCiks = {};
+  for (const ticker of targets) {
+    if (cikMap[ticker]) continue;
+    try {
+      const { cik, source } = await resolveCik(ticker, cikMap);
+      cikMap[ticker] = cik;
+      resolvedNewCiks[ticker] = cik;
+      console.log(`  ${ticker}: resolved CIK ${cik} via ${source}`);
+    } catch (err) {
+      console.error(`  ${ticker}: CIK resolution failed — ${err.message}`);
+    }
+  }
+  // Drop any tickers we still couldn't resolve (avoid confusing per-ticker errors below)
+  const targetable = targets.filter((t) => cikMap[t]);
+  if (targetable.length === 0) {
+    console.error("ERROR: no targets could be resolved to a CIK");
     process.exit(1);
   }
 
-  console.log(`EDGAR refresh: ${targets.length} ticker(s)${args.dryRun ? " [DRY RUN]" : ""}`);
-
   const summaries = [];
-  for (const ticker of targets) {
+  for (const ticker of targetable) {
     const cik = cikMap[ticker];
     process.stdout.write(`  ${ticker} (CIK ${cik}) ... `);
     const summary = await processTicker(ticker, cik, { dryRun: args.dryRun });
@@ -307,6 +365,19 @@ async function main() {
     }
     await fs.mkdir(FACTS_DIR, { recursive: true });
     await fs.writeFile(INDEX_PATH, JSON.stringify(nextIndex, null, 2) + "\n", "utf8");
+
+    // Persist any newly-resolved CIKs back to cik_map.json so the next run
+    // (and scripts/credit_data_fetcher.py, which reads the same file) hit the
+    // cache directly.
+    if (Object.keys(resolvedNewCiks).length > 0) {
+      const sortedMap = Object.fromEntries(
+        Object.entries(cikMap).sort(([a], [b]) => a.localeCompare(b))
+      );
+      await fs.writeFile(CIK_MAP_PATH, JSON.stringify(sortedMap, null, 2) + "\n", "utf8");
+      console.log(
+        `\nCached ${Object.keys(resolvedNewCiks).length} new CIK(s) to data/cik_map.json: ${Object.keys(resolvedNewCiks).join(", ")}`
+      );
+    }
   }
 
   const errorCount = summaries.filter((s) => s.status === "error").length;

@@ -9,6 +9,7 @@ GET /api/sec_filings?all=true&days=14
 """
 import json
 import os
+import pathlib
 from datetime import datetime, timedelta
 from http.server import BaseHTTPRequestHandler
 from urllib.parse import parse_qs, urlparse
@@ -19,16 +20,15 @@ try:
 except ImportError:
     pass
 
-# CIK mapping for portfolio companies (10-digit zero-padded)
-CIK_MAP = {
-    "LCID": "0001811210",
-    "RIVN": "0001874178",
-    "CENT": "0000887733",
-    "IHRT": "0001400891",
-    "SMC":  "0002024218",
-    "UPBD": "0000933036",
-    "WSC":  "0001647088",
-}
+# CIK mapping loaded from canonical data/cik_map.json (single source of truth
+# shared with scripts/credit_data_fetcher.py and scripts/fetch-edgar.mjs).
+# Falls back to an empty dict if the file is missing so the dynamic
+# ticker_to_cik resolver still works.
+_CIK_MAP_PATH = pathlib.Path(__file__).parent.parent / "data" / "cik_map.json"
+try:
+    CIK_MAP = json.loads(_CIK_MAP_PATH.read_text())
+except (FileNotFoundError, json.JSONDecodeError):
+    CIK_MAP = {}
 
 # Module-level cache for dynamically resolved CIKs
 _cik_cache = {}
