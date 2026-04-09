@@ -459,6 +459,72 @@ def _compute_ltm(annual_series, quarterly_series, target_end):
     return annual_val, anchor
 
 
+def _get_field_at_period(facts, field_name, anchor_end, forms=ANNUAL_FORMS, tolerance_days=120):
+    """Period-aligned replacement for _get_field + latest_val_m.
+
+    Returns the series entry whose `end` date falls within `tolerance_days`
+    of `anchor_end`, trying EVERY tag in the CONCEPT_MAP fallback list and
+    picking the closest match across all of them.
+
+    Why this exists: the legacy _get_field picks whatever the first fallback
+    tag yields and returns its newest entry, which silently accepts stale
+    data when a ticker has switched XBRL tags over time. Example: iHeart's
+    `InterestExpense` tag still has FY2018 data from before the 2019
+    bankruptcy reorganization while current filings use `InterestExpenseDebt`.
+    The legacy helper returns the FY2018 value; this helper walks past it
+    and returns the period-matched FY2025 value from `InterestExpenseDebt`.
+
+    Returns: dict {fy, end, val, tag} or None if no tag has a matching entry.
+    """
+    if not anchor_end:
+        # No anchor → legacy behavior (first tag with data wins)
+        for tag in CONCEPT_MAP.get(field_name, []):
+            series = _extract_series(facts, tag, forms, n=1)
+            if series:
+                return series[0]
+        return None
+
+    try:
+        anchor_dt = datetime.strptime(anchor_end, "%Y-%m-%d")
+    except (ValueError, TypeError):
+        return None
+
+    best_match = None
+    best_delta_days = None
+
+    for tag in CONCEPT_MAP.get(field_name, []):
+        series = _extract_series(facts, tag, forms, n=8)
+        for entry in series:
+            end_str = entry.get("end") or ""
+            if not end_str:
+                continue
+            try:
+                entry_dt = datetime.strptime(end_str, "%Y-%m-%d")
+            except ValueError:
+                continue
+            delta_days = abs((entry_dt - anchor_dt).days)
+            if delta_days <= tolerance_days:
+                if best_delta_days is None or delta_days < best_delta_days:
+                    best_match = entry
+                    best_delta_days = delta_days
+        if best_match and best_delta_days == 0:
+            break  # exact match in the first winning tag — no need to search further
+    return best_match
+
+
+def _series_at_period(facts, field_name, anchor_end, forms=ANNUAL_FORMS, tolerance_days=120):
+    """Wrapper that returns a 1-element series list [entry] in the same shape
+    as _get_field's return value, or [] if no period-matching entry exists.
+
+    Used to replace `ie_s = _get_field(...)` style calls throughout the
+    downstream EBITDA bridge so the existing `latest_val_m(ie_s)` and
+    `_xbrl_src(ie_s)` code works unchanged but now operates on the
+    period-aligned entry.
+    """
+    entry = _get_field_at_period(facts, field_name, anchor_end, forms, tolerance_days)
+    return [entry] if entry else []
+
+
 def to_m(val):
     if val is None:
         return 0
@@ -481,6 +547,47 @@ def latest_val_m(series):
     if not series:
         return 0
     return to_m(series[0]["val"])
+
+
+def _build_report_period_label(end_date, fiscal_year, fiscal_year_end):
+    """Format a "LTM 12/31/25" or "FYE 12/31/25" label for the financials tab.
+
+    Parameters
+    ----------
+    end_date        : str YYYY-MM-DD, the latest revenue period end date
+    fiscal_year     : int, the fiscal year (e.g. 2025)
+    fiscal_year_end : str "MM-DD", the company's fiscal year-end month-day
+                      from the EDGAR submissions endpoint (e.g. "12-31")
+
+    Returns a display label like "FYE 12/31/25" when the end_date matches
+    the company's FYE month-day, or "LTM 12/31/25" otherwise. Falls back to
+    "FY2025" when no end_date is available.
+    """
+    if not end_date:
+        return f"FY{fiscal_year}" if fiscal_year else "LTM"
+    try:
+        dt = datetime.strptime(end_date, "%Y-%m-%d")
+    except (ValueError, TypeError):
+        return f"FY{fiscal_year}" if fiscal_year else end_date
+
+    formatted = dt.strftime("%m/%d/%y")
+
+    # Treat the period as an FYE if we have a fiscal_year_end hint and the
+    # MM-DD matches (with a ±2-day tolerance for leap years / 52-week filers).
+    # If no hint is available, fall back to assuming calendar year-end is FYE.
+    is_fye = False
+    if fiscal_year_end and len(fiscal_year_end) >= 4:
+        try:
+            fye_month = int(fiscal_year_end[:2])
+            fye_day = int(fiscal_year_end[-2:])
+            if dt.month == fye_month and abs(dt.day - fye_day) <= 2:
+                is_fye = True
+        except ValueError:
+            pass
+    elif dt.month == 12 and dt.day >= 28:
+        is_fye = True
+
+    return f"{'FYE' if is_fye else 'LTM'} {formatted}"
 
 
 def _latest_xbrl_val(facts, tag):
@@ -765,64 +872,51 @@ def generate_company_profile(ticker):
     # Quarterly data for burns (fetch extra entries to support YTD de-cumulation)
     q_ocf = _get_field(facts, "ocf", forms=QUARTERLY_FORMS, n=8, quarterly=True)
     q_capex = _get_field(facts, "capex", forms=QUARTERLY_FORMS, n=8, quarterly=True)
-    q_rev = _get_field(facts, "revenue", forms=QUARTERLY_FORMS, n=8, quarterly=True)
-    q_ni = _get_field(facts, "net_income", forms=QUARTERLY_FORMS, n=8, quarterly=True)
-    q_ie = _get_field(facts, "interest_expense", forms=QUARTERLY_FORMS, n=8, quarterly=True)
-    q_tx = _get_field(facts, "tax_expense", forms=QUARTERLY_FORMS, n=8, quarterly=True)
-    q_da = _get_field(facts, "depreciation", forms=QUARTERLY_FORMS, n=8, quarterly=True)
-    q_oi = _get_field(facts, "operating_income", forms=QUARTERLY_FORMS, n=8, quarterly=True)
-    q_sbc = _get_field(facts, "sbc", forms=QUARTERLY_FORMS, n=8, quarterly=True)
-    q_restr = _get_field(facts, "restructuring", forms=QUARTERLY_FORMS, n=8, quarterly=True)
-    q_nonop_total = _get_field(facts, "nonop_total", forms=QUARTERLY_FORMS, n=8, quarterly=True)
+    q_rev = _get_field(facts, "revenue", forms=QUARTERLY_FORMS, n=4, quarterly=True)
 
-    # ─── Canonical target period ────────────────────────────────────────────
-    # All EBITDA-walk line items must be pulled from the SAME fiscal period.
-    # Historic bug: the old code pulled each concept independently, which let
-    # stale values (e.g. iHeart's FY2018 InterestExpense) slip into a current
-    # GAAP→Adj bridge. We now anchor every line to ``target_end`` — the newest
-    # annual period that is consistently reported across the core P&L
-    # concepts (Revenue, NI, Interest, Tax, D&A). That period becomes the
-    # single source of truth for the Historical P&L "LATEST" row, the LTM
-    # basis used throughout the Financials tab, and the reconciliation walk.
+    # ─── Period-alignment pass ──────────────────────────────────────────
+    # The reconciliationWalk bridge (NI + Tax + Interest + D&A → GAAP EBITDA,
+    # then addbacks → Adjusted EBITDA) requires every input to come from the
+    # SAME fiscal period as the anchor revenue. The legacy first-tag-wins
+    # _get_field() silently accepts stale data when a ticker has switched
+    # XBRL tags over time — the canonical example is iHeart, whose old
+    # `InterestExpense` tag still carries FY2018 data from before the 2019
+    # bankruptcy reorganization while current filings use `InterestExpenseDebt`.
+    # The legacy `latest_val_m(ie_s)` returns the FY2018 value and silently
+    # bleeds it into an FY2025 EBITDA calculation.
     #
-    # LTM uplift: if quarterly filings are MORE recent than the anchor annual,
-    # we compute true LTM per concept via ``_compute_ltm`` (LastFY + YTD
-    # − PriorYearYTD). The resulting period_type flips from FYE to LTM.
-    core_anchor_series = [rev_s, ni_s, ie_s, tx_s, da_s]
-    candidate_ends = [s[0]["end"] for s in core_anchor_series if s and s[0].get("end")]
-    target_end = min(candidate_ends) if candidate_ends else (rev_s[0]["end"] if rev_s and rev_s[0].get("end") else "")
+    # Fix: after the initial _get_field calls populate the series variables
+    # above (which is still useful for multi-year history arrays), re-extract
+    # the EBITDA inputs via _series_at_period so each one is pinned to the
+    # same period as rev_s[0]. When there's no tolerable match we get an
+    # empty list, which latest_val_m() correctly converts to 0.
+    anchor_end = rev_s[0]["end"] if rev_s else ""
+    anchor_fy = rev_s[0].get("fy") if rev_s else None
+    if anchor_end:
+        ni_s        = _series_at_period(facts, "net_income",           anchor_end) or ni_s
+        oi_s        = _series_at_period(facts, "operating_income",     anchor_end) or oi_s
+        ie_s        = _series_at_period(facts, "interest_expense",     anchor_end) or []
+        tx_s        = _series_at_period(facts, "tax_expense",          anchor_end) or []
+        da_s        = _series_at_period(facts, "depreciation",         anchor_end) or []
+        sbc_s       = _series_at_period(facts, "sbc",                  anchor_end) or []
+        restr_s     = _series_at_period(facts, "restructuring",        anchor_end) or []
+        gw_imp_s    = _series_at_period(facts, "goodwill_impairment",  anchor_end) or []
+        asset_imp_s = _series_at_period(facts, "asset_impairment",     anchor_end) or []
+        acq_cost_s  = _series_at_period(facts, "acquisition_costs",    anchor_end) or []
+        gain_disp_s = _series_at_period(facts, "gain_loss_disposal",   anchor_end) or []
+        other_nonop_s   = _series_at_period(facts, "other_nonop",     anchor_end) or []
+        nonop_total_s   = _series_at_period(facts, "nonop_total",     anchor_end) or []
+        int_income_s    = _series_at_period(facts, "interest_income", anchor_end) or []
 
-    # Determine whether quarterly data extends the period beyond the anchor FY
-    latest_q_end = ""
-    for q in (q_rev, q_ni, q_ie, q_tx, q_da):
-        if q and q[0].get("end", "") > latest_q_end:
-            latest_q_end = q[0]["end"]
-    use_ltm = bool(latest_q_end and target_end and latest_q_end > target_end)
-    if use_ltm:
-        target_end = latest_q_end
-
-    period_type = "LTM" if use_ltm else "FYE"
-    period_label = f"{period_type} {_fmt_period_mdy(target_end)}" if target_end else period_type
-
-    def _annual_m(series, q_series=None, abs_val=False):
-        """Return the value for ``series`` at ``target_end`` — LTM-adjusted
-        when a quarterly series is provided and quarterly data extends past
-        the anchor FY. Zero when nothing aligns."""
-        if use_ltm:
-            val, _ = _compute_ltm(series, q_series, target_end)
-        else:
-            val = _val_m_at(series, target_end)
-        return abs(val) if abs_val else val
-
-    # Latest annual values (in $M) — all aligned to the canonical period
-    revenue = _annual_m(rev_s, q_rev)
-    net_income = _annual_m(ni_s, q_ni)
-    oper_income = _annual_m(oi_s, q_oi)
-    int_exp = _annual_m(ie_s, q_ie, abs_val=True)
-    tax_exp = _annual_m(tx_s, q_tx)
-    da = _annual_m(da_s, q_da)
-    sbc = _annual_m(sbc_s, q_sbc)
-    restructuring = _annual_m(restr_s, q_restr, abs_val=True)
+    # Latest annual values (in $M)
+    revenue = latest_val_m(rev_s)
+    net_income = latest_val_m(ni_s)
+    oper_income = latest_val_m(oi_s)
+    int_exp = abs(latest_val_m(ie_s))
+    tax_exp = latest_val_m(tx_s)
+    da = latest_val_m(da_s)
+    sbc = latest_val_m(sbc_s)
+    restructuring = abs(latest_val_m(restr_s))
     # Granular reconciliation add-backs ($M, signed where meaningful)
     goodwill_impairment = abs(_val_m_at(gw_imp_s, target_end))
     asset_impairment = abs(_val_m_at(asset_imp_s, target_end))
@@ -1643,6 +1737,12 @@ def generate_company_profile(ticker):
         "news": [], "ratingHistory": rating_history,
         "research": research, "financials": financials,
         "trends": trends, "creditTrend": credit_trend,
+        # ─── Period metadata (drives the "FYE 12/31/25" / "LTM 09/30/25"
+        # badge on the financials tab so users can see exactly which
+        # reporting period the figures come from).
+        "reportEndDate": anchor_end or None,
+        "reportPeriodLabel": _build_report_period_label(anchor_end, anchor_fy, fiscal_year_end),
+        "reportFiscalYear": anchor_fy,
         "_generated": True, "_source": "sec_edgar",
         "_generatedAt": datetime.now(timezone.utc).isoformat(),
         "_zScore": z_score, "_ratingScore": rating_score,
