@@ -44,6 +44,26 @@ const fmtM = (n) => {
 const pct = (n) => (n === null || n === undefined ? "\u2014" : `${n > 0 ? "+" : ""}${n.toFixed(1)}%`);
 const bps = (n) => (n === null || n === undefined ? "\u2014" : `${n > 0 ? "+" : ""}${n}`);
 
+// Format an ISO "YYYY-MM-DD" into "12/31/25" for period-end chips; returns
+// the raw string unchanged when parsing fails (or when the caller passed an
+// already-formatted value like "12/31/25"). Accepts null/undefined → "".
+const fmtPeriodMDY = (iso) => {
+  if (!iso) return "";
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso));
+  if (!m) return String(iso);
+  return `${+m[2]}/${+m[3]}/${m[1].slice(2)}`;
+};
+// Build a display label like "LTM 12/31/25" / "FYE 12/31/25". Prefers an
+// explicit periodLabel from the backend, then synthesizes from type+end, and
+// finally falls back to a generic "FYXXXX" string when no date is available.
+const periodLabelOf = (obj, fallbackPeriodString) => {
+  if (!obj) return fallbackPeriodString || "";
+  if (obj.periodLabel) return obj.periodLabel;
+  if (obj.periodType && obj.periodEnd) return `${obj.periodType} ${fmtPeriodMDY(obj.periodEnd)}`;
+  if (obj.periodEnd) return `FYE ${fmtPeriodMDY(obj.periodEnd)}`;
+  return fallbackPeriodString || "";
+};
+
 const ratingScore = (r) => {
 const map = { AAA: 1, "AA+": 2, AA: 3, "AA-": 4, "A+": 5, A: 6, "A-": 7, "BBB+": 8, BBB: 9, "BBB-": 10, "BB+": 11, BB: 12, "BB-": 13, "B+": 14, B: 15, "B-": 16, "CCC+": 17, CCC: 18, NR: 20, Aaa: 1, Aa1: 2, Aa2: 3, Aa3: 4, A1: 5, A2: 6, A3: 7, Baa1: 8, Baa2: 9, Baa3: 10, Ba1: 11, Ba2: 12, Ba3: 13, B1: 14, B2: 15, B3: 16, Caa1: 17, Caa2: 18 };
 return map[r] || 20;
@@ -633,6 +653,10 @@ useEffect(() => {
             nonOpTotal: ab.nonOpTotal,
             nonOpReversal: ab.nonOpReversal,
             nonOpReversalMethod: ab.nonOpReversalMethod,
+            // Canonical LTM/FYE period the live SEC walk was anchored to
+            periodEnd: ab.periodEnd || company.periodEnd || null,
+            periodType: ab.periodType || company.periodType || null,
+            periodLabel: ab.periodLabel || company.periodLabel || null,
             _fetchedAt: Date.now(),
           },
         }));
@@ -683,6 +707,11 @@ const detail = useMemo(() => {
         nonOpTotal: liveRecon.nonOpTotal,
         nonOpReversal: liveRecon.nonOpReversal,
         nonOpReversalMethod: liveRecon.nonOpReversalMethod,
+        // Propagate canonical LTM/FYE period so the walk card can label the
+        // header (e.g. "LTM 12/31/25") and prove every line ties to that date.
+        periodEnd: liveRecon.periodEnd ?? rawDetail.adjBurn.periodEnd ?? null,
+        periodType: liveRecon.periodType ?? rawDetail.adjBurn.periodType ?? null,
+        periodLabel: liveRecon.periodLabel ?? rawDetail.adjBurn.periodLabel ?? null,
       },
     };
   }
@@ -825,7 +854,16 @@ return (
             <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: isNetCashGenerator ? "linear-gradient(90deg, #22c55e, #3b82f6, #22c55e)" : "linear-gradient(90deg, #ef4444, #f97316, #ef4444)" }} />
             <div style={{ fontSize: mob ? 11 : 13, fontWeight: 800, color: isNetCashGenerator ? "#86efac" : "#fca5a5", marginBottom: 16, textTransform: "uppercase", letterSpacing: mob ? "0.5px" : "1px", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
               {isNetCashGenerator ? "\u2713" : "\u26A0"} {isNetCashGenerator ? "Cash Flow & Liquidity" : "Cash Burn & Liquidity"}
-              {!mob && <span style={{ fontSize: 10, fontWeight: 500, color: "#64748b", textTransform: "none", letterSpacing: 0 }}>{"\u2014"} LTM adjusted basis {"\u00B7"} {isNetCashGenerator ? "Net cash generator" : "Cash consumer"}</span>}
+              {!mob && (() => {
+                // Prefer the canonical LTM/FYE label from the backend; fall
+                // back to the latest financials row's label, then to a generic
+                // marker. This is the single place the Financials tab's
+                // reference period is introduced to the user.
+                const label = periodLabelOf(detail.adjBurn, null)
+                  || periodLabelOf(detail.financials && detail.financials[0], null)
+                  || (detail.periodLabel || "LTM basis");
+                return <span style={{ fontSize: 10, fontWeight: 500, color: "#64748b", textTransform: "none", letterSpacing: 0 }}>{"\u2014"} {label} {"\u00B7"} {isNetCashGenerator ? "Net cash generator" : "Cash consumer"}</span>;
+              })()}
             </div>
 
             {/* Runway Gauge */}
@@ -960,11 +998,27 @@ return (
             }
             const maxRecon = Math.max(...reconItems.map(r => Math.abs(r.amount)), 1);
 
+            // Canonical period every walk line was pulled from (e.g. "LTM
+            // 12/31/25"). Backend anchors the whole bridge to this date, so
+            // the header chip is a one-glance consistency check for the user
+            // — if any line shows a different date in its tooltip, something
+            // upstream is broken. Walks built from static portfolio data
+            // fall back to the latest financial row's label.
+            const reconPeriodLabel = periodLabelOf(ab, null)
+              || periodLabelOf(detail.financials && detail.financials[0], null)
+              || "";
             return (
             <div style={{ ...card, gridColumn: "1 / -1" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-                <div style={{ fontSize: mob ? 11 : 13, fontWeight: 800, color: "#94a3b8", textTransform: "uppercase", letterSpacing: mob ? "0.5px" : "1px" }}>
-                  EBITDA Reconciliation {"\u2014"} GAAP to Adjusted
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4, flexWrap: "wrap", gap: 8 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                  <div style={{ fontSize: mob ? 11 : 13, fontWeight: 800, color: "#94a3b8", textTransform: "uppercase", letterSpacing: mob ? "0.5px" : "1px" }}>
+                    EBITDA Reconciliation {"\u2014"} GAAP to Adjusted
+                  </div>
+                  {reconPeriodLabel && (
+                    <span style={{ fontSize: 10, fontWeight: 700, color: "#60a5fa", background: "rgba(96,165,250,0.1)", border: "1px solid rgba(96,165,250,0.3)", borderRadius: 4, padding: "3px 8px", letterSpacing: "0.3px", textTransform: "none" }}>
+                      {reconPeriodLabel}
+                    </span>
+                  )}
                 </div>
                 <div style={{ fontSize: 9, color: "#64748b", textAlign: "right" }}>
                   Total Adjustments: <span style={{ color: totalAdj >= 0 ? "#22c55e" : "#ef4444", fontWeight: 700 }}>{totalAdj >= 0 ? "+" : ""}{fmtM(totalAdj).replace("$", "")}</span>
@@ -974,14 +1028,16 @@ return (
                 {noReconDisclosed
                   ? "Issuer's 10-K does not separately disclose a GAAP-to-Adjusted EBITDA walk; reported figure is shown as both GAAP and Adjusted."
                   : walk
-                    ? "Bottom-up bridge built from individual us-gaap XBRL concepts pulled live from SEC EDGAR companyfacts. Hover any line for the exact concept and 10-K period."
+                    ? `Bottom-up bridge built from individual us-gaap XBRL concepts pulled live from SEC EDGAR companyfacts${reconPeriodLabel ? ` — every line anchored to ${reconPeriodLabel}` : ""}. Hover any line for the exact concept and period end.`
                     : "Reconciles reported GAAP EBITDA to company-reported Non-GAAP Adjusted EBITDA by adding back non-cash and non-recurring items."}
               </div>
               {reconSource && (
                 <div style={{ fontSize: 9, color: "#475569", marginBottom: 12, fontFamily: "'JetBrains Mono', monospace", wordBreak: "break-all" }}>
                   Source: {reconSource.provider}
                   {reconSource.endpoint && <> — <a href={reconSource.endpoint} target="_blank" rel="noopener noreferrer" style={{ color: "#60a5fa", textDecoration: "none" }}>{reconSource.endpoint}</a></>}
-                  {reconSource.fy && <> · FY{reconSource.fy}</>}
+                  {reconSource.periodLabel
+                    ? <> · {reconSource.periodLabel}</>
+                    : (reconSource.fy && <> · FY{reconSource.fy}</>)}
                   {reconSource.method && <> · {reconSource.method}</>}
                 </div>
               )}
@@ -990,7 +1046,16 @@ return (
                 <div>
                   {reconItems.map((r, ri) => {
                     const barPct = (maxRecon > 0 && isFinite(r.amount)) ? (Math.abs(r.amount) / maxRecon * 100) : 0;
-                    const tooltip = r.source && r.source.label ? r.source.label : (r.source && r.source.concept ? `${r.source.concept} · FY${r.source.fy ?? "?"}` : "");
+                    // Build a rich tooltip that always surfaces the source
+                    // period the line was pulled from — the whole point of
+                    // this refactor is to make it impossible to hide a
+                    // stale-period value (iHeart-style FY2018 interest bug).
+                    const srcPeriod = r.source && (r.source.periodLabel
+                      || (r.source.period_end ? `${r.source.period_basis || "Period"} ${fmtPeriodMDY(r.source.period_end)}` : null));
+                    const tooltip = r.source
+                      ? [r.source.label, srcPeriod].filter(Boolean).join(" · ")
+                        || (r.source.concept ? `${r.source.concept} · FY${r.source.fy ?? "?"}` : "")
+                      : "";
                     return (
                       <div key={ri} style={{ marginBottom: ri < reconItems.length - 1 ? 8 : 0 }} title={tooltip || undefined}>
                         {r.isSubtotal && ri > 0 && <div style={{ borderTop: "2px dashed rgba(148,163,184,0.2)", margin: "10px 0" }} />}
@@ -1014,7 +1079,12 @@ return (
                     <tbody>
                       {reconItems.map((r, ri) => {
                         const conceptShort = r.source && r.source.concept ? r.source.concept : "";
-                        const periodShort = r.source && r.source.period_end ? r.source.period_end : "";
+                        // Render a formatted period chip (12/31/25) under
+                        // each line label so the user can audit at a glance
+                        // that every row shares the same source date.
+                        const periodShort = r.source && r.source.period_end
+                          ? fmtPeriodMDY(r.source.period_end)
+                          : "";
                         const tipFull = r.source && r.source.label ? r.source.label : conceptShort;
                         // For walks the labels already include their own +/=/− prefix.
                         const labelText = walk ? r.label : `${r.isSubtotal && ri > 0 ? "= " : ri > 0 && !r.isSubtotal ? "+ " : ""}${r.label}`;
@@ -1022,9 +1092,9 @@ return (
                         <tr key={ri} style={{ borderTop: r.isSubtotal && ri > 0 ? "2px solid rgba(148,163,184,0.15)" : "none" }} title={tipFull || undefined}>
                           <td style={{ padding: "6px 0", color: r.isSubtotal ? "#e2e8f0" : "#94a3b8", fontWeight: r.isSubtotal ? 700 : 400 }}>
                             <div>{labelText}</div>
-                            {conceptShort && (
+                            {(conceptShort || periodShort) && (
                               <div style={{ fontSize: 8, color: "#475569", fontFamily: "'JetBrains Mono', monospace", marginTop: 1 }}>
-                                {conceptShort}{periodShort ? ` · ${periodShort}` : ""}
+                                {conceptShort}{conceptShort && periodShort ? " · " : ""}{periodShort}
                               </div>
                             )}
                           </td>
@@ -2064,7 +2134,22 @@ return (
 
           {/* ═══ HISTORICAL P&L ═══ */}
           <div style={{ ...card, gridColumn: "1 / -1" }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: "#94a3b8", marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.5px" }}>Historical P&L ($M)</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#94a3b8", marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.5px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <span>Historical P&L ($M)</span>
+              {(() => {
+                // Echo the canonical period chip here too so the Historical
+                // P&L card can be read in isolation and still show the
+                // reference date the "LATEST" row is derived from.
+                const label = periodLabelOf(detail.financials && detail.financials[0], null)
+                  || periodLabelOf(detail.adjBurn, null)
+                  || "";
+                return label ? (
+                  <span style={{ fontSize: 9, fontWeight: 700, color: "#60a5fa", background: "rgba(96,165,250,0.1)", border: "1px solid rgba(96,165,250,0.3)", borderRadius: 4, padding: "3px 8px", letterSpacing: "0.3px", textTransform: "none" }}>
+                    Latest: {label}
+                  </span>
+                ) : null;
+              })()}
+            </div>
             <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}><table style={{ width: "100%", borderCollapse: "collapse", minWidth: mob ? 380 : "auto" }}>
               <thead>
                 <tr>
@@ -2082,9 +2167,21 @@ return (
                   };
                   const ebitdaMargin = ((f.ebitda / f.rev) * 100).toFixed(1);
                   const nc = f.cash - f.debt;
+                  // Prefer an explicit periodLabel/periodEnd from the backend
+                  // (every SEC-sourced row now carries one). Static portfolio
+                  // rows without periodEnd fall back to just the "FY20XX"
+                  // string — the user still sees dates where the pipeline
+                  // knows them, without forcing migration of every hardcoded
+                  // entry in portfolioData.js.
+                  const rowLabel = periodLabelOf(f, null);
                   return (
                     <tr key={i} style={{ borderBottom: "1px solid #1e293b", background: i === 0 ? "#0f172a" : "transparent" }}>
-                      <td style={{ padding: "8px 6px", fontWeight: 700, fontSize: 12 }}>{f.period} {i === 0 && <span style={{ fontSize: 8, color: "#3b82f6" }}>LATEST</span>}</td>
+                      <td style={{ padding: "8px 6px", fontWeight: 700, fontSize: 12, lineHeight: 1.25 }}>
+                        <div>{f.period} {i === 0 && <span style={{ fontSize: 8, color: "#3b82f6" }}>LATEST</span>}</div>
+                        {rowLabel && rowLabel !== f.period && (
+                          <div style={{ fontSize: 9, fontWeight: 500, color: "#64748b", marginTop: 1 }}>{rowLabel}</div>
+                        )}
+                      </td>
                       <td style={{ padding: "8px 6px", textAlign: "right", fontSize: 12 }}>{fmtB(f.rev)}</td>
                       <td style={{ padding: "8px 6px", textAlign: "right", fontSize: 12, color: f.ebitda < 0 ? "#ef4444" : "#22c55e", fontWeight: 600 }}>{fmtB(f.ebitda)}</td>
                       <td style={{ padding: "8px 6px", textAlign: "right", fontSize: 12, color: f.ebitda < 0 ? "#ef4444" : "#94a3b8" }}>{ebitdaMargin}%</td>

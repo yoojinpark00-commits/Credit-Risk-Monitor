@@ -288,12 +288,175 @@ def _extract_series(facts, tag, forms, n=4, quarterly=False):
 
 
 def _get_field(facts, field_name, forms=ANNUAL_FORMS, n=4, quarterly=False):
-    """Try each XBRL tag alias until one returns data."""
-    for tag in CONCEPT_MAP.get(field_name, []):
+    """Return the freshest XBRL series for ``field_name`` across its tag aliases.
+
+    Historic bug: the previous implementation returned the *first* alias that
+    contained any data, which silently surfaced stale values when an issuer had
+    migrated to a newer tag. For example, iHeartMedia's ``InterestExpense`` tag
+    stops in FY2018 while its ``InterestExpenseDebt`` tag continues through
+    FY2024 — the old code returned the stale 2018 series, causing a GAAP→Adj
+    EBITDA walk that mixed FY2018 interest into a current-year bridge.
+
+    The fix collects every alias's series and picks the one whose newest
+    ``end`` date is most recent. Ties fall back to alias declaration order
+    (the canonical/preferred tag wins).
+    """
+    best_series = []
+    best_end = ""
+    best_rank = None
+    for idx, tag in enumerate(CONCEPT_MAP.get(field_name, [])):
         series = _extract_series(facts, tag, forms, n, quarterly)
-        if series:
-            return series
-    return []
+        if not series:
+            continue
+        latest_end = series[0].get("end", "")
+        if (latest_end > best_end) or (latest_end == best_end and (best_rank is None or idx < best_rank)):
+            best_series = series
+            best_end = latest_end
+            best_rank = idx
+    return best_series
+
+
+def _pick_at_period(series, target_end, fy_window_days=400):
+    """Return the series entry whose ``end`` date matches ``target_end``.
+
+    ``series`` is sorted newest-first (as produced by :func:`_extract_series`).
+    We consider an entry a match when its ``end`` equals ``target_end`` exactly
+    — typical for properly-aligned annual XBRL concepts. When no exact match
+    exists, we accept the closest entry within ``fy_window_days`` of the target
+    so minor fiscal-year drift (e.g. a 52/53-week retailer, or the target being
+    computed LTM-through-Q3 while the concept only reports FY) still matches.
+    Entries more than ``fy_window_days`` away are rejected outright, so stale
+    values from prior years can never leak into a current-period bridge.
+    """
+    if not series or not target_end:
+        return None
+    target_dt = _parse_ymd(target_end)
+    if target_dt is None:
+        return None
+    exact = [e for e in series if e.get("end", "") == target_end]
+    if exact:
+        return exact[0]
+    best = None
+    best_delta = None
+    for e in series:
+        e_dt = _parse_ymd(e.get("end", ""))
+        if e_dt is None:
+            continue
+        delta = abs((target_dt - e_dt).days)
+        if delta > fy_window_days:
+            continue
+        if best_delta is None or delta < best_delta:
+            best = e
+            best_delta = delta
+    return best
+
+
+def _parse_ymd(s):
+    try:
+        return datetime.strptime(s, "%Y-%m-%d")
+    except (ValueError, TypeError):
+        return None
+
+
+def _fmt_period_mdy(ymd):
+    """Format ``'2025-12-31'`` as ``'12/31/25'`` for display."""
+    dt = _parse_ymd(ymd)
+    if dt is None:
+        return ymd or ""
+    return dt.strftime("%m/%d/%y").lstrip("0").replace("/0", "/")
+
+
+def _val_m_at(series, target_end):
+    """Return ``to_m(value)`` for the series entry at ``target_end`` (or 0)."""
+    e = _pick_at_period(series, target_end)
+    return to_m(e["val"]) if e else 0
+
+
+def _xbrl_src_at(series, target_end):
+    """Provenance block for the entry of ``series`` at ``target_end``."""
+    e = _pick_at_period(series, target_end)
+    if not e:
+        return None
+    return {
+        "concept": f"us-gaap:{e.get('tag', '?')}",
+        "fy": e.get("fy"),
+        "period_end": e.get("end", ""),
+        "label": (
+            f"SEC EDGAR XBRL — us-gaap:{e.get('tag','?')} "
+            f"(period ending {e.get('end','?')})"
+        ),
+    }
+
+
+def _compute_ltm(annual_series, quarterly_series, target_end):
+    """Compute an LTM value for a concept at ``target_end``.
+
+    SEC companyfacts returns 10-Q entries as YTD-cumulative figures. A clean
+    LTM bridge therefore is::
+
+        LTM_through_Q = LastCompleteFY + YTD_current_year_through_Q
+                         - YTD_prior_year_through_Q
+
+    Returns ``(ltm_value_m, source_entry)`` where ``source_entry`` is the
+    annual entry used as the anchor (so caller can attribute the tag). When
+    quarterly data isn't recent enough — or is missing — returns the annual
+    value at the closest FY to ``target_end``.
+    """
+    if not annual_series:
+        return 0, None
+    # Default: latest annual that lines up with target_end
+    anchor = _pick_at_period(annual_series, target_end) or annual_series[0]
+    annual_val = to_m(anchor["val"])
+    anchor_end = anchor.get("end", "")
+    anchor_dt = _parse_ymd(anchor_end)
+
+    if not quarterly_series:
+        return annual_val, anchor
+
+    # Locate the current-year YTD entry ending at target_end (or latest available).
+    target_dt = _parse_ymd(target_end)
+    if target_dt is None or anchor_dt is None:
+        return annual_val, anchor
+
+    # No quarterly uplift needed if the anchor already spans the target date
+    if anchor_end >= target_end:
+        return annual_val, anchor
+
+    # Find the current-year YTD entry at target_end, then the prior-year YTD
+    # entry ending ~365 days earlier (same fiscal quarter).
+    current_ytd = None
+    for q in quarterly_series:
+        if q.get("end") == target_end:
+            current_ytd = q
+            break
+
+    if current_ytd is None:
+        # Fall back to the newest quarterly point if no exact match
+        current_ytd = quarterly_series[0]
+
+    cyt_dt = _parse_ymd(current_ytd.get("end", ""))
+    if cyt_dt is None:
+        return annual_val, anchor
+
+    prior_ytd = None
+    for q in quarterly_series:
+        if q is current_ytd:
+            continue
+        q_dt = _parse_ymd(q.get("end", ""))
+        if q_dt is None:
+            continue
+        # Prior-year match: ~365 days earlier, within 14-day fiscal tolerance
+        if abs(((cyt_dt - q_dt).days) - 365) <= 14:
+            prior_ytd = q
+            break
+
+    # LTM = annual + current YTD - prior YTD
+    if current_ytd and prior_ytd:
+        ltm = annual_val + to_m(current_ytd["val"]) - to_m(prior_ytd["val"])
+        # Upgrade the anchor's reported period_end to the LTM period for provenance
+        anchor = dict(anchor, end=current_ytd.get("end", anchor_end))
+        return ltm, anchor
+    return annual_val, anchor
 
 
 def to_m(val):
@@ -602,39 +765,87 @@ def generate_company_profile(ticker):
     # Quarterly data for burns (fetch extra entries to support YTD de-cumulation)
     q_ocf = _get_field(facts, "ocf", forms=QUARTERLY_FORMS, n=8, quarterly=True)
     q_capex = _get_field(facts, "capex", forms=QUARTERLY_FORMS, n=8, quarterly=True)
-    q_rev = _get_field(facts, "revenue", forms=QUARTERLY_FORMS, n=4, quarterly=True)
+    q_rev = _get_field(facts, "revenue", forms=QUARTERLY_FORMS, n=8, quarterly=True)
+    q_ni = _get_field(facts, "net_income", forms=QUARTERLY_FORMS, n=8, quarterly=True)
+    q_ie = _get_field(facts, "interest_expense", forms=QUARTERLY_FORMS, n=8, quarterly=True)
+    q_tx = _get_field(facts, "tax_expense", forms=QUARTERLY_FORMS, n=8, quarterly=True)
+    q_da = _get_field(facts, "depreciation", forms=QUARTERLY_FORMS, n=8, quarterly=True)
+    q_oi = _get_field(facts, "operating_income", forms=QUARTERLY_FORMS, n=8, quarterly=True)
+    q_sbc = _get_field(facts, "sbc", forms=QUARTERLY_FORMS, n=8, quarterly=True)
+    q_restr = _get_field(facts, "restructuring", forms=QUARTERLY_FORMS, n=8, quarterly=True)
+    q_nonop_total = _get_field(facts, "nonop_total", forms=QUARTERLY_FORMS, n=8, quarterly=True)
 
-    # Latest annual values (in $M)
-    revenue = latest_val_m(rev_s)
-    net_income = latest_val_m(ni_s)
-    oper_income = latest_val_m(oi_s)
-    int_exp = abs(latest_val_m(ie_s))
-    tax_exp = latest_val_m(tx_s)
-    da = latest_val_m(da_s)
-    sbc = latest_val_m(sbc_s)
-    restructuring = abs(latest_val_m(restr_s))
+    # ─── Canonical target period ────────────────────────────────────────────
+    # All EBITDA-walk line items must be pulled from the SAME fiscal period.
+    # Historic bug: the old code pulled each concept independently, which let
+    # stale values (e.g. iHeart's FY2018 InterestExpense) slip into a current
+    # GAAP→Adj bridge. We now anchor every line to ``target_end`` — the newest
+    # annual period that is consistently reported across the core P&L
+    # concepts (Revenue, NI, Interest, Tax, D&A). That period becomes the
+    # single source of truth for the Historical P&L "LATEST" row, the LTM
+    # basis used throughout the Financials tab, and the reconciliation walk.
+    #
+    # LTM uplift: if quarterly filings are MORE recent than the anchor annual,
+    # we compute true LTM per concept via ``_compute_ltm`` (LastFY + YTD
+    # − PriorYearYTD). The resulting period_type flips from FYE to LTM.
+    core_anchor_series = [rev_s, ni_s, ie_s, tx_s, da_s]
+    candidate_ends = [s[0]["end"] for s in core_anchor_series if s and s[0].get("end")]
+    target_end = min(candidate_ends) if candidate_ends else (rev_s[0]["end"] if rev_s and rev_s[0].get("end") else "")
+
+    # Determine whether quarterly data extends the period beyond the anchor FY
+    latest_q_end = ""
+    for q in (q_rev, q_ni, q_ie, q_tx, q_da):
+        if q and q[0].get("end", "") > latest_q_end:
+            latest_q_end = q[0]["end"]
+    use_ltm = bool(latest_q_end and target_end and latest_q_end > target_end)
+    if use_ltm:
+        target_end = latest_q_end
+
+    period_type = "LTM" if use_ltm else "FYE"
+    period_label = f"{period_type} {_fmt_period_mdy(target_end)}" if target_end else period_type
+
+    def _annual_m(series, q_series=None, abs_val=False):
+        """Return the value for ``series`` at ``target_end`` — LTM-adjusted
+        when a quarterly series is provided and quarterly data extends past
+        the anchor FY. Zero when nothing aligns."""
+        if use_ltm:
+            val, _ = _compute_ltm(series, q_series, target_end)
+        else:
+            val = _val_m_at(series, target_end)
+        return abs(val) if abs_val else val
+
+    # Latest annual values (in $M) — all aligned to the canonical period
+    revenue = _annual_m(rev_s, q_rev)
+    net_income = _annual_m(ni_s, q_ni)
+    oper_income = _annual_m(oi_s, q_oi)
+    int_exp = _annual_m(ie_s, q_ie, abs_val=True)
+    tax_exp = _annual_m(tx_s, q_tx)
+    da = _annual_m(da_s, q_da)
+    sbc = _annual_m(sbc_s, q_sbc)
+    restructuring = _annual_m(restr_s, q_restr, abs_val=True)
     # Granular reconciliation add-backs ($M, signed where meaningful)
-    goodwill_impairment = abs(latest_val_m(gw_imp_s))
-    asset_impairment = abs(latest_val_m(asset_imp_s))
-    acquisition_costs = abs(latest_val_m(acq_cost_s))
+    goodwill_impairment = abs(_val_m_at(gw_imp_s, target_end))
+    asset_impairment = abs(_val_m_at(asset_imp_s, target_end))
+    acquisition_costs = abs(_val_m_at(acq_cost_s, target_end))
     # Disposal: a *gain* (positive XBRL value) reduces EBITDA add-backs; a loss increases.
-    gain_loss_disposal = latest_val_m(gain_disp_s)
+    gain_loss_disposal = _val_m_at(gain_disp_s, target_end)
     # Other non-operating: typically signed; reverse for an EBITDA bridge.
-    other_nonop = latest_val_m(other_nonop_s)
-    # Net non-operating income/expense (signed): positive = net income from non-op
-    nonop_total = latest_val_m(nonop_total_s)
-    interest_income = latest_val_m(int_income_s)
-    lt_debt = latest_val_m(ltd_s)
-    current_debt = latest_val_m(cd_s)
+    other_nonop = _val_m_at(other_nonop_s, target_end)
+    # Net non-operating income/expense (signed) — LTM when quarterly extends the period
+    nonop_total = _annual_m(nonop_total_s, q_nonop_total)
+    interest_income = _val_m_at(int_income_s, target_end)
+    # Balance-sheet items: use point-in-time value at target_end (no LTM logic)
+    lt_debt = _val_m_at(ltd_s, target_end) or latest_val_m(ltd_s)
+    current_debt = _val_m_at(cd_s, target_end) or latest_val_m(cd_s)
     total_debt = lt_debt + current_debt
-    cash = latest_val_m(cash_s)
-    st_investments = latest_val_m(sti_s)
-    total_assets = latest_val_m(ta_s)
-    total_equity = latest_val_m(te_s)
-    current_assets = latest_val_m(ca_s)
-    current_liab = latest_val_m(cl_s)
-    ocf = latest_val_m(ocf_s)
-    capex = abs(latest_val_m(capex_s))
+    cash = _val_m_at(cash_s, target_end) or latest_val_m(cash_s)
+    st_investments = _val_m_at(sti_s, target_end) or latest_val_m(sti_s)
+    total_assets = _val_m_at(ta_s, target_end) or latest_val_m(ta_s)
+    total_equity = _val_m_at(te_s, target_end) or latest_val_m(te_s)
+    current_assets = _val_m_at(ca_s, target_end) or latest_val_m(ca_s)
+    current_liab = _val_m_at(cl_s, target_end) or latest_val_m(cl_s)
+    ocf = _annual_m(ocf_s, q_ocf)
+    capex = _annual_m(capex_s, q_capex, abs_val=True)
     fcf = ocf - capex
     gross_profit = latest_val_m(gp_s)
     cogs = latest_val_m(cogs_s)
@@ -644,29 +855,50 @@ def generate_company_profile(ticker):
     buybacks = abs(latest_val_m(buybacks_s))
 
     # ─── Granular EBITDA Reconciliation (sourced live from SEC EDGAR XBRL) ────
-    # Build a textbook bottom-up EBITDA bridge from the individual us-gaap concepts
-    # already fetched above. Each line records the exact XBRL tag and 10-K period
-    # so the UI can surface provenance and prove the figure came from SEC filings.
-    def _xbrl_src(series):
-        if not series:
-            return None
-        e = series[0]
+    # Build a textbook bottom-up EBITDA bridge from the individual us-gaap
+    # concepts already fetched above. Every line is anchored to ``target_end``
+    # (the canonical LTM/FYE period set earlier) so it's impossible for stale
+    # values like iHeart's FY2018 InterestExpense to leak into a current-
+    # period bridge. Each line records the exact XBRL tag and period end so
+    # the UI can surface provenance on a per-line basis.
+    def _walk_src(series, amount):
+        """Provenance block for a walk line at the canonical target period.
+
+        When the concept has no entry at ``target_end`` (within the fiscal
+        window), returns a neutral marker — the caller should still render
+        the line using the amount that was aligned via ``_val_m_at`` /
+        ``_compute_ltm``, which will be 0 in that case, so the line gets
+        filtered out below.
+        """
+        src = _xbrl_src_at(series, target_end)
+        if src is not None:
+            # Annotate whether this concept was used as-is (FYE) or rolled up
+            # to an LTM period via quarterly YTD arithmetic.
+            src = dict(src)
+            src["period_basis"] = period_type
+            src["period_label"] = period_label
+            return src
         return {
-            "concept": f"us-gaap:{e.get('tag', '?')}",
-            "fy": e.get("fy"),
-            "period_end": e.get("end", ""),
-            "label": f"SEC EDGAR XBRL — us-gaap:{e.get('tag','?')} (FY{e.get('fy','?')} 10-K, period ending {e.get('end','?')})",
+            "concept": None,
+            "fy": None,
+            "period_end": target_end,
+            "period_basis": period_type,
+            "period_label": period_label,
+            "label": f"No XBRL value at {period_label}",
         }
 
     ebitda_walk = []
-    if ni_s:
-        ebitda_walk.append({"label": "Net Income", "amount": net_income, "isSubtotal": False, "category": "starting", "source": _xbrl_src(ni_s)})
-    if tx_s:
-        ebitda_walk.append({"label": "+ Income Tax Expense", "amount": tax_exp, "isSubtotal": False, "category": "tax", "source": _xbrl_src(tx_s)})
-    if ie_s:
-        ebitda_walk.append({"label": "+ Interest Expense", "amount": int_exp, "isSubtotal": False, "category": "interest", "source": _xbrl_src(ie_s)})
-    if da_s:
-        ebitda_walk.append({"label": "+ Depreciation & Amortization", "amount": da, "isSubtotal": False, "category": "da", "source": _xbrl_src(da_s)})
+    # Only include a line when the concept has an entry aligned to target_end.
+    # _pick_at_period enforces a 400-day fiscal window so prior-decade values
+    # can never sneak in even if a concept is missing for the anchor period.
+    if ni_s and _pick_at_period(ni_s, target_end):
+        ebitda_walk.append({"label": "Net Income", "amount": net_income, "isSubtotal": False, "category": "starting", "source": _walk_src(ni_s, net_income)})
+    if tx_s and _pick_at_period(tx_s, target_end):
+        ebitda_walk.append({"label": "+ Income Tax Expense", "amount": tax_exp, "isSubtotal": False, "category": "tax", "source": _walk_src(tx_s, tax_exp)})
+    if ie_s and _pick_at_period(ie_s, target_end):
+        ebitda_walk.append({"label": "+ Interest Expense", "amount": int_exp, "isSubtotal": False, "category": "interest", "source": _walk_src(ie_s, int_exp)})
+    if da_s and _pick_at_period(da_s, target_end):
+        ebitda_walk.append({"label": "+ Depreciation & Amortization", "amount": da, "isSubtotal": False, "category": "da", "source": _walk_src(da_s, da)})
 
     # ─── Non-operating reversal ──────────────────────────────────────────────
     # The bottom-up bridge (NI + Tax + Int + D&A) carries every non-operating
@@ -680,9 +912,9 @@ def generate_company_profile(ticker):
     # Sign convention: `nonop_total` is positive when non-op is net INCOME
     # (inflating NI → inflating bottom-up EBITDA). Subtracting it neutralizes
     # the effect. Negative nonop_total (net expense) gets added back.
-    if nonop_total_s:
+    if nonop_total_s and _pick_at_period(nonop_total_s, target_end):
         nonop_reversal = -nonop_total
-        nonop_source = _xbrl_src(nonop_total_s)
+        nonop_source = _walk_src(nonop_total_s, nonop_reversal)
         nonop_method = "aggregate us-gaap:NonoperatingIncomeExpense"
     else:
         # Fallback: reconstruct from components. Interest income and "other
@@ -692,13 +924,16 @@ def generate_company_profile(ticker):
         nonop_reversal = -nonop_fallback
         nonop_source = {
             "label": (
-                f"Fallback sum: InvestmentIncomeInterest ({interest_income}M) "
+                f"Fallback sum at {period_label}: "
+                f"InvestmentIncomeInterest ({interest_income}M) "
                 f"+ OtherNonoperatingIncomeExpense ({other_nonop}M) "
                 f"+ GainLossOnDispositionOfAssets ({gain_loss_disposal}M)"
             ),
             "concept": "us-gaap:(InvestmentIncomeInterest + OtherNonoperatingIncomeExpense + GainLossOnDispositionOfAssets)",
             "fy": None,
-            "period_end": "",
+            "period_end": target_end,
+            "period_basis": period_type,
+            "period_label": period_label,
         }
         nonop_method = "component sum (aggregate concept unavailable)"
 
@@ -731,39 +966,48 @@ def generate_company_profile(ticker):
         gaap_ebitda = gaap_ebitda_bottomup
         gaap_ebitda_method = "best-effort from available XBRL fields"
     ebitda_walk.append({
-        "label": "= GAAP EBITDA",
+        "label": f"= GAAP EBITDA ({period_label})",
         "amount": gaap_ebitda,
         "isSubtotal": True,
         "category": "subtotal",
-        "source": {"label": f"Computed ({gaap_ebitda_method})"},
+        "source": {
+            "label": f"Computed ({gaap_ebitda_method}) — {period_label}",
+            "period_end": target_end,
+            "period_basis": period_type,
+            "period_label": period_label,
+        },
     })
 
-    # Non-GAAP add-backs — each from a distinct SEC XBRL concept.
-    # NOTE: `other_nonop` and `gain_loss_disposal` are intentionally NOT added
-    # here. They were already reversed above via the non-op reversal line
-    # (either through the aggregate NonoperatingIncomeExpense concept or the
-    # component-sum fallback). Adding them again would double-count.
+    # Non-GAAP add-backs — each from a distinct SEC XBRL concept, filtered to
+    # the canonical ``target_end`` so every add-back shares the same period as
+    # the GAAP base. `other_nonop` and `gain_loss_disposal` are intentionally
+    # NOT added here: they were already reversed via the non-op reversal line.
     addbacks = []
-    if sbc:
-        addbacks.append({"label": "+ Stock-Based Compensation", "amount": sbc, "isSubtotal": False, "category": "sbc", "source": _xbrl_src(sbc_s)})
-    if restructuring:
-        addbacks.append({"label": "+ Restructuring Charges", "amount": restructuring, "isSubtotal": False, "category": "restructuring", "source": _xbrl_src(restr_s)})
-    if goodwill_impairment:
-        addbacks.append({"label": "+ Goodwill Impairment", "amount": goodwill_impairment, "isSubtotal": False, "category": "impairment", "source": _xbrl_src(gw_imp_s)})
-    if asset_impairment:
-        addbacks.append({"label": "+ Asset / Intangible Impairment", "amount": asset_impairment, "isSubtotal": False, "category": "impairment", "source": _xbrl_src(asset_imp_s)})
-    if acquisition_costs:
-        addbacks.append({"label": "+ Acquisition-Related Costs", "amount": acquisition_costs, "isSubtotal": False, "category": "acquisition", "source": _xbrl_src(acq_cost_s)})
+    if sbc and _pick_at_period(sbc_s, target_end):
+        addbacks.append({"label": "+ Stock-Based Compensation", "amount": sbc, "isSubtotal": False, "category": "sbc", "source": _walk_src(sbc_s, sbc)})
+    if restructuring and _pick_at_period(restr_s, target_end):
+        addbacks.append({"label": "+ Restructuring Charges", "amount": restructuring, "isSubtotal": False, "category": "restructuring", "source": _walk_src(restr_s, restructuring)})
+    if goodwill_impairment and _pick_at_period(gw_imp_s, target_end):
+        addbacks.append({"label": "+ Goodwill Impairment", "amount": goodwill_impairment, "isSubtotal": False, "category": "impairment", "source": _walk_src(gw_imp_s, goodwill_impairment)})
+    if asset_impairment and _pick_at_period(asset_imp_s, target_end):
+        addbacks.append({"label": "+ Asset / Intangible Impairment", "amount": asset_impairment, "isSubtotal": False, "category": "impairment", "source": _walk_src(asset_imp_s, asset_impairment)})
+    if acquisition_costs and _pick_at_period(acq_cost_s, target_end):
+        addbacks.append({"label": "+ Acquisition-Related Costs", "amount": acquisition_costs, "isSubtotal": False, "category": "acquisition", "source": _walk_src(acq_cost_s, acquisition_costs)})
 
     ebitda_walk.extend(addbacks)
     total_addbacks = sum(item["amount"] for item in addbacks)
     adj_ebitda = gaap_ebitda + total_addbacks
     ebitda_walk.append({
-        "label": "= Adjusted EBITDA",
+        "label": f"= Adjusted EBITDA ({period_label})",
         "amount": adj_ebitda,
         "isSubtotal": True,
         "category": "final",
-        "source": {"label": f"Computed: GAAP EBITDA + {len(addbacks)} XBRL-sourced adjustments"},
+        "source": {
+            "label": f"Computed: GAAP EBITDA + {len(addbacks)} XBRL-sourced adjustments — {period_label}",
+            "period_end": target_end,
+            "period_basis": period_type,
+            "period_label": period_label,
+        },
     })
 
     # Aggregated bucket for the legacy compact view (kept for backwards-compat).
@@ -821,10 +1065,15 @@ def generate_company_profile(ticker):
             0.999 * safe_div(revenue, total_assets),
         2)
 
-    # Financials array (trailing 4 years)
+    # Financials array (trailing 4 years) — each row carries the exact
+    # period-end date from XBRL so the UI can label it as "FYE 12/31/25".
+    # When quarterly data extends the most-recent point past the anchor FY,
+    # the latest row is upgraded to an LTM row (period_type="LTM") with its
+    # period_end set to the latest quarterly period.
     financials = []
     for i in range(min(len(rev_s), 4)):
         fy = rev_s[i].get("fy", 2025 - i)
+        row_end = rev_s[i].get("end", "")
         # Determine per-year EBITDA, guarding against:
         #   1. operator-precedence: wrap addition in parens before the ternary
         #   2. fiscal-year misalignment: verify oi_s and da_s entries share the same FY
@@ -840,14 +1089,35 @@ def generate_company_profile(ticker):
                           + to_m(tx_s[i]["val"]) + to_m(da_s[i]["val"]))
         else:
             row_ebitda = 0
-        financials.append({
+        row = {
             "period": f"FY{fy}",
+            "periodEnd": row_end,
+            "periodType": "FYE",
+            "periodLabel": f"FYE {_fmt_period_mdy(row_end)}" if row_end else f"FY{fy}",
             "rev": to_m(rev_s[i]["val"]) if i < len(rev_s) else 0,
             "ebitda": row_ebitda,
             "ni": to_m(ni_s[i]["val"]) if i < len(ni_s) else 0,
             "debt": to_m(ltd_s[i]["val"]) if i < len(ltd_s) else 0,
             "cash": to_m(cash_s[i]["val"]) if i < len(cash_s) else 0,
-        })
+        }
+        financials.append(row)
+
+    # Promote the latest financials row to LTM when quarterly data extends the
+    # anchor period, so the Historical P&L "LATEST" row matches the LTM basis
+    # the rest of the Financials tab uses for its ratios.
+    if use_ltm and financials:
+        financials[0] = {
+            **financials[0],
+            "period": f"LTM {rev_s[0].get('fy', '')}".strip(),
+            "periodEnd": target_end,
+            "periodType": "LTM",
+            "periodLabel": period_label,
+            "rev": revenue,
+            "ebitda": gaap_ebitda,  # row ebitda is GAAP (adj shown separately)
+            "ni": net_income,
+            "debt": total_debt,
+            "cash": cash,
+        }
 
     # ── Trends: YoY changes across the 4-year financials array ─────────────
     # financials[0] is the most recent year; financials[1] is one year prior, etc.
@@ -1020,7 +1290,7 @@ def generate_company_profile(ticker):
     adj_burn = {
         "adjEBITDA": adj_ebitda,
         "adjEBITDA_src": (
-            f"SEC EDGAR XBRL companyfacts (CIK{cik}) — FY{fy_label}: "
+            f"SEC EDGAR XBRL companyfacts (CIK{cik}) — {period_label}: "
             f"GAAP EBITDA via {gaap_ebitda_method} ({gaap_ebitda}M) "
             f"+ {len(addbacks)} non-GAAP add-backs = {adj_ebitda}M"
         ),
@@ -1035,21 +1305,28 @@ def generate_company_profile(ticker):
         "nonOpTotal": nonop_total,
         "nonOpReversal": nonop_reversal,
         "nonOpReversalMethod": nonop_method,
+        # Canonical LTM/FYE period every EBITDA-walk line was pulled from.
+        "periodEnd": target_end,
+        "periodType": period_type,
+        "periodLabel": period_label,
         # Granular GAAP→Adjusted EBITDA bridge sourced live from SEC XBRL.
-        # Each entry carries the exact us-gaap concept and 10-K period.
+        # Every line in reconciliationWalk is anchored to periodEnd above.
         "reconciliationWalk": ebitda_walk,
         "reconciliationSource": {
             "provider": "SEC EDGAR XBRL companyfacts API",
             "endpoint": f"https://data.sec.gov/api/xbrl/companyfacts/CIK{cik}.json",
             "cik": cik,
             "fy": fy_label,
+            "periodEnd": target_end,
+            "periodType": period_type,
+            "periodLabel": period_label,
             "method": gaap_ebitda_method,
         },
-        "incomeTaxes": tax_exp, "incomeTaxes_src": f"FY{fy_label} 10-K",
+        "incomeTaxes": tax_exp, "incomeTaxes_src": f"{period_label} (SEC XBRL)",
         "prefDividends": 0, "prefDividends_src": "N/A",
-        "maintCapex": None, "totalCapex": capex, "totalCapex_src": f"FY{fy_label} 10-K",
-        "currentLTD": current_debt, "currentLTD_src": f"FY{fy_label} 10-K",
-        "intExpCash": int_exp, "intExpCash_src": f"FY{fy_label} 10-K",
+        "maintCapex": None, "totalCapex": capex, "totalCapex_src": f"{period_label} (SEC XBRL)",
+        "currentLTD": current_debt, "currentLTD_src": f"{period_label} (SEC XBRL)",
+        "intExpCash": int_exp, "intExpCash_src": f"{period_label} (SEC XBRL)",
     }
 
     # Rating history (from filing dates)
@@ -1336,6 +1613,12 @@ def generate_company_profile(ticker):
         "ebitda": adj_ebitda, "intExp": int_exp, "revenue": revenue,
         "netIncome": net_income, "totalAssets": total_assets, "totalEquity": total_equity,
         "fcf": fcf, "currentAssets": current_assets, "currentLiab": current_liab,
+        # Canonical reporting period the headline figures above were derived
+        # from. UI uses this to label the Financials tab (e.g. "LTM 12/31/25")
+        # and to prove that every figure shares the same reference date.
+        "periodEnd": target_end,
+        "periodType": period_type,
+        "periodLabel": period_label,
         # Operating metrics
         "grossProfit": gross_profit or None,
         "cogs": cogs or None,
