@@ -633,6 +633,13 @@ useEffect(() => {
             nonOpTotal: ab.nonOpTotal,
             nonOpReversal: ab.nonOpReversal,
             nonOpReversalMethod: ab.nonOpReversalMethod,
+            // Period metadata — the live SEC response tells us exactly
+            // which fiscal period these numbers come from. Portfolio
+            // entries cache this so the "FYE 12/31/25" badge reflects
+            // the actual reporting date rather than a static guess.
+            reportPeriodLabel: company.reportPeriodLabel,
+            reportEndDate: company.reportEndDate,
+            reportFiscalYear: company.reportFiscalYear,
             _fetchedAt: Date.now(),
           },
         }));
@@ -662,6 +669,11 @@ const detail = useMemo(() => {
   if (liveRecon && rawDetail.adjBurn) {
     mergedRaw = {
       ...rawDetail,
+      // Overlay period metadata from the live SEC response when present,
+      // otherwise fall back to whatever the static entry had.
+      reportPeriodLabel: liveRecon.reportPeriodLabel || rawDetail.reportPeriodLabel,
+      reportEndDate: liveRecon.reportEndDate || rawDetail.reportEndDate,
+      reportFiscalYear: liveRecon.reportFiscalYear || rawDetail.reportFiscalYear,
       adjBurn: {
         ...rawDetail.adjBurn,
         // Live walk + provenance
@@ -717,6 +729,20 @@ const detail = useMemo(() => {
     cashBurnQtr: rawDetail.cashBurnQtr ?? 0,
     currentAssets: rawDetail.currentAssets ?? 0,
     currentLiab: rawDetail.currentLiab ?? 0,
+    // ─── Period metadata ──────────────────────────────────────────
+    // Preference order:
+    //   1. mergedRaw.reportPeriodLabel — populated by the live SEC
+    //      walk fetch (portfolio tickers after lazy-fetch) or
+    //      api/company.py (ad-hoc lookups via lookupTicker).
+    //   2. fallback: derive "LTM FY2025" from financials[0].period for
+    //      hand-curated portfolio entries that haven't been refreshed
+    //      with a live SEC fetch yet.
+    reportPeriodLabel: mergedRaw.reportPeriodLabel
+      || (mergedRaw.financials && mergedRaw.financials[0] && mergedRaw.financials[0].period
+            ? `LTM ${mergedRaw.financials[0].period}`
+            : null),
+    reportEndDate: mergedRaw.reportEndDate || null,
+    reportFiscalYear: mergedRaw.reportFiscalYear || null,
   };
 }, [rawDetail, portfolioReconCache]);
 
@@ -749,6 +775,7 @@ return (
 {!getWatchlistStatus(detail).active && <span style={{ background: "rgba(5,46,22,0.5)", color: "#86efac", fontSize: 10, fontWeight: 700, padding: "4px 10px", borderRadius: 20, textTransform: "uppercase", letterSpacing: "0.5px", flexShrink: 0, border: "1px solid rgba(34,197,94,0.2)" }}>{"\u2713"} ACTIVE</span>}
 {isPubliclyRated(detail) ? <span style={{ background: "rgba(234,179,8,0.15)", color: "#fcd34d", fontSize: 10, fontWeight: 700, padding: "4px 10px", borderRadius: 20, textTransform: "uppercase", letterSpacing: "0.5px", flexShrink: 0, border: "1px solid rgba(234,179,8,0.2)" }}>RATED</span> : <span style={{ background: "rgba(100,116,139,0.15)", color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "4px 10px", borderRadius: 20, textTransform: "uppercase", letterSpacing: "0.5px", flexShrink: 0, border: "1px solid rgba(100,116,139,0.2)" }}>NOT RATED</span>}
 {detail._generated && <span style={{ background: "rgba(59,130,246,0.15)", color: "#60a5fa", fontSize: 10, fontWeight: 700, padding: "4px 10px", borderRadius: 20, textTransform: "uppercase", letterSpacing: "0.5px", flexShrink: 0, border: "1px solid rgba(59,130,246,0.2)" }}>API Generated {detail._zScore ? `\u00B7 Z=${detail._zScore}` : ""}</span>}
+{detail.reportPeriodLabel && <span title={detail.reportEndDate ? `Figures from period ending ${detail.reportEndDate}` : "Latest period available"} style={{ background: "rgba(14,165,233,0.12)", color: "#7dd3fc", fontSize: 10, fontWeight: 700, padding: "4px 10px", borderRadius: 20, textTransform: "uppercase", letterSpacing: "0.5px", flexShrink: 0, border: "1px solid rgba(14,165,233,0.2)", fontFamily: "'JetBrains Mono', monospace" }}>{detail.reportPeriodLabel}</span>}
 {detail.pm && <span style={{ background: "rgba(30,41,59,0.6)", color: "#cbd5e1", fontSize: 10, fontWeight: 700, padding: "4px 10px", borderRadius: 20, textTransform: "uppercase", letterSpacing: "0.5px", flexShrink: 0, border: "1px solid rgba(148,163,184,0.18)" }}>PM {detail.pm}</span>}
 </div>
 <div style={{ position: "relative", width: mob ? "100%" : "auto", marginTop: mob ? 2 : 0 }}>
@@ -825,6 +852,11 @@ return (
             <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: isNetCashGenerator ? "linear-gradient(90deg, #22c55e, #3b82f6, #22c55e)" : "linear-gradient(90deg, #ef4444, #f97316, #ef4444)" }} />
             <div style={{ fontSize: mob ? 11 : 13, fontWeight: 800, color: isNetCashGenerator ? "#86efac" : "#fca5a5", marginBottom: 16, textTransform: "uppercase", letterSpacing: mob ? "0.5px" : "1px", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
               {isNetCashGenerator ? "\u2713" : "\u26A0"} {isNetCashGenerator ? "Cash Flow & Liquidity" : "Cash Burn & Liquidity"}
+              {detail.reportPeriodLabel && (
+                <span title={detail.reportEndDate ? `Figures derived from period ending ${detail.reportEndDate}` : undefined} style={{ fontSize: mob ? 9 : 11, fontWeight: 700, color: "#60a5fa", textTransform: "none", letterSpacing: 0, padding: "2px 8px", background: "rgba(59,130,246,0.1)", border: "1px solid rgba(59,130,246,0.25)", borderRadius: 4, fontFamily: "'JetBrains Mono', monospace" }}>
+                  {detail.reportPeriodLabel}
+                </span>
+              )}
               {!mob && <span style={{ fontSize: 10, fontWeight: 500, color: "#64748b", textTransform: "none", letterSpacing: 0 }}>{"\u2014"} LTM adjusted basis {"\u00B7"} {isNetCashGenerator ? "Net cash generator" : "Cash consumer"}</span>}
             </div>
 
