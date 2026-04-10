@@ -1076,43 +1076,26 @@ def generate_company_profile(ticker):
         },
     })
 
-    # Non-GAAP add-backs — each from a distinct SEC XBRL concept.
-    # Disposal gains/losses are now here (not in the NonOp reversal) because
-    # they can be either operating or non-operating. Gains are subtracted
-    # (they inflate GAAP EBITDA but are non-recurring), losses are added.
-    addbacks = []
-    if sbc:
-        addbacks.append({"label": "+ Stock-Based Compensation", "amount": sbc, "isSubtotal": False, "category": "sbc", "source": _walk_src(sbc_s, sbc)})
-    if restructuring:
-        addbacks.append({"label": "+ Restructuring Charges", "amount": restructuring, "isSubtotal": False, "category": "restructuring", "source": _walk_src(restr_s, restructuring)})
-    if goodwill_impairment:
-        addbacks.append({"label": "+ Goodwill Impairment", "amount": goodwill_impairment, "isSubtotal": False, "category": "impairment", "source": _walk_src(gw_imp_s, goodwill_impairment)})
-    if asset_impairment:
-        addbacks.append({"label": "+ Asset / Intangible Impairment", "amount": asset_impairment, "isSubtotal": False, "category": "impairment", "source": _walk_src(asset_imp_s, asset_impairment)})
-    if acquisition_costs:
-        addbacks.append({"label": "+ Acquisition-Related Costs", "amount": acquisition_costs, "isSubtotal": False, "category": "acquisition", "source": _walk_src(acq_cost_s, acquisition_costs)})
-    if gain_loss_disposal:
-        # Gains (positive) are subtracted (non-recurring income reduces Adj
-        # EBITDA); losses (negative) are added back. The amount stored is the
-        # XBRL value (positive = gain), so we negate it for the add-back.
-        addbacks.append({
-            "label": ("− Gain on Asset Disposal" if gain_loss_disposal > 0 else "+ Loss on Asset Disposal"),
-            "amount": -gain_loss_disposal,
-            "isSubtotal": False,
-            "category": "disposal",
-            "source": _walk_src(gain_disp_s, gain_loss_disposal),
-        })
-
-    ebitda_walk.extend(addbacks)
-    total_addbacks = sum(item["amount"] for item in addbacks)
-    adj_ebitda = gaap_ebitda + total_addbacks
+    # ─── Adjusted EBITDA ──────────────────────────────────────────────────
+    # XBRL-sourced add-backs (SBC, restructuring, impairment, disposal)
+    # have proven unreliable across diverse filers: stale period data,
+    # double-counting with aggregate tags, wrong classification (operating
+    # vs non-operating disposal gains), and amounts that don't match
+    # management's own reconciliation.
+    #
+    # Approach: Adjusted EBITDA = GAAP EBITDA as the TIER 2 baseline.
+    # Non-GAAP adjustments are applied ONLY when the TIER 1 narrative
+    # pipeline provides management-reported reconciliation items from the
+    # 10-K (via _enrich_with_narrative). This ensures the add-backs are
+    # authoritative, period-correct, and match the company's own disclosure.
+    adj_ebitda = gaap_ebitda
     ebitda_walk.append({
-        "label": f"= Adjusted EBITDA ({period_label})",
+        "label": f"= EBITDA ({period_label})",
         "amount": adj_ebitda,
         "isSubtotal": True,
         "category": "final",
         "source": {
-            "label": f"Computed: GAAP EBITDA + {len(addbacks)} XBRL-sourced adjustments — {period_label}",
+            "label": f"Computed ({gaap_ebitda_method}) — {period_label}",
             "period_end": target_end,
             "period_basis": period_type,
             "period_label": period_label,
@@ -1400,8 +1383,7 @@ def generate_company_profile(ticker):
         "adjEBITDA": adj_ebitda,
         "adjEBITDA_src": (
             f"SEC EDGAR XBRL companyfacts (CIK{cik}) — {period_label}: "
-            f"GAAP EBITDA via {gaap_ebitda_method} ({gaap_ebitda}M) "
-            f"+ {len(addbacks)} non-GAAP add-backs = {adj_ebitda}M"
+            f"EBITDA via {gaap_ebitda_method} = {adj_ebitda}M"
         ),
         "gaapEbitda": gaap_ebitda, "sbc": sbc, "restructuring": restructuring,
         "otherNonCash": other_non_cash_total,
