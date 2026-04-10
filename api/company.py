@@ -828,23 +828,27 @@ def generate_company_profile(ticker):
         when a quarterly series is provided and quarterly data extends past
         the anchor FY.
 
-        Fallback: when the period-aligned lookup returns 0 but the series
-        contains data, use ``latest_val_m`` (the absolute latest entry).
-        This covers companies where a concept's freshest alias is still
-        stale relative to ``target_end`` — e.g. iHeart's only interest-
-        expense tag stops at FY2018 while revenue is at FY2024.  The walk
-        source annotation still reflects the actual period the data came
-        from so the user can see the mismatch.
+        Fallback: when ``_pick_at_period`` found NO entry (returned None)
+        but the series contains data, use ``latest_val_m``. This covers
+        companies where a concept's freshest alias is stale relative to
+        ``target_end`` (e.g. iHeart FY2018 InterestExpense).
+
+        Importantly, the fallback distinguishes "no entry found" from
+        "entry found with $0 value" — a genuine $0 is kept as-is and
+        does NOT trigger the stale-data fallback (fixes BUG 3).
         """
         if use_ltm and q_series:
             val, _ = _compute_ltm(series, q_series, target_end)
         else:
-            val = _val_m_at(series, target_end)
-            # If the 400-day window rejected the entry but the series has
-            # data, fall back to the latest available value rather than
-            # leaving a hole in the EBITDA bridge.
-            if val == 0 and series:
+            # Check whether _pick_at_period actually found an entry
+            entry = _pick_at_period(series, target_end) if series else None
+            if entry is not None:
+                val = to_m(entry["val"])
+            elif series:
+                # No entry within the 400-day window — fall back to latest
                 val = latest_val_m(series)
+            else:
+                val = 0
         return abs(val) if abs_val else val
 
     # Latest annual values (in $M) — all aligned to the canonical period
@@ -1092,8 +1096,16 @@ def generate_company_profile(ticker):
                     w["source"] = src
                     break
 
+    # ─── GAAP EBITDA computation ────────────────────────────────────────
+    # Prefer top-down (OpInc + D&A) — uses `is not None` so breakeven
+    # companies with OpInc==$0 still take this path (fixes BUG 13).
+    # When the top-down path is used, reconcile the walk: if the walk's
+    # line-item sum differs from OpInc+D&A (which happens whenever
+    # NonOp reversal doesn't perfectly reconstruct OpInc), insert a
+    # reconciliation-difference line so the walk ALWAYS ties to the
+    # subtotal (fixes BUG 10 — walk-vs-subtotal mismatch).
     gaap_ebitda_bottomup = net_income + tax_exp + int_exp + da + nonop_reversal
-    if oper_income and da:
+    if oper_income is not None and da:
         gaap_ebitda = oper_income + da
         if da != da_raw:
             gaap_ebitda_method = (
@@ -1101,6 +1113,26 @@ def generate_company_profile(ticker):
             )
         else:
             gaap_ebitda_method = "top-down: Operating Income + D&A"
+        # Reconcile walk to subtotal: if bottom-up sum ≠ top-down, insert
+        # a reconciliation line so the displayed walk always ties.
+        recon_diff = gaap_ebitda - gaap_ebitda_bottomup
+        if abs(recon_diff) >= 1:
+            ebitda_walk.append({
+                "label": ("+ Other Operating Items" if recon_diff > 0 else "− Other Operating Items"),
+                "amount": recon_diff,
+                "isSubtotal": False,
+                "category": "other_nonop",
+                "source": {
+                    "concept": None,
+                    "period_end": target_end,
+                    "period_label": period_label,
+                    "label": (
+                        f"Reconciliation: OpInc+D&A ({gaap_ebitda}M) − "
+                        f"bottom-up ({gaap_ebitda_bottomup}M) = {recon_diff}M "
+                        f"(non-op items not captured by XBRL reversal)"
+                    ),
+                },
+            })
     elif ni_s and tx_s and ie_s and da_s:
         gaap_ebitda = gaap_ebitda_bottomup
         gaap_ebitda_method = (
