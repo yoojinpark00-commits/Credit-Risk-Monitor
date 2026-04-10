@@ -904,16 +904,29 @@ return (
             <div style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.5px" }}>Cash Bridge {"\u2014"} Sources & Uses (Annual)</div>
             <div style={{ display: "flex", gap: 2, alignItems: "flex-end", height: 80, marginBottom: 4 }}>
               {(() => {
+                const priorCash = detail.financials[1]?.cash ?? detail.cash;
+                const priorDebt = detail.financials[1]?.debt ?? detail.totalDebt;
+                const netDebtChg = detail.totalDebt - priorDebt;
+                // FCF already = OCF − CapEx. The "plug" captures everything
+                // else: dividends, buybacks, equity issuance, acquisitions,
+                // FX, and working-capital timing vs. accrual differences.
+                // This guarantees the bridge always ties: Opening + sources
+                // − uses = Ending Cash.
+                const cashDelta = detail.cash - priorCash;
+                const explained = detail.fcf + netDebtChg;
+                const otherPlug = cashDelta - explained;
+                const opex = -(detail.revenue - detail.ebitda);
+                const capexOther = -(detail.ebitda - detail.fcf);
                 const items = [
-                  { l: "Opening\nCash", v: detail.financials[1]?.cash || detail.cash, type: "neutral" },
-                  { l: "Revenue", v: detail.revenue, type: "inflow" },
-                  { l: "OpEx &\nCOGS", v: -(detail.revenue - detail.ebitda), type: "outflow" },
-                  { l: "CapEx &\nOther", v: detail.ebitda - detail.fcf, type: "outflow" },
-                  { l: "Debt\nProceeds", v: Math.max(0, detail.totalDebt - (detail.financials[1]?.debt || detail.totalDebt)), type: "inflow" },
-                  { l: "Ending\nCash", v: detail.cash, type: "neutral" },
+                  { l: "Opening\nCash",  v: priorCash, type: "neutral" },
+                  { l: "Revenue",        v: detail.revenue, type: "inflow" },
+                  { l: "OpEx &\nCOGS",   v: opex, type: opex >= 0 ? "inflow" : "outflow" },
+                  { l: "CapEx, Int.\n& Tax",  v: capexOther, type: capexOther >= 0 ? "inflow" : "outflow" },
+                  ...(netDebtChg !== 0 ? [{ l: netDebtChg >= 0 ? "Debt\nProceeds" : "Debt\nRepayment", v: netDebtChg, type: netDebtChg >= 0 ? "inflow" : "outflow" }] : []),
+                  ...(Math.abs(otherPlug) > 0.5 ? [{ l: "Divs, Buybacks\n& Other", v: otherPlug, type: otherPlug >= 0 ? "inflow" : "outflow" }] : []),
+                  { l: "Ending\nCash",   v: detail.cash, type: "neutral" },
                 ];
-                const maxV = Math.max(...items.map(i => Math.abs(i.v)));
-                const barW = `${100 / items.length - 1}%`;
+                const maxV = Math.max(...items.map(i => Math.abs(i.v)), 1);
                 return items.map((item, idx) => {
                   const h = Math.max(8, (Math.abs(item.v) / maxV) * 70);
                   const color = item.type === "inflow" ? "#22c55e" : item.type === "outflow" ? "#ef4444" : "#3b82f6";
@@ -929,9 +942,25 @@ return (
               })()}
             </div>
             <div style={{ display: "flex", gap: 2 }}>
-              {["Opening\nCash", "Revenue", "OpEx &\nCOGS", "CapEx &\nOther", "Debt\nProceeds", "Ending\nCash"].map((l, i) => (
-                <div key={i} style={{ flex: 1, textAlign: "center", fontSize: 8, color: "#64748b", lineHeight: 1.3, whiteSpace: "pre-line" }}>{l}</div>
-              ))}
+              {(() => {
+                // Rebuild the same label list so it stays in sync with the
+                // dynamic bar array above. A mismatch would put the wrong
+                // label under the wrong bar.
+                const priorDebt = detail.financials[1]?.debt ?? detail.totalDebt;
+                const netDebtChg = detail.totalDebt - priorDebt;
+                const priorCash = detail.financials[1]?.cash ?? detail.cash;
+                const cashDelta = detail.cash - priorCash;
+                const otherPlug = cashDelta - (detail.fcf + netDebtChg);
+                const labels = [
+                  "Opening\nCash", "Revenue", "OpEx &\nCOGS", "CapEx, Int.\n& Tax",
+                  ...(netDebtChg !== 0 ? [netDebtChg >= 0 ? "Debt\nProceeds" : "Debt\nRepayment"] : []),
+                  ...(Math.abs(otherPlug) > 0.5 ? ["Divs, Buybacks\n& Other"] : []),
+                  "Ending\nCash",
+                ];
+                return labels.map((l, i) => (
+                  <div key={i} style={{ flex: 1, textAlign: "center", fontSize: 8, color: "#64748b", lineHeight: 1.3, whiteSpace: "pre-line" }}>{l}</div>
+                ));
+              })()}
             </div>
           </div>
 

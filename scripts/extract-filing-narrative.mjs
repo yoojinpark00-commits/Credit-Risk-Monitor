@@ -30,7 +30,7 @@
 //
 // ─── Usage ───────────────────────────────────────────────────────────────────
 //   node scripts/extract-filing-narrative.mjs --ticker GT
-//   node scripts/extract-filing-narrative.mjs --ticker GT --accession 0000046104-26-000012
+//   node scripts/extract-filing-narrative.mjs --ticker GT --accession 0000042582-25-000008
 //   node scripts/extract-filing-narrative.mjs --all
 //   node scripts/extract-filing-narrative.mjs --ticker GT --dry-run    # download + parse only
 //
@@ -112,7 +112,7 @@ function printHelp() {
   console.log(`Usage:
   node scripts/extract-filing-narrative.mjs --ticker GT
   node scripts/extract-filing-narrative.mjs --all
-  node scripts/extract-filing-narrative.mjs --ticker GT --accession 0000046104-26-000012
+  node scripts/extract-filing-narrative.mjs --ticker GT --accession 0000042582-25-000008
   node scripts/extract-filing-narrative.mjs --ticker GT --dry-run
 
 Flags:
