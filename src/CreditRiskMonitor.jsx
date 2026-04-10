@@ -1050,7 +1050,7 @@ return (
                     // period the line was pulled from — the whole point of
                     // this refactor is to make it impossible to hide a
                     // stale-period value (iHeart-style FY2018 interest bug).
-                    const srcPeriod = r.source && (r.source.periodLabel
+                    const srcPeriod = r.source && (r.source.period_label
                       || (r.source.period_end ? `${r.source.period_basis || "Period"} ${fmtPeriodMDY(r.source.period_end)}` : null));
                     const tooltip = r.source
                       ? [r.source.label, srcPeriod].filter(Boolean).join(" · ")
