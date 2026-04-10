@@ -174,8 +174,6 @@ def ticker_to_cik(ticker):
         t = entry["ticker"].upper()
         c = str(entry["cik_str"]).zfill(10)
         _cik_cache[t] = c
-        if t == ticker.upper():
-            result = c
     return _cik_cache.get(ticker.upper())
 
 
@@ -790,7 +788,7 @@ def generate_company_profile(ticker):
     # − PriorYearYTD). The resulting period_type flips from FYE to LTM.
     core_anchor_series = [rev_s, ni_s, ie_s, tx_s, da_s]
     candidate_ends = [s[0]["end"] for s in core_anchor_series if s and s[0].get("end")]
-    target_end = min(candidate_ends) if candidate_ends else (rev_s[0]["end"] if rev_s and rev_s[0].get("end") else "")
+    target_end = max(candidate_ends) if candidate_ends else (rev_s[0]["end"] if rev_s and rev_s[0].get("end") else "")
 
     # Determine whether quarterly data extends the period beyond the anchor FY
     latest_q_end = ""
@@ -1191,7 +1189,7 @@ def generate_company_profile(ticker):
         # Per-year interest expense for coverage; fall back to latest if FY misaligns.
         def _row_int_exp(idx):
             if idx < len(ie_s):
-                fy_str = financials[idx]["period"][2:]   # "FY2024" -> "2024"
+                fy_str = financials[idx]["period"].replace("FY", "").replace("LTM", "").strip()
                 if str(ie_s[idx].get("fy", "")) == fy_str:
                     return abs(to_m(ie_s[idx]["val"]))
             return int_exp  # fallback: latest year's interest expense
