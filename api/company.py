@@ -1027,26 +1027,27 @@ def generate_company_profile(ticker):
     # aggregate, others don't. Blindly adjusting the aggregate creates
     # either double-counting or over-correction depending on the filer.
     #
-    # Safest approach: ALWAYS use the component-sum path (interest income +
-    # other non-op + disposal), which by definition excludes interest
-    # expense. This is reliable across all filer conventions. The aggregate
-    # NonoperatingIncomeExpense tag is NOT used.
-    nonop_fallback = interest_income + other_nonop + gain_loss_disposal
-    nonop_reversal = -nonop_fallback
+    # Safest approach: reverse only investment income + other non-op.
+    # Disposal gains/losses are handled separately as an Adjusted EBITDA
+    # line because they can be classified as either operating (GT: $816M
+    # sale of business divisions above OpInc) or non-operating. Putting
+    # them in the NonOp reversal causes overstatement when the gain is
+    # operating (the reversal can't reach items already in OpInc).
+    nonop_components = interest_income + other_nonop
+    nonop_reversal = -nonop_components
     nonop_source = {
         "label": (
-            f"Non-op reversal at {period_label} (excl. interest): "
+            f"Non-op reversal at {period_label}: "
             f"InvestmentIncomeInterest ({interest_income}M) "
-            f"+ OtherNonoperatingIncomeExpense ({other_nonop}M) "
-            f"+ GainLossOnDispositionOfAssets ({gain_loss_disposal}M)"
+            f"+ OtherNonoperatingIncomeExpense ({other_nonop}M)"
         ),
-        "concept": "us-gaap:(InvestmentIncomeInterest + OtherNonoperatingIncomeExpense + GainLossOnDispositionOfAssets)",
+        "concept": "us-gaap:(InvestmentIncomeInterest + OtherNonoperatingIncomeExpense)",
         "fy": None,
         "period_end": target_end,
         "period_basis": period_type,
         "period_label": period_label,
     }
-    nonop_method = "component sum (interest-safe)"
+    nonop_method = "component sum (excl. interest and disposal)"
 
     if nonop_reversal:
         # Label reflects direction: a reversal of net non-op *income* shows
@@ -1150,10 +1151,10 @@ def generate_company_profile(ticker):
         },
     })
 
-    # Non-GAAP add-backs — each from a distinct SEC XBRL concept, filtered to
-    # the canonical ``target_end`` so every add-back shares the same period as
-    # the GAAP base. `other_nonop` and `gain_loss_disposal` are intentionally
-    # NOT added here: they were already reversed via the non-op reversal line.
+    # Non-GAAP add-backs — each from a distinct SEC XBRL concept.
+    # Disposal gains/losses are now here (not in the NonOp reversal) because
+    # they can be either operating or non-operating. Gains are subtracted
+    # (they inflate GAAP EBITDA but are non-recurring), losses are added.
     addbacks = []
     if sbc:
         addbacks.append({"label": "+ Stock-Based Compensation", "amount": sbc, "isSubtotal": False, "category": "sbc", "source": _walk_src(sbc_s, sbc)})
@@ -1165,6 +1166,17 @@ def generate_company_profile(ticker):
         addbacks.append({"label": "+ Asset / Intangible Impairment", "amount": asset_impairment, "isSubtotal": False, "category": "impairment", "source": _walk_src(asset_imp_s, asset_impairment)})
     if acquisition_costs:
         addbacks.append({"label": "+ Acquisition-Related Costs", "amount": acquisition_costs, "isSubtotal": False, "category": "acquisition", "source": _walk_src(acq_cost_s, acquisition_costs)})
+    if gain_loss_disposal:
+        # Gains (positive) are subtracted (non-recurring income reduces Adj
+        # EBITDA); losses (negative) are added back. The amount stored is the
+        # XBRL value (positive = gain), so we negate it for the add-back.
+        addbacks.append({
+            "label": ("− Gain on Asset Disposal" if gain_loss_disposal > 0 else "+ Loss on Asset Disposal"),
+            "amount": -gain_loss_disposal,
+            "isSubtotal": False,
+            "category": "disposal",
+            "source": _walk_src(gain_disp_s, gain_loss_disposal),
+        })
 
     ebitda_walk.extend(addbacks)
     total_addbacks = sum(item["amount"] for item in addbacks)
