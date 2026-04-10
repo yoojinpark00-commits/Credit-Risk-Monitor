@@ -834,16 +834,27 @@ def generate_company_profile(ticker):
     # Net non-operating income/expense (signed) — LTM when quarterly extends the period
     nonop_total = _annual_m(nonop_total_s, q_nonop_total)
     interest_income = _val_m_at(int_income_s, target_end)
-    # Balance-sheet items: use point-in-time value at target_end (no LTM logic)
-    lt_debt = _val_m_at(ltd_s, target_end) or latest_val_m(ltd_s)
-    current_debt = _val_m_at(cd_s, target_end) or latest_val_m(cd_s)
+    # Balance-sheet items: prefer point-in-time at target_end, fall back to
+    # the absolute latest when no entry aligns to the canonical period.
+    # NOTE: use a helper that distinguishes "0" (legitimate) from "not found".
+    def _bs_at(series):
+        """Balance-sheet lookup that falls back only when _pick_at_period
+        returned None (no entry within the fiscal window), NOT when the
+        entry's value happens to be $0M."""
+        e = _pick_at_period(series, target_end) if series else None
+        if e is not None:
+            return to_m(e["val"])
+        return latest_val_m(series)
+
+    lt_debt = _bs_at(ltd_s)
+    current_debt = _bs_at(cd_s)
     total_debt = lt_debt + current_debt
-    cash = _val_m_at(cash_s, target_end) or latest_val_m(cash_s)
-    st_investments = _val_m_at(sti_s, target_end) or latest_val_m(sti_s)
-    total_assets = _val_m_at(ta_s, target_end) or latest_val_m(ta_s)
-    total_equity = _val_m_at(te_s, target_end) or latest_val_m(te_s)
-    current_assets = _val_m_at(ca_s, target_end) or latest_val_m(ca_s)
-    current_liab = _val_m_at(cl_s, target_end) or latest_val_m(cl_s)
+    cash = _bs_at(cash_s)
+    st_investments = _bs_at(sti_s)
+    total_assets = _bs_at(ta_s)
+    total_equity = _bs_at(te_s)
+    current_assets = _bs_at(ca_s)
+    current_liab = _bs_at(cl_s)
     ocf = _annual_m(ocf_s, q_ocf)
     capex = _annual_m(capex_s, q_capex, abs_val=True)
     fcf = ocf - capex
@@ -888,16 +899,18 @@ def generate_company_profile(ticker):
         }
 
     ebitda_walk = []
-    # Only include a line when the concept has an entry aligned to target_end.
-    # _pick_at_period enforces a 400-day fiscal window so prior-decade values
-    # can never sneak in even if a concept is missing for the anchor period.
-    if ni_s and _pick_at_period(ni_s, target_end):
+    # Include a walk line when the series exists AND the period-aligned value
+    # is non-zero. The stale-data guard now lives in ``_get_field`` (which
+    # picks the freshest alias) and ``_annual_m`` / ``_val_m_at`` (which
+    # return 0 when nothing aligns to ``target_end``), so the walk lines
+    # no longer need an additional ``_pick_at_period`` gate here.
+    if ni_s:
         ebitda_walk.append({"label": "Net Income", "amount": net_income, "isSubtotal": False, "category": "starting", "source": _walk_src(ni_s, net_income)})
-    if tx_s and _pick_at_period(tx_s, target_end):
+    if tx_s and tax_exp:
         ebitda_walk.append({"label": "+ Income Tax Expense", "amount": tax_exp, "isSubtotal": False, "category": "tax", "source": _walk_src(tx_s, tax_exp)})
-    if ie_s and _pick_at_period(ie_s, target_end):
+    if ie_s and int_exp:
         ebitda_walk.append({"label": "+ Interest Expense", "amount": int_exp, "isSubtotal": False, "category": "interest", "source": _walk_src(ie_s, int_exp)})
-    if da_s and _pick_at_period(da_s, target_end):
+    if da_s and da:
         ebitda_walk.append({"label": "+ Depreciation & Amortization", "amount": da, "isSubtotal": False, "category": "da", "source": _walk_src(da_s, da)})
 
     # ─── Non-operating reversal ──────────────────────────────────────────────
@@ -912,7 +925,7 @@ def generate_company_profile(ticker):
     # Sign convention: `nonop_total` is positive when non-op is net INCOME
     # (inflating NI → inflating bottom-up EBITDA). Subtracting it neutralizes
     # the effect. Negative nonop_total (net expense) gets added back.
-    if nonop_total_s and _pick_at_period(nonop_total_s, target_end):
+    if nonop_total_s and nonop_total:
         nonop_reversal = -nonop_total
         nonop_source = _walk_src(nonop_total_s, nonop_reversal)
         nonop_method = "aggregate us-gaap:NonoperatingIncomeExpense"
@@ -983,15 +996,15 @@ def generate_company_profile(ticker):
     # the GAAP base. `other_nonop` and `gain_loss_disposal` are intentionally
     # NOT added here: they were already reversed via the non-op reversal line.
     addbacks = []
-    if sbc and _pick_at_period(sbc_s, target_end):
+    if sbc:
         addbacks.append({"label": "+ Stock-Based Compensation", "amount": sbc, "isSubtotal": False, "category": "sbc", "source": _walk_src(sbc_s, sbc)})
-    if restructuring and _pick_at_period(restr_s, target_end):
+    if restructuring:
         addbacks.append({"label": "+ Restructuring Charges", "amount": restructuring, "isSubtotal": False, "category": "restructuring", "source": _walk_src(restr_s, restructuring)})
-    if goodwill_impairment and _pick_at_period(gw_imp_s, target_end):
+    if goodwill_impairment:
         addbacks.append({"label": "+ Goodwill Impairment", "amount": goodwill_impairment, "isSubtotal": False, "category": "impairment", "source": _walk_src(gw_imp_s, goodwill_impairment)})
-    if asset_impairment and _pick_at_period(asset_imp_s, target_end):
+    if asset_impairment:
         addbacks.append({"label": "+ Asset / Intangible Impairment", "amount": asset_impairment, "isSubtotal": False, "category": "impairment", "source": _walk_src(asset_imp_s, asset_impairment)})
-    if acquisition_costs and _pick_at_period(acq_cost_s, target_end):
+    if acquisition_costs:
         addbacks.append({"label": "+ Acquisition-Related Costs", "amount": acquisition_costs, "isSubtotal": False, "category": "acquisition", "source": _walk_src(acq_cost_s, acquisition_costs)})
 
     ebitda_walk.extend(addbacks)
