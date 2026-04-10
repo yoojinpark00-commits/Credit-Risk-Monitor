@@ -245,8 +245,9 @@ class EdgarFetcher:
                 ("SalesRevenueNet", us_gaap),
             ],
             "depreciation_amortization": [
-                ("DepreciationDepletionAndAmortization", us_gaap),
-                ("DepreciationAndAmortization", us_gaap),
+                ("DepreciationAndAmortization", us_gaap),        # IS-level (preferred)
+                ("Depreciation", us_gaap),
+                ("DepreciationDepletionAndAmortization", us_gaap),  # CF stmt (fallback)
             ],
             "interest_expense": [
                 ("InterestExpense", us_gaap),

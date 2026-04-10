@@ -76,8 +76,9 @@ const CONCEPT_MAP = {
     "NetCashProvidedByUsedInOperatingActivities",
   ],
   depreciation_amortization: [
-    "DepreciationDepletionAndAmortization",
-    "DepreciationAndAmortization",
+    "DepreciationAndAmortization",          // IS-level (preferred)
+    "Depreciation",
+    "DepreciationDepletionAndAmortization", // CF stmt (fallback — may include financing amort)
   ],
 };
 

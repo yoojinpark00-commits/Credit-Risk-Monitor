@@ -61,8 +61,17 @@ CONCEPT_MAP = {
     ],
     "tax_expense": ["IncomeTaxExpenseBenefit"],
     "depreciation": [
+        # Prefer income-statement D&A over the cash-flow-statement total.
+        # DepreciationDepletionAndAmortization is the CF-stmt concept that
+        # can include financing amortization (debt issuance costs, already
+        # captured in InterestExpense) and accretion — overstating EBITDA
+        # for capital-intensive issuers like GT. DepreciationAndAmortization
+        # is the IS-level concept that excludes those items.  When both tags
+        # share the same end date, _get_field's tie-break picks the lower
+        # index, so IS tags must come first.
+        "DepreciationAndAmortization",
+        "Depreciation",
         "DepreciationDepletionAndAmortization",
-        "DepreciationAndAmortization", "Depreciation",
     ],
     "sbc": ["ShareBasedCompensation", "AllocatedShareBasedCompensationExpense"],
     "restructuring": ["RestructuringCharges", "RestructuringSettlementAndImpairmentProvisions"],
@@ -1007,19 +1016,20 @@ def generate_company_profile(ticker):
             "source": nonop_source,
         })
 
-    # GAAP EBITDA: bottom-up (NI + Tax + Int + D&A − NonOp) when the 4 core
-    # building-blocks are available; fall back to OpInc + D&A otherwise. The
-    # bottom-up result now equals Operating Income + D&A when the non-op
-    # reversal lines up cleanly, which is the textbook definition.
+    # GAAP EBITDA — prefer top-down (OpInc + D&A) when Operating Income is
+    # available.  The CONCEPT_MAP ordering already prefers the IS-level D&A
+    # tag over the CF-statement total, so the value used here should be the
+    # income-statement version.  Top-down is more robust because it doesn't
+    # depend on the NonOp reversal being complete.
     gaap_ebitda_bottomup = net_income + tax_exp + int_exp + da + nonop_reversal
-    if ni_s and tx_s and ie_s and da_s:
+    if oper_income and da:
+        gaap_ebitda = oper_income + da
+        gaap_ebitda_method = "top-down: Operating Income + D&A"
+    elif ni_s and tx_s and ie_s and da_s:
         gaap_ebitda = gaap_ebitda_bottomup
         gaap_ebitda_method = (
             f"bottom-up: NI + Tax + Interest + D&A − NonOp ({nonop_method})"
         )
-    elif oper_income and da:
-        gaap_ebitda = oper_income + da
-        gaap_ebitda_method = "top-down: Operating Income + D&A (2 XBRL concepts)"
     else:
         gaap_ebitda = gaap_ebitda_bottomup
         gaap_ebitda_method = "best-effort from available XBRL fields"
