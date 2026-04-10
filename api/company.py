@@ -52,7 +52,11 @@ CONCEPT_MAP = {
     ],
     "net_income": ["NetIncomeLoss", "ProfitLoss"],
     "operating_income": ["OperatingIncomeLoss"],
-    "interest_expense": ["InterestExpense", "InterestExpenseDebt", "InterestAndDebtExpense"],
+    "interest_expense": [
+        "InterestExpense", "InterestExpenseDebt", "InterestAndDebtExpense",
+        "InterestExpenseNonoperating",          # 2024+ taxonomy disaggregation
+        "InterestIncomeExpenseNonoperatingNet",  # last-resort: net figure (includes interest income offset)
+    ],
     "tax_expense": ["IncomeTaxExpenseBenefit"],
     "depreciation": [
         "DepreciationDepletionAndAmortization",
