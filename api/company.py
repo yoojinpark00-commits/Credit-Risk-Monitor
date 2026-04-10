@@ -1016,15 +1016,47 @@ def generate_company_profile(ticker):
             "source": nonop_source,
         })
 
-    # GAAP EBITDA — prefer top-down (OpInc + D&A) when Operating Income is
-    # available.  The CONCEPT_MAP ordering already prefers the IS-level D&A
-    # tag over the CF-statement total, so the value used here should be the
-    # income-statement version.  Top-down is more robust because it doesn't
-    # depend on the NonOp reversal being complete.
+    # ─── D&A inflation guard ────────────────────────────────────────────────
+    # The CONCEPT_MAP ordering prefers the IS-level D&A tag over the CF
+    # total. But when only the CF tag exists (DepreciationDepletion...),
+    # it can include items NOT on the income statement — rental-merchandise
+    # depreciation (UPBD: ~$2B, 3.5× overstatement), debt-issuance-cost
+    # amortization (GT/IHRT), accretion (SMC), etc.
+    #
+    # Universal cross-check: when Gross Profit, SGA, R&D, and OpInc are
+    # all available, derive the IS residual:
+    #   IS_residual = GrossProfit − SGA − R&D − OpInc
+    # This captures D&A plus any other operating charges (restructuring,
+    # impairment, etc.). If the XBRL D&A exceeds this residual, the CF
+    # tag carries non-IS items — clamp to the residual.
+    da_raw = da
+    if oper_income is not None and da and gross_profit and sga_expense:
+        is_residual = gross_profit - sga_expense - rd_expense - oper_income
+        # Clamp when XBRL D&A exceeds the IS residual by >20%
+        # (the 20% tolerance absorbs minor classification differences)
+        if is_residual > 0 and da > is_residual * 1.20:
+            da = is_residual
+            for w in ebitda_walk:
+                if w["category"] == "da":
+                    w["amount"] = da
+                    src = w.get("source") or {}
+                    src["label"] = (
+                        f"{src.get('label', '')} "
+                        f"[clamped: XBRL D&A {da_raw}M → IS-residual {da}M "
+                        f"(GP−SGA−R&D−OpInc)]"
+                    )
+                    w["source"] = src
+                    break
+
     gaap_ebitda_bottomup = net_income + tax_exp + int_exp + da + nonop_reversal
     if oper_income and da:
         gaap_ebitda = oper_income + da
-        gaap_ebitda_method = "top-down: Operating Income + D&A"
+        if da != da_raw:
+            gaap_ebitda_method = (
+                f"top-down: OpInc + D&A (XBRL D&A {da_raw}M → IS-implied {da}M)"
+            )
+        else:
+            gaap_ebitda_method = "top-down: Operating Income + D&A"
     elif ni_s and tx_s and ie_s and da_s:
         gaap_ebitda = gaap_ebitda_bottomup
         gaap_ebitda_method = (
