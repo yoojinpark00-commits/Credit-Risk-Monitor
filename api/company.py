@@ -54,7 +54,8 @@ CONCEPT_MAP = {
     "operating_income": ["OperatingIncomeLoss"],
     "interest_expense": [
         "InterestExpense", "InterestExpenseDebt", "InterestAndDebtExpense",
-        "InterestExpenseNonoperating",          # 2024+ taxonomy disaggregation
+        "InterestExpenseNonoperating",          # 2024+ taxonomy disaggregation (non-op)
+        "InterestExpenseOperating",             # 2024+ taxonomy disaggregation (op — leasing/finance cos)
         "InterestCostsIncurred",                # capital-intensive filers (utilities, RE)
         "InterestIncomeExpenseNonoperatingNet",  # last-resort: net figure (includes interest income offset)
     ],
