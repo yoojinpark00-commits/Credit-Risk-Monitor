@@ -1789,14 +1789,25 @@ def _enrich_with_narrative(profile, ticker):
     accession = cache.get("accession", "")
     src_tag = f"LLM-extracted from {cache.get('form', '10-K')} (accession {accession}) by {cache.get('model', 'claude')}"
 
-    # 1. reconciliationItems → adjBurn.reconciliationItems
+    # 1. reconciliationItems → TIER 1 reconciliation walk
+    #    When the LLM narrative cache has management-reported non-GAAP
+    #    reconciliation items (extracted directly from the 10-K's GAAP-to-
+    #    Adjusted EBITDA table), promote them to the PRIMARY walk source.
+    #    The XBRL-computed walk (TIER 2) is retained as a fallback when no
+    #    narrative cache exists.
+    #
+    #    Walk structure: keep the XBRL-computed GAAP base (NI → Tax → Int →
+    #    D&A → NonOp reversal → GAAP EBITDA), then REPLACE the non-GAAP
+    #    add-back section with the management-reported items. This gives:
+    #      - Reliable, auditable GAAP base from structured XBRL
+    #      - Authoritative non-GAAP adjustments from the company's own
+    #        disclosure (the items they chose to add back, in their words)
     recon = cache.get("reconciliationItems") or []
     if recon:
-        profile.setdefault("adjBurn", {})
-        profile["adjBurn"]["reconciliationItems"] = recon
-        # Also bucket into restructuring + otherNonCash so the existing UI
-        # reconciliation card renders the LLM-extracted items. Mirrors the
-        # GT data quality fix bucketing convention.
+        ab = profile.setdefault("adjBurn", {})
+        ab["reconciliationItems"] = recon
+
+        # Bucket for legacy compact view + downstream consumers
         restructuring_keywords = (
             "impair", "rationalization", "restructur", "severance",
             "pension", "forward", "transformation",
@@ -1811,11 +1822,82 @@ def _enrich_with_narrative(profile, ticker):
             else:
                 other_total += amt
         if restructuring_total:
-            profile["adjBurn"]["restructuring"] = restructuring_total
-            profile["adjBurn"]["restructuring_src"] = src_tag
+            ab["restructuring"] = restructuring_total
+            ab["restructuring_src"] = src_tag
         if other_total:
-            profile["adjBurn"]["otherNonCash"] = other_total
-            profile["adjBurn"]["otherNonCash_src"] = src_tag
+            ab["otherNonCash"] = other_total
+            ab["otherNonCash_src"] = src_tag
+
+        # Build the TIER 1 walk: XBRL GAAP base + management add-backs
+        existing_walk = ab.get("reconciliationWalk") or []
+        # Extract the GAAP base lines (everything up to and including the
+        # "subtotal" category — NI, Tax, Int, D&A, NonOp, = GAAP EBITDA)
+        gaap_base = []
+        for w in existing_walk:
+            gaap_base.append(w)
+            if w.get("category") == "subtotal":
+                break
+        gaap_ebitda = ab.get("gaapEbitda") or 0
+        if gaap_base:
+            gaap_subtotal = gaap_base[-1]
+            gaap_ebitda = gaap_subtotal.get("amount", gaap_ebitda)
+
+        # Build management add-back lines
+        mgmt_source = {
+            "concept": None,
+            "period_end": cache.get("report_date", ""),
+            "period_label": f"10-K (mgmt-reported)",
+            "label": src_tag,
+        }
+        mgmt_addbacks = []
+        total_mgmt_adj = 0
+        for item in recon:
+            amt = item.get("amount") or 0
+            if amt == 0:
+                continue
+            total_mgmt_adj += amt
+            mgmt_addbacks.append({
+                "label": f"+ {item.get('label', 'Adjustment')}",
+                "amount": amt,
+                "isSubtotal": False,
+                "category": "mgmt_addback",
+                "source": {
+                    **mgmt_source,
+                    "label": item.get("src") or src_tag,
+                },
+            })
+
+        adj_ebitda_mgmt = gaap_ebitda + total_mgmt_adj
+
+        # Assemble the final TIER 1 walk
+        tier1_walk = list(gaap_base) + mgmt_addbacks + [{
+            "label": f"= Adjusted EBITDA (Mgmt-Reported)",
+            "amount": adj_ebitda_mgmt,
+            "isSubtotal": True,
+            "category": "final",
+            "source": {
+                "label": f"GAAP EBITDA ({gaap_ebitda}M) + {len(mgmt_addbacks)} "
+                         f"management-reported adjustments from {cache.get('form', '10-K')} "
+                         f"non-GAAP reconciliation table",
+                "period_end": cache.get("report_date", ""),
+                "period_label": "Mgmt-reported",
+            },
+        }]
+
+        # Replace the walk and update headline figures
+        ab["reconciliationWalk"] = tier1_walk
+        ab["adjEBITDA"] = adj_ebitda_mgmt
+        ab["adjEBITDA_src"] = (
+            f"TIER 1: {src_tag} — GAAP EBITDA {gaap_ebitda}M + "
+            f"{len(mgmt_addbacks)} management add-backs = {adj_ebitda_mgmt}M"
+        )
+        ab["reconciliationSource"] = {
+            "provider": f"Management-reported ({cache.get('form', '10-K')} non-GAAP reconciliation)",
+            "endpoint": cache.get("source_url", ""),
+            "accession": accession,
+            "method": "TIER 1: LLM-extracted management reconciliation + XBRL GAAP base",
+            "periodLabel": ab.get("periodLabel", ""),
+        }
 
     # 2. debtMaturities → liquidityBreakdown.debtMaturities (only if XBRL gave us nothing)
     nb_maturities = cache.get("debtMaturities") or []

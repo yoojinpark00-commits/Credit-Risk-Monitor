@@ -983,6 +983,7 @@ return (
                 case "acquisition":  return "#ec4899";
                 case "disposal":     return "#14b8a6";
                 case "other_nonop":  return "#94a3b8";
+                case "mgmt_addback": return amount >= 0 ? "#f59e0b" : "#14b8a6";
                 default:             return "#94a3b8";
               }
             };
