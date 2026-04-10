@@ -1014,129 +1014,55 @@ def generate_company_profile(ticker):
     if da_s and da:
         ebitda_walk.append({"label": "+ Depreciation & Amortization", "amount": da, "isSubtotal": False, "category": "da", "source": _walk_src(da_s, da)})
 
-    # ─── Non-operating reversal ──────────────────────────────────────────────
-    # The bottom-up bridge (NI + Tax + Int + D&A) already adds back interest
-    # explicitly. To arrive at operating EBITDA we need to reverse out the
-    # REMAINING non-operating items (investment income, FX, disposal gains,
-    # "other" non-op) WITHOUT touching interest again.
-    #
-    # Per XBRL taxonomy (DQC_0181), NonoperatingIncomeExpense is defined as
-    # the aggregate of ALL below-the-line items INCLUDING interest expense.
-    # But individual filers are inconsistent: some include interest in the
-    # aggregate, others don't. Blindly adjusting the aggregate creates
-    # either double-counting or over-correction depending on the filer.
-    #
-    # Safest approach: reverse only investment income + other non-op.
-    # Disposal gains/losses are handled separately as an Adjusted EBITDA
-    # line because they can be classified as either operating (GT: $816M
-    # sale of business divisions above OpInc) or non-operating. Putting
-    # them in the NonOp reversal causes overstatement when the gain is
-    # operating (the reversal can't reach items already in OpInc).
-    nonop_components = interest_income + other_nonop
-    nonop_reversal = -nonop_components
-    nonop_source = {
-        "label": (
-            f"Non-op reversal at {period_label}: "
-            f"InvestmentIncomeInterest ({interest_income}M) "
-            f"+ OtherNonoperatingIncomeExpense ({other_nonop}M)"
-        ),
-        "concept": "us-gaap:(InvestmentIncomeInterest + OtherNonoperatingIncomeExpense)",
-        "fy": None,
-        "period_end": target_end,
-        "period_basis": period_type,
-        "period_label": period_label,
-    }
-    nonop_method = "component sum (excl. interest and disposal)"
-
-    if nonop_reversal:
-        # Label reflects direction: a reversal of net non-op *income* shows
-        # up as a negative line ("− Net Non-Op Income"); reversal of net
-        # non-op *expense* shows up as a positive add-back.
-        ebitda_walk.append({
-            "label": ("− Net Non-Operating Income" if nonop_reversal < 0 else "+ Net Non-Operating Expense"),
-            "amount": nonop_reversal,
-            "isSubtotal": False,
-            "category": "nonop_reversal",
-            "source": nonop_source,
-        })
-
     # ─── D&A inflation guard ────────────────────────────────────────────────
-    # The CONCEPT_MAP ordering prefers the IS-level D&A tag over the CF
-    # total. But when only the CF tag exists (DepreciationDepletion...),
-    # it can include items NOT on the income statement — rental-merchandise
-    # depreciation (UPBD: ~$2B, 3.5× overstatement), debt-issuance-cost
-    # amortization (GT/IHRT), accretion (SMC), etc.
-    #
-    # Universal cross-check: when Gross Profit, SGA, R&D, and OpInc are
-    # all available, derive the IS residual:
-    #   IS_residual = GrossProfit − SGA − R&D − OpInc
-    # This captures D&A plus any other operating charges (restructuring,
-    # impairment, etc.). If the XBRL D&A exceeds this residual, the CF
-    # tag carries non-IS items — clamp to the residual.
     da_raw = da
+    nonop_reversal = 0
+    nonop_method = "n/a (top-down)"
     if oper_income is not None and da and gross_profit and sga_expense:
         is_residual = gross_profit - sga_expense - rd_expense - oper_income
-        # Clamp when XBRL D&A exceeds the IS residual by >20%
-        # (the 20% tolerance absorbs minor classification differences)
         if is_residual > 0 and da > is_residual * 1.20:
             da = is_residual
-            for w in ebitda_walk:
-                if w["category"] == "da":
-                    w["amount"] = da
-                    src = w.get("source") or {}
-                    src["label"] = (
-                        f"{src.get('label', '')} "
-                        f"[clamped: XBRL D&A {da_raw}M → IS-residual {da}M "
-                        f"(GP−SGA−R&D−OpInc)]"
-                    )
-                    w["source"] = src
-                    break
 
-    # ─── GAAP EBITDA computation ────────────────────────────────────────
-    # Prefer top-down (OpInc + D&A) — uses `is not None` so breakeven
-    # companies with OpInc==$0 still take this path (fixes BUG 13).
-    # When the top-down path is used, reconcile the walk: if the walk's
-    # line-item sum differs from OpInc+D&A (which happens whenever
-    # NonOp reversal doesn't perfectly reconstruct OpInc), insert a
-    # reconciliation-difference line so the walk ALWAYS ties to the
-    # subtotal (fixes BUG 10 — walk-vs-subtotal mismatch).
-    gaap_ebitda_bottomup = net_income + tax_exp + int_exp + da + nonop_reversal
+    # ─── GAAP EBITDA walk + computation ─────────────────────────────────────
+    # Two walk styles depending on data availability:
+    #
+    # TOP-DOWN (preferred, when OperatingIncomeLoss is available):
+    #   Operating Income  →  + D&A  →  = GAAP EBITDA
+    # Clean, always correct. No NonOp reversal or reconciliation needed.
+    # Eliminates the "Other Operating Items" and "Net Non-Operating"
+    # phantom lines that confused users when the bottom-up bridge didn't
+    # perfectly reconstruct OpInc (GT: $1,487M mystery line).
+    #
+    # BOTTOM-UP (fallback, when OpInc is missing):
+    #   NI + Tax + Int + D&A − NonOp (interest income + other) = GAAP EBITDA
     if oi_s and da:
         gaap_ebitda = oper_income + da
+        gaap_ebitda_method = "top-down: Operating Income + D&A"
         if da != da_raw:
-            gaap_ebitda_method = (
-                f"top-down: OpInc + D&A (XBRL D&A {da_raw}M → IS-implied {da}M)"
-            )
-        else:
-            gaap_ebitda_method = "top-down: Operating Income + D&A"
-        # Reconcile walk to subtotal: if bottom-up sum ≠ top-down, insert
-        # a reconciliation line so the displayed walk always ties.
-        recon_diff = gaap_ebitda - gaap_ebitda_bottomup
-        if abs(recon_diff) >= 1:
-            ebitda_walk.append({
-                "label": ("+ Other Operating Items" if recon_diff > 0 else "− Other Operating Items"),
-                "amount": recon_diff,
-                "isSubtotal": False,
-                "category": "other_nonop",
-                "source": {
-                    "concept": None,
-                    "period_end": target_end,
-                    "period_label": period_label,
-                    "label": (
-                        f"Reconciliation: OpInc+D&A ({gaap_ebitda}M) − "
-                        f"bottom-up ({gaap_ebitda_bottomup}M) = {recon_diff}M "
-                        f"(non-op items not captured by XBRL reversal)"
-                    ),
-                },
-            })
-    elif ni_s and tx_s and ie_s and da_s:
-        gaap_ebitda = gaap_ebitda_bottomup
-        gaap_ebitda_method = (
-            f"bottom-up: NI + Tax + Interest + D&A − NonOp ({nonop_method})"
-        )
+            gaap_ebitda_method += f" (D&A clamped: {da_raw}M → {da}M)"
+
+        # Replace the bottom-up walk with clean top-down lines
+        ebitda_walk = [
+            {"label": "Operating Income", "amount": oper_income, "isSubtotal": False,
+             "category": "starting", "source": _walk_src(oi_s, oper_income)},
+        ]
+        if da:
+            ebitda_walk.append(
+                {"label": "+ Depreciation & Amortization", "amount": da,
+                 "isSubtotal": False, "category": "da", "source": _walk_src(da_s, da)})
     else:
-        gaap_ebitda = gaap_ebitda_bottomup
-        gaap_ebitda_method = "best-effort from available XBRL fields"
+        # Bottom-up fallback: NonOp reversal only for non-interest, non-disposal
+        nonop_components = interest_income + other_nonop
+        nonop_reversal = -nonop_components
+        if nonop_reversal:
+            ebitda_walk.append({
+                "label": ("− Net Non-Operating Income" if nonop_reversal < 0 else "+ Net Non-Operating Expense"),
+                "amount": nonop_reversal, "isSubtotal": False, "category": "nonop_reversal",
+                "source": {"label": f"InvestmentIncomeInterest ({interest_income}M) + OtherNonOp ({other_nonop}M)",
+                           "period_end": target_end, "period_label": period_label},
+            })
+        gaap_ebitda = net_income + tax_exp + int_exp + da + nonop_reversal
+        gaap_ebitda_method = "bottom-up: NI + Tax + Interest + D&A − NonOp"
     ebitda_walk.append({
         "label": f"= GAAP EBITDA ({period_label})",
         "amount": gaap_ebitda,
