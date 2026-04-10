@@ -130,6 +130,7 @@ CONCEPT_MAP: dict[str, list[str]] = {
         "InterestExpenseDebt",
         "InterestAndDebtExpense",
         "InterestExpenseNonoperating",
+        "InterestCostsIncurred",
         "InterestIncomeExpenseNonoperatingNet",
     ],
     "operating_cash_flow": [

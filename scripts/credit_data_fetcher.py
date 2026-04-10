@@ -253,6 +253,7 @@ class EdgarFetcher:
                 ("InterestExpenseDebt", us_gaap),
                 ("InterestAndDebtExpense", us_gaap),
                 ("InterestExpenseNonoperating", us_gaap),
+                ("InterestCostsIncurred", us_gaap),
                 ("InterestIncomeExpenseNonoperatingNet", us_gaap),
             ],
             "interest_income": [
