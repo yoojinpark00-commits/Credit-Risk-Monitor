@@ -858,21 +858,20 @@ def generate_company_profile(ticker):
     int_exp = _annual_m(ie_s, q_ie, abs_val=True)
     tax_exp = _annual_m(tx_s, q_tx)
     da = _annual_m(da_s, q_da)
-    sbc = _annual_m(sbc_s, q_sbc)
-    restructuring = _annual_m(restr_s, q_restr, abs_val=True)
+    # SBC and restructuring are add-backs: strict period-aligned lookup.
+    # Missing = no adjustment (correct), not stale data from years ago.
+    sbc = _val_m_at(sbc_s, target_end)
+    restructuring = abs(_val_m_at(restr_s, target_end))
     # Granular reconciliation add-backs ($M, signed where meaningful).
-    # Use _annual_m so stale-but-present values fall back to latest_val_m
-    # instead of silently becoming 0 (same window-drop fix as core items).
-    def _val_or_latest(series):
-        """Period-aligned value with latest-available fallback."""
-        v = _val_m_at(series, target_end)
-        if v == 0 and series:
-            v = latest_val_m(series)
-        return v
-
-    goodwill_impairment = abs(_val_or_latest(gw_imp_s))
-    asset_impairment = abs(_val_or_latest(asset_imp_s))
-    acquisition_costs = abs(_val_or_latest(acq_cost_s))
+    # These use STRICT period-aligned lookup (_val_m_at) — NO fallback to
+    # latest_val_m. Unlike core walk items (NI, Tax, Int, D&A) where a
+    # missing value breaks the bridge, a missing add-back just means "no
+    # adjustment for this period" which is the correct behavior. The
+    # latest_val_m fallback was injecting decade-old data (e.g. GT's 2014
+    # disposal gain of $816M showing up in a 2025 reconciliation).
+    goodwill_impairment = abs(_val_m_at(gw_imp_s, target_end))
+    asset_impairment = abs(_val_m_at(asset_imp_s, target_end))
+    acquisition_costs = abs(_val_m_at(acq_cost_s, target_end))
 
     # ─── Deduplication guard: aggregate XBRL tags that subsume granular ones ──
     # RestructuringSettlementAndImpairmentProvisions bundles restructuring +
@@ -911,13 +910,13 @@ def generate_company_profile(ticker):
         # This tag covers goodwill AND intangible impairment — suppress the
         # separate intangible/asset impairment add-back that would overlap.
         asset_impairment = 0
-    # Disposal: a *gain* (positive XBRL value) reduces EBITDA add-backs; a loss increases.
-    gain_loss_disposal = _val_or_latest(gain_disp_s)
-    # Other non-operating: typically signed; reverse for an EBITDA bridge.
-    other_nonop = _val_or_latest(other_nonop_s)
-    # Net non-operating income/expense (signed) — LTM when quarterly extends the period
+    # Disposal, other non-op, and interest income: strict period-aligned
+    # lookup — no stale fallback. These are non-core items where a missing
+    # value means "no such item this period" (correct: 0), not "data gap".
+    gain_loss_disposal = _val_m_at(gain_disp_s, target_end)
+    other_nonop = _val_m_at(other_nonop_s, target_end)
     nonop_total = _annual_m(nonop_total_s, q_nonop_total)
-    interest_income = _val_or_latest(int_income_s)
+    interest_income = _val_m_at(int_income_s, target_end)
     # Balance-sheet items: prefer point-in-time at target_end, fall back to
     # the absolute latest when no entry aligns to the canonical period.
     # NOTE: use a helper that distinguishes "0" (legitimate) from "not found".
