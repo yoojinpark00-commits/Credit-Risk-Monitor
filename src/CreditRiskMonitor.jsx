@@ -906,25 +906,25 @@ return (
               {(() => {
                 const priorCash = detail.financials[1]?.cash ?? detail.cash;
                 const priorDebt = detail.financials[1]?.debt ?? detail.totalDebt;
+                // Operating Cash Flow = FCF + CapEx (reverse the CapEx deduction)
+                const ocfVal = (detail.adjBurn && detail.adjBurn.totalCapex != null)
+                  ? detail.fcf + detail.adjBurn.totalCapex
+                  : (detail.ebitda || detail.fcf);
+                const capexVal = (detail.adjBurn && detail.adjBurn.totalCapex != null)
+                  ? detail.adjBurn.totalCapex
+                  : Math.max(0, detail.ebitda - detail.fcf);
                 const netDebtChg = detail.totalDebt - priorDebt;
-                // FCF already = OCF − CapEx. The "plug" captures everything
-                // else: dividends, buybacks, equity issuance, acquisitions,
-                // FX, and working-capital timing vs. accrual differences.
-                // This guarantees the bridge always ties: Opening + sources
-                // − uses = Ending Cash.
+                // Plug = ΔCash − FCF − ΔDebt — captures dividends, buybacks,
+                // equity issuance, acquisitions, FX, and any accrual timing.
                 const cashDelta = detail.cash - priorCash;
-                const explained = detail.fcf + netDebtChg;
-                const otherPlug = cashDelta - explained;
-                const opex = -(detail.revenue - detail.ebitda);
-                const capexOther = -(detail.ebitda - detail.fcf);
+                const otherPlug = cashDelta - detail.fcf - netDebtChg;
                 const items = [
-                  { l: "Opening\nCash",  v: priorCash, type: "neutral" },
-                  { l: "Revenue",        v: detail.revenue, type: "inflow" },
-                  { l: "OpEx &\nCOGS",   v: opex, type: opex >= 0 ? "inflow" : "outflow" },
-                  { l: "CapEx, Int.\n& Tax",  v: capexOther, type: capexOther >= 0 ? "inflow" : "outflow" },
+                  { l: "Opening\nCash",   v: priorCash, type: "neutral" },
+                  { l: "Operating\nCash Flow", v: ocfVal, type: ocfVal >= 0 ? "inflow" : "outflow" },
+                  { l: "Capital\nExpenditure", v: -capexVal, type: "outflow" },
                   ...(netDebtChg !== 0 ? [{ l: netDebtChg >= 0 ? "Debt\nProceeds" : "Debt\nRepayment", v: netDebtChg, type: netDebtChg >= 0 ? "inflow" : "outflow" }] : []),
                   ...(Math.abs(otherPlug) > 0.5 ? [{ l: "Divs, Buybacks\n& Other", v: otherPlug, type: otherPlug >= 0 ? "inflow" : "outflow" }] : []),
-                  { l: "Ending\nCash",   v: detail.cash, type: "neutral" },
+                  { l: "Ending\nCash",    v: detail.cash, type: "neutral" },
                 ];
                 const maxV = Math.max(...items.map(i => Math.abs(i.v)), 1);
                 return items.map((item, idx) => {
@@ -943,16 +943,12 @@ return (
             </div>
             <div style={{ display: "flex", gap: 2 }}>
               {(() => {
-                // Rebuild the same label list so it stays in sync with the
-                // dynamic bar array above. A mismatch would put the wrong
-                // label under the wrong bar.
                 const priorDebt = detail.financials[1]?.debt ?? detail.totalDebt;
                 const netDebtChg = detail.totalDebt - priorDebt;
                 const priorCash = detail.financials[1]?.cash ?? detail.cash;
-                const cashDelta = detail.cash - priorCash;
-                const otherPlug = cashDelta - (detail.fcf + netDebtChg);
+                const otherPlug = (detail.cash - priorCash) - detail.fcf - netDebtChg;
                 const labels = [
-                  "Opening\nCash", "Revenue", "OpEx &\nCOGS", "CapEx, Int.\n& Tax",
+                  "Opening\nCash", "Operating\nCash Flow", "Capital\nExpenditure",
                   ...(netDebtChg !== 0 ? [netDebtChg >= 0 ? "Debt\nProceeds" : "Debt\nRepayment"] : []),
                   ...(Math.abs(otherPlug) > 0.5 ? ["Divs, Buybacks\n& Other"] : []),
                   "Ending\nCash",
