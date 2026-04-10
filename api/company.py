@@ -74,7 +74,13 @@ CONCEPT_MAP = {
         "DepreciationDepletionAndAmortization",
     ],
     "sbc": ["ShareBasedCompensation", "AllocatedShareBasedCompensationExpense"],
-    "restructuring": ["RestructuringCharges", "RestructuringSettlementAndImpairmentProvisions"],
+    "restructuring": [
+        "RestructuringCharges",
+        # NOTE: RestructuringSettlementAndImpairmentProvisions intentionally
+        # EXCLUDED — it's an aggregate that bundles restructuring + settlements
+        # + impairments. Using it here would double-count with the separate
+        # goodwill_impairment and asset_impairment add-backs below.
+    ],
     # Granular EBITDA reconciliation add-backs (each pulled live from SEC XBRL)
     "goodwill_impairment": [
         "GoodwillImpairmentLoss",
@@ -863,6 +869,44 @@ def generate_company_profile(ticker):
     goodwill_impairment = abs(_val_or_latest(gw_imp_s))
     asset_impairment = abs(_val_or_latest(asset_imp_s))
     acquisition_costs = abs(_val_or_latest(acq_cost_s))
+
+    # ─── Deduplication guard: aggregate XBRL tags that subsume granular ones ──
+    # RestructuringSettlementAndImpairmentProvisions bundles restructuring +
+    # settlements + impairments.  If _get_field picked this aggregate tag for
+    # the "restructuring" field, goodwill_impairment and asset_impairment are
+    # already included — adding them separately would double-count.
+    # Similarly, GoodwillAndIntangibleAssetImpairment bundles goodwill +
+    # intangible impairment; if it was picked for "goodwill_impairment", the
+    # intangible portion overlaps with asset_impairment.
+    _restr_tag = restr_s[0].get("tag", "") if restr_s else ""
+    _gw_tag = gw_imp_s[0].get("tag", "") if gw_imp_s else ""
+
+    # Known aggregate tags whose values already subsume granular impairment tags.
+    _AGGREGATE_RESTR_TAGS = {
+        "RestructuringSettlementAndImpairmentProvisions",
+    }
+    _AGGREGATE_GW_TAGS = {
+        "GoodwillAndIntangibleAssetImpairment",
+    }
+
+    if _restr_tag in _AGGREGATE_RESTR_TAGS:
+        # The restructuring value already contains impairment charges —
+        # suppress the separate impairment add-backs to avoid double-counting.
+        goodwill_impairment = 0
+        asset_impairment = 0
+    elif restructuring and (goodwill_impairment + asset_impairment):
+        # Numerical sanity check: if the restructuring value is ≥ the sum of
+        # the granular impairment add-backs, the "restructuring" tag likely
+        # bundles them even if we didn't recognize the tag name above.  This
+        # guards against future aggregate tags the CONCEPT_MAP doesn't yet list.
+        if restructuring >= (goodwill_impairment + asset_impairment) * 0.95:
+            goodwill_impairment = 0
+            asset_impairment = 0
+
+    if _gw_tag in _AGGREGATE_GW_TAGS and goodwill_impairment:
+        # This tag covers goodwill AND intangible impairment — suppress the
+        # separate intangible/asset impairment add-back that would overlap.
+        asset_impairment = 0
     # Disposal: a *gain* (positive XBRL value) reduces EBITDA add-backs; a loss increases.
     gain_loss_disposal = _val_or_latest(gain_disp_s)
     # Other non-operating: typically signed; reverse for an EBITDA bridge.
@@ -1842,7 +1886,17 @@ def _enrich_with_narrative(profile, ticker):
             gaap_subtotal = gaap_base[-1]
             gaap_ebitda = gaap_subtotal.get("amount", gaap_ebitda)
 
-        # Build management add-back lines
+        # Build management add-back lines — FILTER OUT items that are
+        # already captured in the GAAP base (NI → Tax → Int → D&A → GAAP
+        # EBITDA). Management tables typically start from GAAP Net Income,
+        # so they include tax, interest, and D&A as explicit rows. Adding
+        # those on top of GAAP EBITDA would double-count them.
+        gaap_base_keywords = (
+            "income tax", "tax expense", "tax provision", "tax benefit",
+            "interest expense", "interest cost", "interest, net",
+            "depreciation", "amortization", "depreciation and amortization",
+            "d&a",
+        )
         mgmt_source = {
             "concept": None,
             "period_end": cache.get("report_date", ""),
@@ -1851,9 +1905,21 @@ def _enrich_with_narrative(profile, ticker):
         }
         mgmt_addbacks = []
         total_mgmt_adj = 0
+        skipped = []
         for item in recon:
             amt = item.get("amount") or 0
             if amt == 0:
+                continue
+            label_lower = (item.get("label") or "").lower().strip()
+            # Skip items already in the GAAP base
+            if any(kw in label_lower for kw in gaap_base_keywords):
+                skipped.append(item.get("label", "?"))
+                continue
+            # Also skip "net income" / "net loss" starting rows
+            if label_lower in ("net income", "net loss", "net income (loss)",
+                               "net income attributable to", "gaap net income",
+                               "gaap net loss"):
+                skipped.append(item.get("label", "?"))
                 continue
             total_mgmt_adj += amt
             mgmt_addbacks.append({
