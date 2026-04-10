@@ -1017,20 +1017,25 @@ def generate_company_profile(ticker):
 
     # ─── Non-operating reversal ──────────────────────────────────────────────
     # The bottom-up bridge (NI + Tax + Int + D&A) carries every non-operating
-    # income/expense item that hit net income (interest income, investment
-    # gains/losses, FX, "other" non-op). To surface a clean *operating* EBITDA
-    # we reverse the net non-op line back out. Preferred: the single aggregate
-    # us-gaap:NonoperatingIncomeExpense concept. Fallback: sum of the component
-    # concepts (interest income + other non-op + disposal gain/loss), used when
-    # the issuer's filing doesn't emit the aggregate tag.
+    # income/expense item that hit net income. To surface a clean *operating*
+    # EBITDA we reverse those out.
     #
-    # Sign convention: `nonop_total` is positive when non-op is net INCOME
-    # (inflating NI → inflating bottom-up EBITDA). Subtracting it neutralizes
-    # the effect. Negative nonop_total (net expense) gets added back.
+    # CRITICAL: per XBRL taxonomy (DQC_0181), NonoperatingIncomeExpense is
+    # the aggregate of ALL below-the-line items INCLUDING interest expense.
+    # Since we already add interest back explicitly (+int_exp), we must
+    # EXCLUDE it from the NonOp reversal to avoid double-counting.
+    # Formula: nonop_reversal = -(NonOp + InterestExpense)
+    #   where NonOp is negative when net non-op is an expense, and
+    #   InterestExpense is positive (magnitude). Adding IntExp back inside
+    #   the negation cancels the interest component out of the reversal.
+    #
+    # Sign convention: `nonop_total` is positive when non-op is net INCOME.
     if nonop_total_s and nonop_total:
-        nonop_reversal = -nonop_total
+        # Exclude interest from the aggregate to avoid double-count
+        nonop_excl_interest = nonop_total + int_exp  # add back the interest expense component
+        nonop_reversal = -nonop_excl_interest
         nonop_source = _walk_src(nonop_total_s, nonop_reversal)
-        nonop_method = "aggregate us-gaap:NonoperatingIncomeExpense"
+        nonop_method = "aggregate NonoperatingIncomeExpense excl. interest"
     else:
         # Fallback: reconstruct from components. Interest income and "other
         # non-op" are the common cases. Gains on disposal are non-op at some
@@ -1105,7 +1110,7 @@ def generate_company_profile(ticker):
     # reconciliation-difference line so the walk ALWAYS ties to the
     # subtotal (fixes BUG 10 — walk-vs-subtotal mismatch).
     gaap_ebitda_bottomup = net_income + tax_exp + int_exp + da + nonop_reversal
-    if oper_income is not None and da:
+    if oi_s and da:
         gaap_ebitda = oper_income + da
         if da != da_raw:
             gaap_ebitda_method = (
