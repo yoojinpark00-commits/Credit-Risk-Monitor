@@ -805,11 +805,25 @@ def generate_company_profile(ticker):
     def _annual_m(series, q_series=None, abs_val=False):
         """Return the value for ``series`` at ``target_end`` — LTM-adjusted
         when a quarterly series is provided and quarterly data extends past
-        the anchor FY. Zero when nothing aligns."""
-        if use_ltm:
+        the anchor FY.
+
+        Fallback: when the period-aligned lookup returns 0 but the series
+        contains data, use ``latest_val_m`` (the absolute latest entry).
+        This covers companies where a concept's freshest alias is still
+        stale relative to ``target_end`` — e.g. iHeart's only interest-
+        expense tag stops at FY2018 while revenue is at FY2024.  The walk
+        source annotation still reflects the actual period the data came
+        from so the user can see the mismatch.
+        """
+        if use_ltm and q_series:
             val, _ = _compute_ltm(series, q_series, target_end)
         else:
             val = _val_m_at(series, target_end)
+            # If the 400-day window rejected the entry but the series has
+            # data, fall back to the latest available value rather than
+            # leaving a hole in the EBITDA bridge.
+            if val == 0 and series:
+                val = latest_val_m(series)
         return abs(val) if abs_val else val
 
     # Latest annual values (in $M) — all aligned to the canonical period
@@ -821,17 +835,26 @@ def generate_company_profile(ticker):
     da = _annual_m(da_s, q_da)
     sbc = _annual_m(sbc_s, q_sbc)
     restructuring = _annual_m(restr_s, q_restr, abs_val=True)
-    # Granular reconciliation add-backs ($M, signed where meaningful)
-    goodwill_impairment = abs(_val_m_at(gw_imp_s, target_end))
-    asset_impairment = abs(_val_m_at(asset_imp_s, target_end))
-    acquisition_costs = abs(_val_m_at(acq_cost_s, target_end))
+    # Granular reconciliation add-backs ($M, signed where meaningful).
+    # Use _annual_m so stale-but-present values fall back to latest_val_m
+    # instead of silently becoming 0 (same window-drop fix as core items).
+    def _val_or_latest(series):
+        """Period-aligned value with latest-available fallback."""
+        v = _val_m_at(series, target_end)
+        if v == 0 and series:
+            v = latest_val_m(series)
+        return v
+
+    goodwill_impairment = abs(_val_or_latest(gw_imp_s))
+    asset_impairment = abs(_val_or_latest(asset_imp_s))
+    acquisition_costs = abs(_val_or_latest(acq_cost_s))
     # Disposal: a *gain* (positive XBRL value) reduces EBITDA add-backs; a loss increases.
-    gain_loss_disposal = _val_m_at(gain_disp_s, target_end)
+    gain_loss_disposal = _val_or_latest(gain_disp_s)
     # Other non-operating: typically signed; reverse for an EBITDA bridge.
-    other_nonop = _val_m_at(other_nonop_s, target_end)
+    other_nonop = _val_or_latest(other_nonop_s)
     # Net non-operating income/expense (signed) — LTM when quarterly extends the period
     nonop_total = _annual_m(nonop_total_s, q_nonop_total)
-    interest_income = _val_m_at(int_income_s, target_end)
+    interest_income = _val_or_latest(int_income_s)
     # Balance-sheet items: prefer point-in-time at target_end, fall back to
     # the absolute latest when no entry aligns to the canonical period.
     # NOTE: use a helper that distinguishes "0" (legitimate) from "not found".
@@ -871,22 +894,40 @@ def generate_company_profile(ticker):
     # period bridge. Each line records the exact XBRL tag and period end so
     # the UI can surface provenance on a per-line basis.
     def _walk_src(series, amount):
-        """Provenance block for a walk line at the canonical target period.
+        """Provenance block for a walk line.
 
-        When the concept has no entry at ``target_end`` (within the fiscal
-        window), returns a neutral marker — the caller should still render
-        the line using the amount that was aligned via ``_val_m_at`` /
-        ``_compute_ltm``, which will be 0 in that case, so the line gets
-        filtered out below.
+        Tries to find the entry at ``target_end`` first (exact or within the
+        400-day fiscal window).  When no entry exists at that period — but
+        the series is non-empty (stale data that was used via the
+        ``latest_val_m`` fallback in ``_annual_m``) — references the actual
+        latest entry so the UI can show the real source period (e.g.
+        "period ending 2018-12-31") instead of a misleading "No XBRL value"
+        placeholder.
         """
+        # Preferred: entry aligned to the canonical target period
         src = _xbrl_src_at(series, target_end)
         if src is not None:
-            # Annotate whether this concept was used as-is (FYE) or rolled up
-            # to an LTM period via quarterly YTD arithmetic.
             src = dict(src)
             src["period_basis"] = period_type
             src["period_label"] = period_label
             return src
+        # Fallback: the latest entry in the series (used when _annual_m fell
+        # back to latest_val_m because the 400-day window rejected it).
+        if series:
+            e = series[0]
+            actual_end = e.get("end", "")
+            return {
+                "concept": f"us-gaap:{e.get('tag', '?')}",
+                "fy": e.get("fy"),
+                "period_end": actual_end,
+                "period_basis": "FYE",
+                "period_label": f"FYE {_fmt_period_mdy(actual_end)}" if actual_end else "FYE ?",
+                "label": (
+                    f"SEC EDGAR XBRL — us-gaap:{e.get('tag','?')} "
+                    f"(period ending {actual_end}) "
+                    f"[stale: outside {period_label} window]"
+                ),
+            }
         return {
             "concept": None,
             "fy": None,
