@@ -1016,46 +1016,37 @@ def generate_company_profile(ticker):
         ebitda_walk.append({"label": "+ Depreciation & Amortization", "amount": da, "isSubtotal": False, "category": "da", "source": _walk_src(da_s, da)})
 
     # ─── Non-operating reversal ──────────────────────────────────────────────
-    # The bottom-up bridge (NI + Tax + Int + D&A) carries every non-operating
-    # income/expense item that hit net income. To surface a clean *operating*
-    # EBITDA we reverse those out.
+    # The bottom-up bridge (NI + Tax + Int + D&A) already adds back interest
+    # explicitly. To arrive at operating EBITDA we need to reverse out the
+    # REMAINING non-operating items (investment income, FX, disposal gains,
+    # "other" non-op) WITHOUT touching interest again.
     #
-    # CRITICAL: per XBRL taxonomy (DQC_0181), NonoperatingIncomeExpense is
+    # Per XBRL taxonomy (DQC_0181), NonoperatingIncomeExpense is defined as
     # the aggregate of ALL below-the-line items INCLUDING interest expense.
-    # Since we already add interest back explicitly (+int_exp), we must
-    # EXCLUDE it from the NonOp reversal to avoid double-counting.
-    # Formula: nonop_reversal = -(NonOp + InterestExpense)
-    #   where NonOp is negative when net non-op is an expense, and
-    #   InterestExpense is positive (magnitude). Adding IntExp back inside
-    #   the negation cancels the interest component out of the reversal.
+    # But individual filers are inconsistent: some include interest in the
+    # aggregate, others don't. Blindly adjusting the aggregate creates
+    # either double-counting or over-correction depending on the filer.
     #
-    # Sign convention: `nonop_total` is positive when non-op is net INCOME.
-    if nonop_total_s and nonop_total:
-        # Exclude interest from the aggregate to avoid double-count
-        nonop_excl_interest = nonop_total + int_exp  # add back the interest expense component
-        nonop_reversal = -nonop_excl_interest
-        nonop_source = _walk_src(nonop_total_s, nonop_reversal)
-        nonop_method = "aggregate NonoperatingIncomeExpense excl. interest"
-    else:
-        # Fallback: reconstruct from components. Interest income and "other
-        # non-op" are the common cases. Gains on disposal are non-op at some
-        # issuers; include when NonoperatingIncomeExpense is absent.
-        nonop_fallback = interest_income + other_nonop + gain_loss_disposal
-        nonop_reversal = -nonop_fallback
-        nonop_source = {
-            "label": (
-                f"Fallback sum at {period_label}: "
-                f"InvestmentIncomeInterest ({interest_income}M) "
-                f"+ OtherNonoperatingIncomeExpense ({other_nonop}M) "
-                f"+ GainLossOnDispositionOfAssets ({gain_loss_disposal}M)"
-            ),
-            "concept": "us-gaap:(InvestmentIncomeInterest + OtherNonoperatingIncomeExpense + GainLossOnDispositionOfAssets)",
-            "fy": None,
-            "period_end": target_end,
-            "period_basis": period_type,
-            "period_label": period_label,
-        }
-        nonop_method = "component sum (aggregate concept unavailable)"
+    # Safest approach: ALWAYS use the component-sum path (interest income +
+    # other non-op + disposal), which by definition excludes interest
+    # expense. This is reliable across all filer conventions. The aggregate
+    # NonoperatingIncomeExpense tag is NOT used.
+    nonop_fallback = interest_income + other_nonop + gain_loss_disposal
+    nonop_reversal = -nonop_fallback
+    nonop_source = {
+        "label": (
+            f"Non-op reversal at {period_label} (excl. interest): "
+            f"InvestmentIncomeInterest ({interest_income}M) "
+            f"+ OtherNonoperatingIncomeExpense ({other_nonop}M) "
+            f"+ GainLossOnDispositionOfAssets ({gain_loss_disposal}M)"
+        ),
+        "concept": "us-gaap:(InvestmentIncomeInterest + OtherNonoperatingIncomeExpense + GainLossOnDispositionOfAssets)",
+        "fy": None,
+        "period_end": target_end,
+        "period_basis": period_type,
+        "period_label": period_label,
+    }
+    nonop_method = "component sum (interest-safe)"
 
     if nonop_reversal:
         # Label reflects direction: a reversal of net non-op *income* shows
